@@ -1,58 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
-  <title>LedgerLight hero banner · light</title>
+  <title>LedgerLight Banner · Light</title>
   <defs>
-    <linearGradient id="bannerLightBg" x1="12%" y1="6%" x2="88%" y2="92%">
+    <linearGradient id="bannerLightBackground" x1="10%" y1="4%" x2="90%" y2="94%">
       <stop offset="0%" stop-color="#FBF9F4"/>
-      <stop offset="55%" stop-color="#F3E5D4"/>
-      <stop offset="100%" stop-color="#F7EDDE"/>
+      <stop offset="55%" stop-color="#F4E6D9"/>
+      <stop offset="100%" stop-color="#F8F0E5"/>
     </linearGradient>
-    <linearGradient id="bannerLightTeal" x1="0%" y1="24%" x2="100%" y2="76%">
-      <stop offset="0%" stop-color="#64C8C3"/>
-      <stop offset="100%" stop-color="#1F6E8E"/>
+    <linearGradient id="bannerLightCoin" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#7FE0D4"/>
+      <stop offset="50%" stop-color="#57C5B6"/>
+      <stop offset="100%" stop-color="#2D8AA2"/>
     </linearGradient>
-    <linearGradient id="bannerLightGold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F7E6C2"/>
-      <stop offset="55%" stop-color="#D6A85B"/>
-      <stop offset="100%" stop-color="#B88728"/>
-    </linearGradient>
-    <linearGradient id="bannerLightBeam" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="bannerLightHighlight" x1="35%" y1="0%" x2="85%" y2="80%">
       <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="60%" stop-color="#F7E6C2" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#F7E6C2" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="bannerLightGlow" cx="40%" cy="34%" r="72%">
-      <stop offset="0%" stop-color="#FCEFD0" stop-opacity="0.75"/>
-      <stop offset="80%" stop-color="#FCEFD0" stop-opacity="0.1"/>
-      <stop offset="100%" stop-color="#FCEFD0" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="lineNavy" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#173A6C" stop-opacity="0"/>
-      <stop offset="40%" stop-color="#1F4A88" stop-opacity="0.55"/>
-      <stop offset="60%" stop-color="#1F4A88" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#173A6C" stop-opacity="0"/>
+      <stop offset="40%" stop-color="#F1FBF8" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#F1FBF8" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <rect width="1600" height="900" fill="url(#bannerLightBg)"/>
-  <g opacity="0.45">
-    <path d="M-40 640c220-160 470-200 720-120s460 220 720 240" fill="none" stroke="url(#lineNavy)" stroke-width="8"/>
-    <path d="M-60 500c200-140 440-150 680-60s480 220 760 240" fill="none" stroke="url(#lineNavy)" stroke-width="4" opacity="0.65"/>
+  <rect width="1600" height="900" fill="url(#bannerLightBackground)"/>
+  <g opacity="0.35">
+    <path d="M0 620c240-160 500-200 760-120s520 240 840 260" fill="none" stroke="rgba(44,88,110,0.25)" stroke-width="6"/>
+    <path d="M0 520c220-140 460-150 710-60s540 240 890 260" fill="none" stroke="rgba(44,88,110,0.12)" stroke-width="3"/>
   </g>
-  <g transform="translate(180 160)">
-    <circle cx="190" cy="190" r="190" fill="url(#bannerLightGlow)" opacity="0.55"/>
-    <circle cx="190" cy="190" r="188" fill="#FFFFFF" opacity="0.95"/>
-    <circle cx="190" cy="190" r="168" fill="none" stroke="url(#bannerLightTeal)" stroke-width="28"/>
-    <circle cx="190" cy="190" r="118" fill="url(#bannerLightGold)"/>
-    <rect x="176" y="70" width="28" height="240" rx="14" fill="#0B1C2C"/>
-    <rect x="180" y="84" width="20" height="212" rx="10" fill="url(#bannerLightBeam)"/>
-    <path d="M190 108c44 0 80 36 80 80h-32c0-27-21-48-48-48s-48 21-48 48 21 48 48 48c44 0 80 36 80 80s-36 80-80 80-80-36-80-80h32c0 27 21 48 48 48s48-21 48-48-21-48-48-48c-44 0-80-36-80-80s36-80 80-80z" fill="#0B1C2C" opacity="0.7"/>
+  <g transform="translate(280 236)">
+    <circle cx="160" cy="160" r="160" fill="#FFFFFF" opacity="0.95"/>
+    <circle cx="160" cy="160" r="160" fill="url(#bannerLightCoin)" opacity="0.9"/>
+    <path d="M160 32c71 0 128 57 128 128s-57 128-128 128S32 231 32 160 89 32 160 32z" fill="url(#bannerLightCoin)"/>
+    <path d="M160 32c71 0 128 57 128 128 0 45-20 85-54 110V32z" fill="#1C3F58" opacity="0.23"/>
+    <path d="M160 56c58 0 104 46 104 104s-46 104-104 104-104-46-104-104 46-104 104-104z" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="18"/>
+    <path d="M180 82h12c7 0 11 4 11 11v68c28 6 50 26 50 58 0 34-24 58-60 64v16c0 7-4 11-11 11h-24c-7 0-11-4-11-11v-16c-24-4-42-14-56-30-4-5-3-12 1-16l16-14c4-3 10-3 13 1 10 11 22 18 38 18 18 0 31-10 31-27s-12-27-33-27c-6 0-11-4-11-11v-32c-16-4-30-12-42-24-4-4-4-10-1-15l14-18c4-4 10-5 14-1 9 10 18 16 29 18v-62c0-7 4-11 11-11z" fill="#FFFFFF"/>
+    <path d="M150 64c32-8 66-6 102 10 5 3 7 9 4 14-20 34-52 58-100 72-6 2-12-1-14-7l-6-20c-2-6 1-12 7-14 28-10 50-24 64-42-15-5-31-7-48-4-6 1-11-2-12-8l-4-18c-1-7 3-13 7-14z" fill="url(#bannerLightHighlight)" opacity="0.6"/>
   </g>
-  <g transform="translate(620 250)">
-    <text x="0" y="120" font-family="'Inter','Poppins','Segoe UI',sans-serif" font-size="140" font-weight="600" letter-spacing="0.06em" fill="#1A3656">Ledger<tspan fill="#B88728">Light</tspan></text>
-    <rect x="6" y="148" width="680" height="8" rx="4" fill="rgba(182,141,45,0.32)"/>
-    <text x="6" y="214" font-family="'Inter','Poppins','Segoe UI',sans-serif" font-size="42" letter-spacing="0.48em" fill="#3F597F" style="text-transform:uppercase;">Illuminate Your Financial Operations</text>
-    <text x="6" y="276" font-family="'Inter','Segoe UI',sans-serif" font-size="30" fill="#4E6483" opacity="0.9">
-      A self-hosted ledger hub blending precision accounting with luminous, modern insight.
+  <g transform="translate(610 300)">
+    <text x="0" y="120" font-family="'Inter','SF Pro Display','Poppins',sans-serif" font-size="140" font-weight="600" letter-spacing="0.06em" fill="#1A3656">Ledger<tspan fill="#1D7E9B">Light</tspan></text>
+    <rect x="8" y="148" width="720" height="10" rx="5" fill="rgba(29,126,155,0.28)"/>
+    <text x="8" y="214" font-family="'Inter','SF Pro Display','Poppins',sans-serif" font-size="40" letter-spacing="0.42em" fill="#425C78" style="text-transform:uppercase;">Minimal Insight For Modern Finance</text>
+    <text x="8" y="272" font-family="'Inter','Segoe UI',sans-serif" font-size="28" fill="#556A84" opacity="0.9">
+      A self-hosted ledger platform with luminous dashboards and trustworthy controls.
     </text>
   </g>
 </svg>
