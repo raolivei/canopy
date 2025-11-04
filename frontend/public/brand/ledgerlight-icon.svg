@@ -2,37 +2,37 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title>LedgerLight icon</title>
   <defs>
-    <linearGradient id="icon-bg" x1="18%" y1="8%" x2="86%" y2="88%">
+    <linearGradient id="bg" x1="14%" y1="8%" x2="86%" y2="88%">
       <stop offset="0%" stop-color="#0B1C2C"/>
       <stop offset="60%" stop-color="#102B52"/>
-      <stop offset="100%" stop-color="#071528"/>
+      <stop offset="100%" stop-color="#050E1C"/>
     </linearGradient>
-    <linearGradient id="icon-ring" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F8E6BE"/>
-      <stop offset="45%" stop-color="#E3BC63"/>
+    <linearGradient id="tealRing" x1="0%" y1="20%" x2="100%" y2="80%">
+      <stop offset="0%" stop-color="#7FD1C9"/>
+      <stop offset="100%" stop-color="#2B7C94"/>
+    </linearGradient>
+    <linearGradient id="goldCoin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7E6C2"/>
+      <stop offset="50%" stop-color="#D6A85B"/>
       <stop offset="100%" stop-color="#B88728"/>
     </linearGradient>
-    <linearGradient id="icon-accent" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7FD1C9"/>
-      <stop offset="100%" stop-color="#3B819F"/>
+    <linearGradient id="lightBeam" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#F7E6C2" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#F7E6C2" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="icon-beam" x1="0%" y1="30%" x2="100%" y2="70%">
-      <stop offset="0%" stop-color="#F8E4B3" stop-opacity="0.9"/>
-      <stop offset="60%" stop-color="#E6C06A" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#D39B41" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="icon-glow" cx="28%" cy="20%" r="65%">
-      <stop offset="0%" stop-color="#FCEAAB" stop-opacity="0.75"/>
-      <stop offset="100%" stop-color="#FCEAAB" stop-opacity="0"/>
+    <radialGradient id="glow" cx="50%" cy="36%" r="62%">
+      <stop offset="0%" stop-color="#FCEFD0" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FCEFD0" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <circle cx="256" cy="256" r="230" fill="url(#icon-bg)"/>
-  <path d="M256 60c107.5 0 196 88.5 196 196 0 9.5-0.7 18.8-2.1 27.9" fill="none" stroke="url(#icon-ring)" stroke-width="22" stroke-linecap="round"/>
-  <path d="M442.8 320.2C417.8 402.5 343 460 256 460c-75.5 0-141.4-43.3-173.5-106.7" fill="none" stroke="url(#icon-ring)" stroke-width="22" stroke-linecap="round"/>
-  <circle cx="176" cy="152" r="108" fill="url(#icon-glow)" opacity="0.7"/>
-  <path d="M188 140c0-11 9-20 20-20h64c11 0 20 9 20 20v180c0 11-9 20-20 20h-64c-11 0-20-9-20-20V140z" fill="url(#icon-accent)"/>
-  <path d="M184 328c0-8 6-14 14-14h138c6 0 11 5 11 11 0 31-25 56-56 56h-95c-8 0-14-6-14-14v-39z" fill="#040F21" opacity="0.6"/>
-  <path d="M188 116c0-6 5-11 11-11h166c6 0 11 5 11 11v20c0 6-5 11-11 11H210c-8 0-15 5-18 12l-14 32c-1 4-7 3-7-1v-74z" fill="#D19A3B" opacity="0.85"/>
-  <path d="M198 206c0-5 4-9 9-9h60c5 0 9 4 9 9v106c0 5-4 9-9 9h-60c-5 0-9-4-9-9V206z" fill="url(#icon-beam)"/>
-  <circle cx="332" cy="156" r="28" fill="#F8E6BE" opacity="0.8"/>
+  <circle cx="256" cy="256" r="232" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="208" fill="none" stroke="url(#tealRing)" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="180" fill="url(#glow)" opacity="0.55"/>
+  <path d="M256 124c73 0 132 59 132 132s-59 132-132 132-132-59-132-132 59-132 132-132z" fill="#071223"/>
+  <path d="M256 140c64 0 116 52 116 116s-52 116-116 116-116-52-116-116 52-116 116-116z" fill="url(#tealRing)"/>
+  <path d="M256 164c51 0 92 41 92 92s-41 92-92 92-92-41-92-92 41-92 92-92z" fill="url(#goldCoin)"/>
+  <path d="M240 164h32c6 0 11 5 11 11v162c0 6-5 11-11 11h-32c-6 0-11-5-11-11V175c0-6 5-11 11-11z" fill="#0B1C2C"/>
+  <path d="M246 176h20c6 0 10 4 10 10v138c0 6-4 10-10 10h-20c-6 0-10-4-10-10V186c0-6 4-10 10-10z" fill="url(#lightBeam)"/>
+  <path d="M256 204c18 0 32 14 32 32h-20c0-7-5-12-12-12s-12 5-12 12 5 12 12 12c18 0 32 14 32 32s-14 32-32 32-32-14-32-32h20c0 7 5 12 12 12s12-5 12-12-5-12-12-12c-18 0-32-14-32-32s14-32 32-32z" fill="#0B1C2C" opacity="0.75"/>
 </svg>

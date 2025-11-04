@@ -11,6 +11,7 @@ This folder contains the bespoke brand visuals generated for LedgerLight. Assets
 - `ledgerlight-banner-dark.svg` / `.png` – 1600×900 hero banner with dark treatment.
 - `ledgerlight-banner-light.svg` / `.png` – 1600×900 hero banner for light surfaces.
 - `ledgerlight-banner-dark-og.png`, `ledgerlight-banner-light-og.png` – 1200×630 crops for social/Open Graph previews.
+- `ledgerlight-cover-dark.svg` – 1800×1200 (3:2) presentation cover / slide background.
 
 ## Palette
 
@@ -25,3 +26,4 @@ This folder contains the bespoke brand visuals generated for LedgerLight. Assets
 - The banners are laid out for hero sections; use the `*-og.png` variants when configuring social cards (OG/Twitter).
 - Text in the logos uses `Poppins` (semibold). If that font is unavailable, system sans-serif fallbacks maintain the intended weight.
 - Feel free to recolour the text layer in the SVGs when integrating with themes, keeping the gold for emphasis to preserve the finance/luxury impression.
+- The 3:2 cover asset can anchor decks or product overviews; export to PNG at 2700×1800 if you need print-ready resolution.
