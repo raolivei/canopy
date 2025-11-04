@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-light
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger-light
+  template:
+    metadata:
+      labels:
+        app: ledger-light
+    spec:
+      containers:
+      - name: ledger-light
+        image: ghcr.io/raolivei/ledger-light:latest
+        ports:
+        - containerPort: 80
