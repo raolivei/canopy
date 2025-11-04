@@ -31,15 +31,19 @@ Most banks don't offer APIs. CSV/OFX files are universal formats that allow user
 Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.  
 
 ## Core Features (MVP - Implemented)  
-- ✅ Transaction tracking with categories and types (income, expense, transfer)
+- ✅ Transaction tracking with categories and types (income, expense, transfer, buy, sell)
 - ✅ Multi-currency FX conversions with display currency toggle
 - ✅ Modern Monarch Money-inspired UI with dark mode support
 - ✅ Dashboard with charts and statistics (cash flow, spending by category)
 - ✅ Transaction CRUD API endpoints
 - ✅ Currency conversion API endpoints
-- 📈 Investment tracking (stocks, ETFs, crypto, cash) - Planned
+- ✅ CSV import with smart format detection (Monarch Money, Chase, Bank of America, etc.)
+- ✅ Duplicate detection and validation
+- ✅ Investment transaction tracking with ticker symbols
+- ✅ Rich transaction data (merchant, notes, tags, original statement)
+- 📈 Investment portfolio tracking (stocks, ETFs, crypto, cash) - Planned
 - 💰 Budgeting with categories and goals - Planned
-- 🧾 CSV/OFX import & reconciliation - Planned
+- 🧾 OFX import - Planned
 - 📤 Local backup to S3-compatible storage (MinIO/B2) - Planned
 - 🔒 Encrypted secrets (no external vault) - Planned
 
@@ -119,8 +123,35 @@ ledgerlight/
  └── README.md  
 ```
 
+## CSV Import
+
+LedgerLight now supports importing transactions from CSV files with smart format detection:
+
+### Supported Formats
+- **Monarch Money** - Full support including merchant names, categories, tags, and investment transactions
+- **Chase Bank** - Standard CSV export format
+- **Bank of America** - Checking and credit card statements
+- **Wells Fargo** - Transaction history exports
+- **Capital One** - With debit/credit columns
+- **American Express** - Card statements
+- **TD Bank, RBC, Nubank** - And many more
+- **Generic CSV** - Custom field mapping for any format
+
+### Key Features
+- 🎯 Automatic format detection
+- 🔍 Duplicate transaction detection
+- 💰 Multi-currency support
+- 📊 Import preview before committing
+- 🏷️ Rich data support (merchant, tags, notes, original statement)
+- 📈 Investment transaction tracking (Buy/Sell with ticker symbols)
+- 📝 Import history tracking
+
+See **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** for detailed instructions and examples.
+
 ## Documentation
 
 - **[CHANGELOG.md](./CHANGELOG.md)** - Version history and release notes
 - **[MASTER_PROMPT.md](./MASTER_PROMPT.md)** - Complete application recreation guide
+- **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** - CSV import documentation and format guide
 - **[test_app.sh](./test_app.sh)** - Test script for verifying functionality
+- **[examples/](./examples/)** - Sample CSV files for different formats

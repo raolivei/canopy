@@ -52,6 +52,11 @@ async def create_transaction(transaction: TransactionCreate):
         category=transaction.category,
         date=transaction.date or datetime.now(),
         account=transaction.account,
+        merchant=transaction.merchant,
+        original_statement=transaction.original_statement,
+        notes=transaction.notes,
+        tags=transaction.tags,
+        ticker=transaction.ticker,
     )
     next_id += 1
     transactions_db.append(new_transaction)

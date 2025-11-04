@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Home, DollarSign, TrendingUp, Settings, Wallet } from "lucide-react";
+import { Home, DollarSign, TrendingUp, Settings, Wallet, Upload } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Import", href: "/import", icon: Upload },
   { name: "Portfolio", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Settings", href: "/settings", icon: Settings },

@@ -8,7 +8,7 @@ from backend.app.config import get_settings
 
 # Import transaction and currency routers if they exist
 try:
-    from backend.api import transactions, currency
+    from backend.api import transactions, currency, csv_import
     HAS_TRANSACTION_ROUTERS = True
 except ImportError:
     HAS_TRANSACTION_ROUTERS = False
@@ -40,6 +40,7 @@ def create_app() -> FastAPI:
     if HAS_TRANSACTION_ROUTERS:
         app.include_router(transactions.router)
         app.include_router(currency.router)
+        app.include_router(csv_import.router)
     
     return app
 
