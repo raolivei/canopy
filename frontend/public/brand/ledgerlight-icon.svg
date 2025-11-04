@@ -2,42 +2,37 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title>LedgerLight icon</title>
   <defs>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#070F1F"/>
-      <stop offset="100%" stop-color="#0C2650"/>
+    <linearGradient id="icon-bg" x1="18%" y1="8%" x2="86%" y2="88%">
+      <stop offset="0%" stop-color="#0B1C2C"/>
+      <stop offset="60%" stop-color="#102B52"/>
+      <stop offset="100%" stop-color="#071528"/>
     </linearGradient>
-    <linearGradient id="ringGradient" x1="30%" y1="0%" x2="70%" y2="100%">
-      <stop offset="0%" stop-color="#F8DFA5"/>
-      <stop offset="100%" stop-color="#D7A13A"/>
+    <linearGradient id="icon-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8E6BE"/>
+      <stop offset="45%" stop-color="#E3BC63"/>
+      <stop offset="100%" stop-color="#B88728"/>
     </linearGradient>
-    <linearGradient id="ledgerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F4CF72"/>
-      <stop offset="100%" stop-color="#D59B2F"/>
+    <linearGradient id="icon-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7FD1C9"/>
+      <stop offset="100%" stop-color="#3B819F"/>
     </linearGradient>
-    <linearGradient id="pageHighlight" x1="20%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#F8E3B2" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#F4CF72" stop-opacity="0.2"/>
+    <linearGradient id="icon-beam" x1="0%" y1="30%" x2="100%" y2="70%">
+      <stop offset="0%" stop-color="#F8E4B3" stop-opacity="0.9"/>
+      <stop offset="60%" stop-color="#E6C06A" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#D39B41" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="beamGlow" cx="68%" cy="32%" r="65%">
-      <stop offset="0%" stop-color="#F8EFD3" stop-opacity="0.9"/>
-      <stop offset="70%" stop-color="#F3C866" stop-opacity="0.1"/>
-      <stop offset="100%" stop-color="#F3C866" stop-opacity="0"/>
+    <radialGradient id="icon-glow" cx="28%" cy="20%" r="65%">
+      <stop offset="0%" stop-color="#FCEAAB" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#FCEAAB" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="beamCore" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F9E8C5" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#E7B85A" stop-opacity="0"/>
-    </linearGradient>
   </defs>
-  <circle cx="256" cy="256" r="240" fill="url(#bgGradient)"/>
-  <circle cx="256" cy="256" r="216" fill="none" stroke="url(#ringGradient)" stroke-width="12"/>
-  <g transform="translate(140 140)">
-    <path d="M54 38h96c18 0 34 16 34 34v147c0 27-22 49-49 49H29c-16 0-29-13-29-29V73c0-19 15-35 34-35l20 0z" fill="url(#ledgerGradient)"/>
-    <path d="M118 38h80c18 0 34 16 34 34v109c0 19-9 37-25 48l-62 43c-13 9-30 4-37-10-4-8-2-18 5-24l33-29c9-8 14-19 14-31V72c0-19-15-34-34-34h-8z" fill="url(#pageHighlight)"/>
-    <path d="M129 28c-8 0-15-6-15-15s7-15 15-15h67c5 0 10 2 13 6l18 24c7 9 4 21-6 26-3 1-5 2-8 2H129z" fill="url(#ringGradient)" opacity="0.75"/>
-    <path d="M238 20c4-3 10-2 12 2 15 28 22 60 22 92 0 47-16 92-47 129-10 12-21 23-33 33-4 3-10 2-12-2-3-4-2-10 2-13 11-9 21-19 30-30 27-33 41-73 41-117 0-29-7-57-20-82-2-4-1-10 3-12z" fill="url(#beamCore)"/>
-    <circle cx="216" cy="66" r="80" fill="url(#beamGlow)" opacity="0.7"/>
-    <rect x="32" y="70" width="22" height="180" rx="10" ry="10" fill="#FAECCF" opacity="0.55"/>
-    <rect x="64" y="70" width="18" height="180" rx="8" ry="8" fill="#FDF5E1" opacity="0.35"/>
-    <path d="M0 80c0-16 13-29 29-29h137c4 0 7 3 7 7s-3 7-7 7H33c-8 0-15 7-15 15v198c0 4-3 7-7 7s-7-3-7-7V80z" fill="#1C2E50" opacity="0.3"/>
-  </g>
+  <circle cx="256" cy="256" r="230" fill="url(#icon-bg)"/>
+  <path d="M256 60c107.5 0 196 88.5 196 196 0 9.5-0.7 18.8-2.1 27.9" fill="none" stroke="url(#icon-ring)" stroke-width="22" stroke-linecap="round"/>
+  <path d="M442.8 320.2C417.8 402.5 343 460 256 460c-75.5 0-141.4-43.3-173.5-106.7" fill="none" stroke="url(#icon-ring)" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="176" cy="152" r="108" fill="url(#icon-glow)" opacity="0.7"/>
+  <path d="M188 140c0-11 9-20 20-20h64c11 0 20 9 20 20v180c0 11-9 20-20 20h-64c-11 0-20-9-20-20V140z" fill="url(#icon-accent)"/>
+  <path d="M184 328c0-8 6-14 14-14h138c6 0 11 5 11 11 0 31-25 56-56 56h-95c-8 0-14-6-14-14v-39z" fill="#040F21" opacity="0.6"/>
+  <path d="M188 116c0-6 5-11 11-11h166c6 0 11 5 11 11v20c0 6-5 11-11 11H210c-8 0-15 5-18 12l-14 32c-1 4-7 3-7-1v-74z" fill="#D19A3B" opacity="0.85"/>
+  <path d="M198 206c0-5 4-9 9-9h60c5 0 9 4 9 9v106c0 5-4 9-9 9h-60c-5 0-9-4-9-9V206z" fill="url(#icon-beam)"/>
+  <circle cx="332" cy="156" r="28" fill="#F8E6BE" opacity="0.8"/>
 </svg>

@@ -13,9 +13,10 @@ This folder contains the bespoke brand visuals generated for LedgerLight. Assets
 
 ## Palette
 
-- Navy core: `#0C2650`, `#10244A`, `#08122B`
-- Warm gold: `#F4CF72`, `#D79D33`, `#B57F1F`
-- Accent neutrals: `#F8EED2`, `#FBF8F2`
+- Navy core: `#0B1C2C`, `#102B52`, `#071223`
+- Warm gold: `#D6A85B`, `#B88728`, `#F0DCA8`
+- Teal accent: `#7FD1C9`, `#31799B`
+- Soft neutrals: `#FDFBF6`, `#F2E6D7`
 
 ## Usage notes
 
