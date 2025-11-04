@@ -1,3 +1,6 @@
+# Flattened manifest generated from files under k8s/ for quick deployments.
+# Edit the files in k8s/ and re-sync this manifest as needed.
+
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -12,6 +15,17 @@ data:
   DEBUG: "false"
   ENVIRONMENT: production
   ALLOWED_HOSTS: ledgerlight.local
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ledgerlight-secrets
+  namespace: ledgerlight
+type: Opaque
+stringData:
+  database_url: postgresql+psycopg://ledgerlight:ledgerlight@postgres/ledgerlight
+  redis_url: redis://redis:6379/0
+  secret_key: changeme-super-secret
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -155,4 +169,58 @@ spec:
             limits:
               cpu: 150m
               memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledgerlight-api
+  namespace: ledgerlight
+spec:
+  selector:
+    app.kubernetes.io/name: ledgerlight-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledgerlight-frontend
+  namespace: ledgerlight
+spec:
+  selector:
+    app.kubernetes.io/name: ledgerlight-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ledgerlight
+  namespace: ledgerlight
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ledgerlight.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: ledgerlight-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ledgerlight-frontend
+                port:
+                  name: http
 

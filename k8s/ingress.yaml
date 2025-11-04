@@ -1,18 +1,28 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ledger-light
+  name: ledgerlight
+  namespace: ledgerlight
   annotations:
-    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
 spec:
+  ingressClassName: nginx
   rules:
-    - host: ledger-light.local
+    - host: ledgerlight.local
       http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: ledgerlight-api
+                port:
+                  name: http
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: ledger-light
+                name: ledgerlight-frontend
                 port:
-                  number: 80
+                  name: http
+
