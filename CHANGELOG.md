@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.2-dev] - 2025-11-04 (Pre-release)
 
 ### Fixed
+
 - Fixed currency conversion endpoint returning 500 error
   - **Why:** Pydantic v2 deprecated `dict()` method in favor of `model_dump()`. The error occurred because code was using deprecated API.
   - **Solution:** Updated to use `model_dump()` with fallback to `dict()` for backward compatibility.
@@ -13,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Currency conversion query parameter now works correctly (`/v1/transactions/?currency=CAD`)
 
 ### Added
+
 - Comprehensive architecture documentation (ARCHITECTURE.md)
   - **Why:** Document design decisions and rationale to help future developers understand the "why" behind technical choices
   - **Contents:** Architecture overview, technology choices, API design, frontend architecture, data management, security considerations, performance optimizations
@@ -20,7 +22,7 @@ All notable changes to this project will be documented in this file.
   - **Why:** Understanding rationale helps maintainability and prevents regression of design decisions
   - **Updated:** MASTER_PROMPT.md, README.md, CHANGELOG.md with design rationale sections
 
-## [0.2.1] - 2025-11-04
+## [0.2.1-dev] - 2025-11-04 (Pre-release)
 
 ### Fixed
 
@@ -108,7 +110,7 @@ All notable changes to this project will be documented in this file.
   - Added `isDarkMode` state tracking for client-side dark mode detection
   - Prevented hydration mismatches in dark mode toggle component
 
-## [0.1.0] - 2025-11-03
+## [0.1.0-dev] - 2025-11-03 (Pre-release)
 
 ### Added
 
