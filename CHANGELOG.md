@@ -2,10 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2025-11-04
+
+### Fixed
+- Fixed currency conversion endpoint returning 500 error
+- Updated to use `model_dump()` for Pydantic v2 compatibility in transaction currency conversion
+- Added fallback to `dict()` for Pydantic v1 support
+- Currency conversion query parameter now works correctly (`/v1/transactions/?currency=CAD`)
+
+## [0.2.1] - 2025-11-04
+
+### Fixed
+- Integrated transaction and currency routers into server.py
+- Added CORS middleware for frontend-backend communication
+- Added missing transaction model to dev branch
+- Verified all API endpoints working correctly
+- Stable application state with full functionality
+
 ## [Unreleased]
 
 ### Added
+
 - **Backend API Setup** (`feature/backend-api-setup`):
+
   - FastAPI application with CORS middleware configuration
   - Transaction models (Transaction, TransactionCreate, TransactionType enum)
   - Transaction CRUD API endpoints (GET all, GET by ID, POST, DELETE)
@@ -14,6 +33,7 @@ All notable changes to this project will be documented in this file.
   - In-memory transaction storage (ready for database migration)
 
 - **UI Redesign** (`feature/ui-redesign-monarch-style`):
+
   - Modern Monarch Money-inspired UI design
   - Sidebar navigation component with active state highlighting
   - Reusable StatCard component for dashboard metrics
@@ -28,6 +48,7 @@ All notable changes to this project will be documented in this file.
   - Responsive grid layouts and modern card designs
 
 - **Currency Support** (`feature/currency-support`):
+
   - Multi-currency support (USD, CAD, BRL, EUR, GBP)
   - Currency API endpoints (`/v1/currency/supported`, `/v1/currency/rates`, `/v1/currency/convert`)
   - Currency conversion logic with mock exchange rates
@@ -38,6 +59,7 @@ All notable changes to this project will be documented in this file.
   - Show both original and converted amounts when currencies differ
 
 - **Dark Mode** (`feature/dark-mode`):
+
   - DarkModeToggle component with localStorage persistence
   - System preference detection for automatic dark mode
   - Dark mode styles throughout all UI components
@@ -46,6 +68,7 @@ All notable changes to this project will be documented in this file.
   - SSR-safe implementation to prevent hydration mismatches
 
 - **Placeholder Pages** (`feature/placeholder-pages`):
+
   - Portfolio page with stat cards for investment metrics
   - Accounts page with account cards (Checking, Credit Card, Savings)
   - Settings page with currency selector, dark mode toggle, and placeholder sections
@@ -61,6 +84,7 @@ All notable changes to this project will be documented in this file.
   - Troubleshooting guide and development workflow
 
 ### Fixed
+
 - **SSR and State Fixes** (`bugfix/ssr-and-state-fixes`):
   - Fixed missing `showConverted` and `convertedAmounts` state variables in transactions page
   - Fixed SSR error with `document` access in chart tooltips
@@ -70,6 +94,7 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0] - 2025-11-03
 
 ### Added
+
 - README with detailed objectives, architecture, and onboarding workflows.
 - FastAPI backend scaffold featuring:
   - Application factory, configuration via `pydantic-settings`, and cached settings loader.

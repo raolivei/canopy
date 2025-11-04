@@ -210,10 +210,14 @@ if currency:
     converted_transactions = []
     for tx in transactions_db:
         converted_amount = convert_currency(tx.amount, tx.currency, currency.upper())
-        converted_tx = Transaction(**tx.dict(), amount=converted_amount, currency=currency.upper())
+        # Use model_dump() for Pydantic v2, fallback to dict() for v1
+        tx_dict = tx.model_dump() if hasattr(tx, 'model_dump') else tx.dict()
+        converted_tx = Transaction(**tx_dict, amount=converted_amount, currency=currency.upper())
         converted_transactions.append(converted_tx)
     return converted_transactions
 ```
+
+**Note:** This code uses `model_dump()` for Pydantic v2 compatibility, with a fallback to `dict()` for Pydantic v1.
 
 ### 4. Currency Models (`backend/models/currency.py`)
 
@@ -993,6 +997,8 @@ LedgerLight is designed to be a comprehensive personal finance management applic
 6. **Type Safety:** Frontend uses TypeScript, backend uses Pydantic for validation. Both should be strictly enforced.
 
 7. **Performance:** Currency conversion happens client-side per transaction. Consider batching or server-side conversion for large datasets.
+
+8. **Pydantic Version Compatibility:** The code uses `model_dump()` for Pydantic v2 compatibility with a fallback to `dict()` for Pydantic v1. Ensure you're using Pydantic v2 (`pydantic>=2.6.0`) for best compatibility.
 
 ---
 
