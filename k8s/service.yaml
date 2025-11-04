@@ -1,11 +1,26 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: ledger-light
+  name: ledgerlight-api
+  namespace: ledgerlight
 spec:
-  type: ClusterIP
   selector:
-    app: ledger-light
+    app.kubernetes.io/name: ledgerlight-api
   ports:
-    - port: 80
-      targetPort: 80
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledgerlight-frontend
+  namespace: ledgerlight
+spec:
+  selector:
+    app.kubernetes.io/name: ledgerlight-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
