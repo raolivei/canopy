@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
-import Image from 'next/image'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import StatCard from '@/components/StatCard'
@@ -202,26 +201,6 @@ export default function Home() {
                   />
                 )}
               </div>
-            </div>
-
-            {/* Hero banner - Clean minimal design */}
-            <div className="relative mb-8 overflow-hidden rounded-3xl shadow-xl">
-              <Image
-                src="/brand/ledgerlight-banner-light.png"
-                alt="LedgerLight"
-                width={1600}
-                height={900}
-                priority
-                className="w-full h-auto dark:hidden"
-              />
-              <Image
-                src="/brand/ledgerlight-banner-dark.png"
-                alt="LedgerLight"
-                width={1600}
-                height={900}
-                priority
-                className="hidden w-full h-auto dark:block"
-              />
             </div>
 
             {/* Stats Grid */}
