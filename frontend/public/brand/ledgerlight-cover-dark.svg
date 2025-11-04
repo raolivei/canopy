@@ -1,52 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="1800" height="1200" viewBox="0 0 1800 1200" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
-  <title>LedgerLight cover · dark 3:2</title>
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>LedgerLight Cover · Dark</title>
   <defs>
-    <linearGradient id="coverDarkBg" x1="14%" y1="8%" x2="86%" y2="92%">
-      <stop offset="0%" stop-color="#050A16"/>
-      <stop offset="50%" stop-color="#0B1F35"/>
-      <stop offset="100%" stop-color="#040810"/>
+    <linearGradient id="coverBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="50%" stop-color="#2d2d2d"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
     </linearGradient>
-    <linearGradient id="coverTeal" x1="0%" y1="20%" x2="100%" y2="80%">
-      <stop offset="0%" stop-color="#7FD1C9"/>
-      <stop offset="100%" stop-color="#2B7C94"/>
+    <linearGradient id="coinCover" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7FE0D4"/>
+      <stop offset="100%" stop-color="#57C5B6"/>
     </linearGradient>
-    <linearGradient id="coverGold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F7E6C2"/>
-      <stop offset="55%" stop-color="#D6A85B"/>
-      <stop offset="100%" stop-color="#B88728"/>
-    </linearGradient>
-    <linearGradient id="coverBeam" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="60%" stop-color="#F7E6C2" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#F7E6C2" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="coverGlow" cx="42%" cy="34%" r="70%">
-      <stop offset="0%" stop-color="#FCEFD0" stop-opacity="0.85"/>
-      <stop offset="80%" stop-color="#FCEFD0" stop-opacity="0.1"/>
-      <stop offset="100%" stop-color="#FCEFD0" stop-opacity="0"/>
+    <radialGradient id="glowCover">
+      <stop offset="0%" stop-color="rgba(127,224,212,0.3)"/>
+      <stop offset="100%" stop-color="rgba(127,224,212,0)"/>
     </radialGradient>
   </defs>
-  <rect width="1800" height="1200" fill="url(#coverDarkBg)"/>
-  <g opacity="0.55">
-    <path d="M-40 860c260-180 540-220 820-120s540 260 860 280" fill="none" stroke="#D6A85B" stroke-width="6" stroke-opacity="0.35"/>
-    <path d="M-80 680c240-160 510-170 800-60s600 280 960 300" fill="none" stroke="#F7E6C2" stroke-width="2" stroke-opacity="0.25"/>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#coverBg)"/>
+  
+  <!-- Glow effect -->
+  <circle cx="300" cy="315" r="250" fill="url(#glowCover)"/>
+  
+  <!-- Icon -->
+  <g transform="translate(150, 190)">
+    <circle cx="150" cy="125" r="110" fill="url(#coinCover)"/>
+    <circle cx="150" cy="125" r="90" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
+    
+    <!-- Simplified Dollar sign -->
+    <g transform="translate(150, 125)">
+      <!-- Vertical bar -->
+      <rect x="-6" y="-67" width="12" height="134" rx="6" fill="white"/>
+      
+      <!-- Top S curve -->
+      <path d="M -28 -35 C -40 -35 -40 -20 -28 -20 L 28 -20 C 40 -20 40 -8 28 -8 L -12 -8" 
+            fill="none" stroke="white" stroke-width="19" stroke-linecap="round"/>
+      
+      <!-- Bottom S curve -->
+      <path d="M 28 8 C 40 8 40 20 28 20 L -28 20 C -40 20 -40 35 -28 35 L 12 35" 
+            fill="none" stroke="white" stroke-width="19" stroke-linecap="round"/>
+    </g>
   </g>
-  <g transform="translate(220 240)">
-    <circle cx="220" cy="220" r="220" fill="url(#coverGlow)" opacity="0.5"/>
-    <circle cx="220" cy="220" r="218" fill="#030A16"/>
-    <circle cx="220" cy="220" r="196" fill="none" stroke="url(#coverTeal)" stroke-width="32"/>
-    <circle cx="220" cy="220" r="138" fill="url(#coverGold)"/>
-    <rect x="204" y="78" width="32" height="284" rx="16" fill="#020712"/>
-    <rect x="210" y="94" width="22" height="256" rx="11" fill="url(#coverBeam)"/>
-    <path d="M220 116c52 0 94 42 94 94h-36c0-32-26-58-58-58s-58 26-58 58 26 58 58 58c52 0 94 42 94 94s-42 94-94 94-94-42-94-94h36c0 32 26 58 58 58s58-26 58-58-26-58-58-58c-52 0-94-42-94-94s42-94 94-94z" fill="#020712" opacity="0.7"/>
-  </g>
-  <g transform="translate(700 340)">
-    <text x="0" y="150" font-family="'Inter','Poppins','Segoe UI',sans-serif" font-size="150" font-weight="600" letter-spacing="0.08em" fill="#7FD1C9">Ledger<tspan fill="#F7E6C2">Light</tspan></text>
-    <rect x="4" y="176" width="750" height="10" rx="5" fill="rgba(247,230,194,0.32)"/>
-    <text x="4" y="240" font-family="'Inter','Poppins','Segoe UI',sans-serif" font-size="48" letter-spacing="0.5em" fill="#AFC3DF" style="text-transform:uppercase;">Modern Finance, Illuminated</text>
-    <text x="4" y="320" font-family="'Inter','Segoe UI',sans-serif" font-size="34" fill="#D3DEEF" opacity="0.88">
-      Self-hosted insight, elegant ledgers, and real-time visibility for teams who demand clarity.
-    </text>
+  
+  <!-- Text -->
+  <g transform="translate(480, 315)">
+    <text x="0" y="0" 
+          font-family="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif" 
+          font-size="96" 
+          font-weight="400" 
+          letter-spacing="-0.02em" 
+          fill="#7FE0D4">LedgerLight</text>
+    <text x="0" y="65" 
+          font-family="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif" 
+          font-size="28" 
+          font-weight="300" 
+          letter-spacing="0.05em" 
+          fill="#999999">Illuminate Your Finance</text>
   </g>
 </svg>

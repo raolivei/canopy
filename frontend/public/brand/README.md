@@ -15,15 +15,21 @@ This folder contains the bespoke brand visuals generated for LedgerLight. Assets
 
 ## Palette
 
-- Navy core: `#0B1C2C`, `#102B52`, `#071223`
-- Warm gold: `#D6A85B`, `#B88728`, `#F0DCA8`
-- Teal accent: `#7FD1C9`, `#31799B`
-- Soft neutrals: `#FDFBF6`, `#F2E6D7`
+- Primary mint/teal gradient: `#7FE0D4` → `#57C5B6`
+- Dark backgrounds: `#1a1a1a`, `#2d2d2d`
+- Light backgrounds: `#f5f5f5`, `#ffffff`
+- Text dark mode: `#7FE0D4` (brand), `#999999` (tagline)
+- Text light mode: `#2d2d2d` (brand), `#666666` (tagline)
+- White accents: `#ffffff` (icon details)
+
+## Design Concept
+
+The LedgerLight brand features a modern, clean circular coin icon with a bold dollar sign symbol at its center. The mint/teal gradient evokes trust, clarity, and financial insight. The design is minimalist and scales beautifully across all sizes.
 
 ## Usage notes
 
 - The icon set covers favicons through store artwork; use `ledgerlight-icon-512.png` for desktop installers and `ledgerlight-icon-1024.png` for app marketplaces.
 - The banners are laid out for hero sections; use the `*-og.png` variants when configuring social cards (OG/Twitter).
-- Text in the logos uses `Poppins` (semibold). If that font is unavailable, system sans-serif fallbacks maintain the intended weight.
-- Feel free to recolour the text layer in the SVGs when integrating with themes, keeping the gold for emphasis to preserve the finance/luxury impression.
-- The 3:2 cover asset can anchor decks or product overviews; export to PNG at 2700×1800 if you need print-ready resolution.
+- Text in the logos uses `Inter`, `SF Pro Display`, or system sans-serif with letter-spacing for a modern, clean appearance.
+- The circular coin icon represents financial clarity and the "light" in LedgerLight - illuminating your financial data.
+- Maintain the mint/teal gradient for brand consistency; it's the signature element of the identity.

@@ -2,46 +2,60 @@
 <svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title>LedgerLight Banner · Dark</title>
   <defs>
-    <linearGradient id="bannerDarkBackground" x1="12%" y1="4%" x2="88%" y2="94%">
-      <stop offset="0%" stop-color="#050A16"/>
-      <stop offset="55%" stop-color="#0B1F35"/>
-      <stop offset="100%" stop-color="#040810"/>
+    <linearGradient id="bannerBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="50%" stop-color="#2d2d2d"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
     </linearGradient>
-    <linearGradient id="bannerCoin" x1="20%" y1="0%" x2="80%" y2="100%">
+    <linearGradient id="coinBanner" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#7FE0D4"/>
-      <stop offset="50%" stop-color="#57C5B6"/>
-      <stop offset="100%" stop-color="#2D8AA2"/>
+      <stop offset="100%" stop-color="#57C5B6"/>
     </linearGradient>
-    <linearGradient id="bannerHighlight" x1="35%" y1="0%" x2="85%" y2="80%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="40%" stop-color="#F1FBF8" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#F1FBF8" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="bannerGlow" cx="35%" cy="30%" r="58%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="rgba(127,224,212,0.3)"/>
+      <stop offset="100%" stop-color="rgba(127,224,212,0)"/>
     </radialGradient>
   </defs>
-  <rect width="1600" height="900" fill="url(#bannerDarkBackground)"/>
-  <g opacity="0.45">
-    <path d="M0 620c240-160 500-200 760-120s520 240 840 260" fill="none" stroke="rgba(127,224,212,0.25)" stroke-width="6"/>
-    <path d="M0 520c220-140 460-150 710-60s540 240 890 260" fill="none" stroke="rgba(127,224,212,0.12)" stroke-width="3"/>
+  
+  <!-- Background -->
+  <rect width="1600" height="900" fill="url(#bannerBg)"/>
+  
+  <!-- Glow effect -->
+  <circle cx="400" cy="450" r="300" fill="url(#glow)"/>
+  
+  <!-- Icon -->
+  <g transform="translate(250, 300)">
+    <circle cx="150" cy="150" r="140" fill="url(#coinBanner)"/>
+    <circle cx="150" cy="150" r="115" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="4"/>
+    
+    <!-- Simplified Dollar Sign -->
+    <g transform="translate(150, 150)">
+      <!-- Vertical bar -->
+      <rect x="-8" y="-85" width="16" height="170" rx="8" fill="white"/>
+      
+      <!-- Top S curve -->
+      <path d="M -35 -45 C -50 -45 -50 -25 -35 -25 L 35 -25 C 50 -25 50 -10 35 -10 L -15 -10" 
+            fill="none" stroke="white" stroke-width="24" stroke-linecap="round"/>
+      
+      <!-- Bottom S curve -->
+      <path d="M 35 10 C 50 10 50 25 35 25 L -35 25 C -50 25 -50 45 -35 45 L 15 45" 
+            fill="none" stroke="white" stroke-width="24" stroke-linecap="round"/>
+    </g>
   </g>
-  <g transform="translate(280 236)">
-    <circle cx="160" cy="160" r="160" fill="#0B1C2C"/>
-    <circle cx="160" cy="160" r="160" fill="url(#bannerCoin)" opacity="0.9"/>
-    <path d="M160 32c71 0 128 57 128 128s-57 128-128 128S32 231 32 160 89 32 160 32z" fill="url(#bannerCoin)"/>
-    <path d="M160 32c71 0 128 57 128 128 0 45-20 85-54 110V32z" fill="#0B273C" opacity="0.25"/>
-    <path d="M160 56c58 0 104 46 104 104s-46 104-104 104-104-46-104-104 46-104 104-104z" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="18"/>
-    <path d="M180 82h12c7 0 11 4 11 11v68c28 6 50 26 50 58 0 34-24 58-60 64v16c0 7-4 11-11 11h-24c-7 0-11-4-11-11v-16c-24-4-42-14-56-30-4-5-3-12 1-16l16-14c4-3 10-3 13 1 10 11 22 18 38 18 18 0 31-10 31-27s-12-27-33-27c-6 0-11-4-11-11v-32c-16-4-30-12-42-24-4-4-4-10-1-15l14-18c4-4 10-5 14-1 9 10 18 16 29 18v-62c0-7 4-11 11-11z" fill="#FFFFFF"/>
-    <path d="M150 64c32-8 66-6 102 10 5 3 7 9 4 14-20 34-52 58-100 72-6 2-12-1-14-7l-6-20c-2-6 1-12 7-14 28-10 50-24 64-42-15-5-31-7-48-4-6 1-11-2-12-8l-4-18c-1-7 3-13 7-14z" fill="url(#bannerHighlight)" opacity="0.65"/>
-  </g>
-  <g transform="translate(610 300)">
-    <text x="0" y="120" font-family="'Inter','SF Pro Display','Poppins',sans-serif" font-size="140" font-weight="600" letter-spacing="0.06em" fill="#7FE0D4">Ledger<tspan fill="#EAEFF4">Light</tspan></text>
-    <rect x="8" y="148" width="720" height="10" rx="5" fill="rgba(234,239,244,0.32)"/>
-    <text x="8" y="214" font-family="'Inter','SF Pro Display','Poppins',sans-serif" font-size="40" letter-spacing="0.42em" fill="#A3BED6" style="text-transform:uppercase;">Minimal Insight For Modern Finance</text>
-    <text x="8" y="272" font-family="'Inter','Segoe UI',sans-serif" font-size="28" fill="#D3DEEF" opacity="0.88">
-      A self-hosted ledger platform with luminous dashboards and trustworthy controls.
-    </text>
+  
+  <!-- Text -->
+  <g transform="translate(600, 450)">
+    <text x="0" y="0" 
+          font-family="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif" 
+          font-size="120" 
+          font-weight="400" 
+          letter-spacing="-0.02em" 
+          fill="#7FE0D4">LedgerLight</text>
+    <text x="0" y="80" 
+          font-family="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif" 
+          font-size="32" 
+          font-weight="300" 
+          letter-spacing="0.05em" 
+          fill="#999999">Illuminate Your Finance</text>
   </g>
 </svg>
