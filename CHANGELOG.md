@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.2] - 2025-11-04
+## [0.2.2-dev] - 2025-11-04 (Pre-release)
 
 ### Fixed
 - Fixed currency conversion endpoint returning 500 error

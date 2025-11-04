@@ -45,7 +45,7 @@ Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 
 
 ## Current Version
 
-**v0.2.2** - Stable MVP release with full transaction and currency support.
+**v0.2.2-dev** - Development build with MVP features (pre-release, not for production use).
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed release notes.
 
