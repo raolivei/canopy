@@ -20,8 +20,10 @@ async def get_transactions(
         converted_transactions = []
         for tx in transactions_db:
             converted_amount = convert_currency(tx.amount, tx.currency, currency.upper())
+            # Use model_dump() for Pydantic v2, fallback to dict() for v1
+            tx_dict = tx.model_dump() if hasattr(tx, 'model_dump') else tx.dict()
             converted_tx = Transaction(
-                **tx.dict(),
+                **tx_dict,
                 amount=converted_amount,
                 currency=currency.upper()
             )
