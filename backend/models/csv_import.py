@@ -34,7 +34,7 @@ class FieldMapping(BaseModel):
     """Maps CSV columns to transaction fields"""
     date_column: str
     description_column: str
-    amount_column: str
+    amount_column: Optional[str] = None  # Optional if using debit/credit columns
     type_column: Optional[str] = None  # For determining income/expense
     category_column: Optional[str] = None
     account_column: Optional[str] = None
