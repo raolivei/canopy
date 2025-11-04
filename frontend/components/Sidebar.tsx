@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Home, DollarSign, TrendingUp, Settings, Wallet, Upload } from "lucide-react";
@@ -20,12 +21,27 @@ export default function Sidebar() {
     <div className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-gray-900 to-gray-800 dark:from-gray-950 dark:to-gray-900 text-white flex flex-col">
       <div className="p-6 border-b border-gray-700 dark:border-gray-800">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-400 to-primary-300 bg-clip-text text-transparent">
-              LedgerLight
-            </h1>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Personal Finance
+          <div className="flex flex-col">
+            <div className="relative h-12 w-44">
+              <Image
+                src="/brand/ledgerlight-logo-light.svg"
+                alt="LedgerLight logo"
+                fill
+                sizes="176px"
+                priority
+                className="object-contain object-left dark:hidden"
+              />
+              <Image
+                src="/brand/ledgerlight-logo-dark.svg"
+                alt="LedgerLight logo"
+                fill
+                sizes="176px"
+                priority
+                className="hidden object-contain object-left dark:block"
+              />
+            </div>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 tracking-[0.3em] uppercase">
+              Illuminate Finance
             </p>
           </div>
           <DarkModeToggle />

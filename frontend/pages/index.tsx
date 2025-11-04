@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
+import Image from 'next/image'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import StatCard from '@/components/StatCard'
@@ -184,6 +185,55 @@ export default function Home() {
                     showLabel={false}
                   />
                 )}
+              </div>
+            </div>
+
+            {/* Hero banner */}
+            <div className="relative mb-8 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+              <div className="absolute inset-0">
+                <Image
+                  src="/brand/ledgerlight-banner-light.png"
+                  alt=""
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 1200px"
+                  className="object-cover dark:hidden"
+                />
+                <Image
+                  src="/brand/ledgerlight-banner-dark.png"
+                  alt=""
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 1200px"
+                  className="hidden object-cover dark:block"
+                />
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/75 to-white/20 dark:from-gray-950/95 dark:via-gray-900/70 dark:to-gray-900/10" />
+              <div className="relative z-10 px-10 py-12 lg:px-16">
+                <p className="text-xs font-semibold uppercase tracking-[0.5em] text-gray-500 dark:text-amber-200">
+                  Illuminate Finance
+                </p>
+                <h2 className="mt-4 text-3xl font-bold text-gray-900 dark:text-white sm:text-4xl">
+                  Real-time intelligence for modern finance teams.
+                </h2>
+                <p className="mt-4 max-w-2xl text-base text-gray-600 dark:text-gray-300">
+                  LedgerLight keeps your ledgers balanced, your insights sharp, and your stakeholders aligned with a beautifully minimal workspace.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center gap-4">
+                  <Link
+                    href="/import"
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-6 py-3 font-semibold text-gray-900 shadow-lg shadow-amber-500/40 transition duration-200 hover:shadow-amber-500/60"
+                  >
+                    Start importing
+                    <ArrowUpRight size={18} />
+                  </Link>
+                  <Link
+                    href="/portfolio"
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-6 py-3 text-sm font-medium text-gray-700 transition duration-200 hover:border-gray-300 hover:bg-white/60 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800/60"
+                  >
+                    View insights
+                  </Link>
+                </div>
               </div>
             </div>
 
