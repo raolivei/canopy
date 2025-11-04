@@ -2,9 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2025-11-04
+
+### Added
+- Comprehensive architecture documentation (ARCHITECTURE.md)
+  - **Why:** Document design decisions and rationale to help future developers understand the "why" behind technical choices
+  - **Contents:** Architecture overview, technology choices, API design, frontend architecture, data management, security considerations, performance optimizations
+- Enhanced documentation with "why" explanations
+  - **Why:** Understanding rationale helps maintainability and prevents regression of design decisions
+  - **Updated:** MASTER_PROMPT.md, README.md, CHANGELOG.md with design rationale sections
+
 ## [0.2.2] - 2025-11-04
 
 ### Fixed
+
 - Fixed currency conversion endpoint returning 500 error
   - **Why:** Pydantic v2 deprecated `dict()` method in favor of `model_dump()`. The error occurred because code was using deprecated API.
   - **Solution:** Updated to use `model_dump()` with fallback to `dict()` for backward compatibility.
@@ -15,6 +26,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.1] - 2025-11-04
 
 ### Fixed
+
 - Integrated transaction and currency routers into server.py
   - **Why:** Feature branches created routers separately. Integration ensures all endpoints are accessible.
   - **Solution:** Conditional import pattern allows routers to work even if some are missing.
