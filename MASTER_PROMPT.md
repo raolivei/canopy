@@ -14,6 +14,32 @@ This document provides a comprehensive guide to recreate the LedgerLight applica
 - Run lean — optimized for Raspberry Pi hardware
 - Be modular so other developers can fork and extend
 
+### Design Philosophy & Rationale
+
+**Why Self-Hosted?**
+- **Privacy First:** Financial data is sensitive. Self-hosting ensures complete control over where data is stored and who has access.
+- **No Vendor Lock-in:** Avoid dependency on third-party services that may change pricing, features, or discontinue service.
+- **Cost Efficiency:** Run on existing hardware (Raspberry Pi) without subscription fees.
+- **Data Ownership:** Users own their data completely, enabling export and migration at any time.
+
+**Why Raspberry Pi Optimized?**
+- **Accessibility:** Raspberry Pi is affordable and widely available, making self-hosting accessible to more users.
+- **Low Power Consumption:** Can run 24/7 without significant electricity costs.
+- **Educational Value:** Encourages learning about self-hosting, Linux, and system administration.
+- **Edge Computing:** Data processing happens locally, reducing latency and bandwidth usage.
+
+**Why Multi-Currency Support?**
+- **Global Users:** Many users have assets and transactions in multiple currencies.
+- **Accurate Reporting:** Convert all transactions to a single display currency for meaningful analysis.
+- **Investment Tracking:** Portfolio assets are often denominated in different currencies.
+- **Future-Proofing:** Supports international expansion and diverse user bases.
+
+**Why Modular Architecture?**
+- **Extensibility:** Easy to add new features without breaking existing functionality.
+- **Maintainability:** Clear separation of concerns makes code easier to understand and modify.
+- **Community Contribution:** Modular design allows community members to contribute specific features.
+- **Testing:** Isolated modules are easier to test independently.
+
 ### MVP Features Implemented
 - 💰 Transaction tracking with categories
 - 🔄 Multi-currency FX conversions with display currency toggle
@@ -27,25 +53,46 @@ This document provides a comprehensive guide to recreate the LedgerLight applica
 
 ### Backend
 - **Framework**: FastAPI 0.104.1
+  - **Why FastAPI?** Async/await support for high performance, automatic OpenAPI/Swagger docs, type hints for better code quality, and excellent Python 3.10+ support. Perfect for building modern APIs quickly.
 - **ASGI Server**: Uvicorn[standard] 0.24.0
+  - **Why Uvicorn?** Fast ASGI server built on uvloop for better performance than traditional WSGI servers. The `[standard]` extras include better performance and websocket support.
 - **Database**: PostgreSQL (via SQLAlchemy 2.0.23, psycopg[binary] 3.1.18)
+  - **Why PostgreSQL?** Robust, ACID-compliant, excellent JSON support, and strong performance. Industry standard for financial applications.
+  - **Why SQLAlchemy?** Powerful ORM with async support, database-agnostic abstractions, and excellent migration tools.
+  - **Why psycopg[binary]?** Pre-compiled binaries avoid compilation issues on various platforms, faster setup.
 - **Migrations**: Alembic 1.12.1
+  - **Why Alembic?** SQLAlchemy's official migration tool, integrates seamlessly, supports version control for schema changes.
 - **Validation**: Pydantic 2.5.0, pydantic-settings 2.1.0
+  - **Why Pydantic v2?** Performance improvements, better type validation, and integration with FastAPI. Used for both request/response validation and settings management.
 - **Auth**: python-jose[cryptography] 3.3.0, passlib[bcrypt] 1.7.4
+  - **Why JOSE?** Industry-standard JWT implementation for secure token-based authentication.
+  - **Why bcrypt?** Strong password hashing algorithm resistant to brute-force attacks.
 - **Task Queue**: Celery 5.3.4
+  - **Why Celery?** Handles background tasks (CSV imports, report generation) without blocking the API. Essential for long-running operations.
 - **Cache**: Redis 5.0.1
+  - **Why Redis?** Fast in-memory cache for frequently accessed data (exchange rates, user sessions). Also used as Celery broker.
 - **HTTP Client**: httpx 0.25.2
+  - **Why httpx?** Modern async HTTP client, better than requests for async code, useful for fetching exchange rates or external APIs.
 - **Testing**: pytest 7.4.3, pytest-asyncio 0.21.1
+  - **Why pytest?** Industry standard Python testing framework with excellent fixtures and async support.
 - **Environment**: python-dotenv 1.0.0
+  - **Why dotenv?** Standard way to manage environment variables in development, keeps secrets out of code.
 
 ### Frontend
 - **Framework**: Next.js 14.0.4
+  - **Why Next.js?** Server-side rendering for better SEO and performance, file-based routing for simplicity, built-in optimizations (image, font, script), and excellent developer experience. Perfect for dashboard applications.
 - **UI Library**: React 18.2.0
+  - **Why React?** Most popular UI library, excellent ecosystem, component reusability, and strong TypeScript support.
 - **Styling**: Tailwind CSS 3.3.6
+  - **Why Tailwind?** Utility-first CSS enables rapid UI development without context switching, consistent design system, smaller bundle sizes through purging, and excellent dark mode support via class strategy.
 - **Charts**: Recharts 2.10.3
+  - **Why Recharts?** React-native charting library, declarative API, responsive by default, and composable components. Better than D3 for React applications.
 - **Icons**: Lucide React 0.294.0
+  - **Why Lucide?** Clean, consistent icon set, tree-shakeable (only import used icons), TypeScript support, and good variety for financial apps.
 - **Date Utils**: date-fns 2.30.0
+  - **Why date-fns?** Immutable, functional API, tree-shakeable, better than Moment.js (smaller bundle), and excellent TypeScript support.
 - **Language**: TypeScript 5.3.3
+  - **Why TypeScript?** Type safety catches errors at compile time, better IDE support, self-documenting code, and reduces runtime errors. Essential for maintainable frontend code.
 
 ### Infrastructure
 - **Containerization**: Docker & Docker Compose
@@ -157,6 +204,28 @@ async def root():
 - Health check endpoint for monitoring
 - Router inclusion pattern for modular API
 
+**Design Rationale:**
+
+**Why CORS Middleware?**
+- **Browser Security:** Browsers enforce Same-Origin Policy. Without CORS, the frontend (localhost:3000) cannot call the backend API (localhost:8000) due to different ports.
+- **Development vs Production:** Currently allows localhost origins. In production, this should be restricted to specific domains for security.
+- **Credentials:** `allow_credentials=True` enables cookies/auth headers to be sent cross-origin when authentication is added.
+
+**Why Path Manipulation?**
+- **Import Resolution:** Python needs to find the `backend` module. Adding parent directory to `sys.path` allows absolute imports (`from backend.api import ...`) to work regardless of where uvicorn is run from.
+- **Alternative Approaches:** Could use relative imports or PYTHONPATH environment variable, but explicit path manipulation is more predictable.
+
+**Why Health Check Endpoint?**
+- **Monitoring:** Kubernetes, load balancers, and monitoring tools can check `/v1/health` to determine if the service is running.
+- **Status Verification:** Returns environment info for debugging and deployment verification.
+- **Best Practice:** Standard pattern for microservices and containerized applications.
+
+**Why Router Pattern?**
+- **Separation of Concerns:** Each router handles a specific domain (transactions, currency) making code easier to maintain.
+- **Scalability:** Easy to add new routers without modifying main server file.
+- **Testing:** Routers can be tested independently.
+- **Team Collaboration:** Different developers can work on different routers without conflicts.
+
 ### 2. Transaction Models (`backend/models/transaction.py`)
 
 ```python
@@ -203,6 +272,22 @@ class TransactionCreate(BaseModel):
 - Global `next_id` counter for ID generation
 - Optional currency conversion on GET all
 
+**Why In-Memory Storage Initially?**
+- **Rapid Prototyping:** MVP doesn't require persistence. Allows fast iteration without database setup.
+- **Simplicity:** No database migrations, connection pooling, or schema management needed initially.
+- **Testing:** Easy to reset state by restarting the server.
+- **Migration Path:** Code structure supports easy migration to database later (models are already Pydantic models compatible with SQLAlchemy).
+
+**Why Global Counter for IDs?**
+- **Simplicity:** No need for database sequences or UUID generation in MVP.
+- **Migration-Friendly:** When moving to database, can use auto-incrementing primary keys or UUIDs.
+- **Temporary Solution:** Will be replaced with proper database primary keys.
+
+**Why Optional Currency Conversion?**
+- **Performance:** Don't convert if not needed (user viewing in original currency).
+- **Flexibility:** Client can request specific currency when needed.
+- **API Design:** Query parameter pattern allows same endpoint to serve multiple use cases.
+
 **Key Logic:**
 ```python
 # Currency conversion example
@@ -217,7 +302,11 @@ if currency:
     return converted_transactions
 ```
 
-**Note:** This code uses `model_dump()` for Pydantic v2 compatibility, with a fallback to `dict()` for Pydantic v1.
+**Why model_dump() with Fallback?**
+- **Pydantic v2 Compatibility:** `dict()` was deprecated in Pydantic v2, replaced with `model_dump()`.
+- **Backward Compatibility:** Fallback ensures code works with both Pydantic v1 and v2.
+- **Future-Proofing:** Code will work as Pydantic evolves.
+- **Best Practice:** Check for method existence rather than version checking.
 
 ### 4. Currency Models (`backend/models/currency.py`)
 
@@ -244,6 +333,18 @@ def convert_currency(amount: float, from_currency: str, to_currency: str) -> flo
     rate = rates.get(to_currency, 1.0)
     return amount * rate
 ```
+
+**Why Mock Exchange Rates Initially?**
+- **Development Speed:** No external API dependencies during development.
+- **Testing:** Predictable rates make testing easier and reproducible.
+- **Offline Development:** Works without internet connection.
+- **Cost:** Avoids API rate limits and costs during development.
+- **Migration Path:** Structure supports easy swap to real API (exchangerate-api.io, Fixer.io, etc.) later.
+
+**Why USD as Base Currency?**
+- **Common Standard:** USD is widely used as base currency in financial markets.
+- **User Base:** Many users think in USD terms.
+- **Flexibility:** Can easily add more base currencies or use EUR/CAD as base if needed.
 
 ### 5. Currency API (`backend/api/currency.py`)
 
@@ -390,6 +491,26 @@ const isActive = router.pathname === item.href
 - System preference detection
 - Prevents hydration mismatch
 - Toggles `dark` class on `document.documentElement`
+
+**Why localStorage Persistence?**
+- **User Experience:** Remembers user preference across sessions.
+- **Consistency:** Same theme on every visit unless user changes it.
+- **Respects Choice:** User's explicit selection takes precedence over system preference.
+
+**Why System Preference Detection?**
+- **First Visit:** New users get sensible default based on their OS setting.
+- **Accessibility:** Users with light sensitivity get appropriate default.
+- **Modern UX:** Expected behavior in modern applications.
+
+**Why Prevent Hydration Mismatch?**
+- **SSR Issue:** Server doesn't know user's preference, would render different HTML than client.
+- **React Error:** Mismatches cause React warnings and potential UI glitches.
+- **Solution:** Render placeholder until client-side JavaScript loads, then apply preference.
+
+**Why Document.documentElement?**
+- **Global Scope:** Dark mode affects entire page, not just React components.
+- **Tailwind Integration:** Tailwind's `dark:` variants check for `dark` class on `<html>` element.
+- **Performance:** Single DOM manipulation affects all elements, more efficient than per-component checks.
 
 **Key Implementation:**
 ```typescript
@@ -806,6 +927,24 @@ echo "Frontend: cd frontend && npm run dev"
    - If same currency or `showConverted` is false:
      - Show only original amount
 
+**Why Store Original Currency?**
+- **Data Integrity:** Preserves original transaction data without modification.
+- **Audit Trail:** Can always see what currency was actually used.
+- **Accuracy:** Avoids rounding errors from multiple conversions.
+- **Compliance:** Financial records should preserve original values.
+
+**Why Client-Side Conversion?**
+- **Real-Time Updates:** User can change display currency without server round-trip.
+- **Performance:** Conversion is fast, no need to fetch from server.
+- **Offline Capability:** Works even if backend is temporarily unavailable.
+- **Flexibility:** User can toggle conversion on/off without affecting others.
+
+**Why Show Both Original and Converted?**
+- **Transparency:** Users understand the conversion is happening.
+- **Trust:** Shows original value so users can verify conversion is correct.
+- **Clarity:** Prevents confusion about which currency is being displayed.
+- **Compliance:** Financial regulations often require showing original currency.
+
 ### Dark Mode Implementation
 
 1. **Toggle:** `DarkModeToggle` component
@@ -822,16 +961,42 @@ echo "Frontend: cd frontend && npm run dev"
 - Converts amounts when currency changes or `showConverted` toggles
 - Tracks dark mode for chart tooltips (prevents SSR errors)
 
+**Why useState Instead of Global State?**
+- **Simplicity:** No need for Redux/Zustand for MVP scope.
+- **Performance:** React's built-in state management is sufficient.
+- **Maintainability:** Easier to understand and debug than global state.
+- **Migration Path:** Can add state management library later if needed.
+
+**Why Multiple useEffect Hooks?**
+- **Separation of Concerns:** Each effect handles one responsibility.
+- **Performance:** Effects only run when their dependencies change.
+- **Debugging:** Easier to identify which effect is causing issues.
+
 **Transactions (`transactions.tsx`):**
 - Similar currency conversion logic
 - Form state management
 - Loading states
+
+**Why Separate State for Form?**
+- **Isolation:** Form state doesn't affect display until submitted.
+- **UX:** Can reset form without affecting displayed transactions.
+- **Validation:** Can validate form data before submission.
 
 ### Error Handling
 
 - API calls wrapped in try-catch
 - Console error logging
 - Graceful fallbacks (e.g., currency conversion fails → show original amount)
+
+**Why Try-Catch on API Calls?**
+- **Resilience:** App continues working even if API fails.
+- **User Experience:** Show meaningful errors instead of crashing.
+- **Debugging:** Console logs help identify issues during development.
+
+**Why Graceful Fallbacks?**
+- **User Experience:** App degrades gracefully rather than breaking completely.
+- **Reliability:** Core functionality (viewing transactions) works even if advanced features fail.
+- **Progressive Enhancement:** Basic features work, enhanced features add value when available.
 
 ---
 

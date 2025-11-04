@@ -8,7 +8,27 @@ LedgerLight is a self-hosted personal finance & investment dashboard that merges
 - Support multi-currency (CAD, USD, BRL, EUR, GBP) assets.  
 - Allow easy CSV/OFX imports for banks and brokerages.  
 - Run lean — optimized for Raspberry Pi hardware.  
-- Be modular so other developers can fork and extend.  
+- Be modular so other developers can fork and extend.
+
+### Design Rationale
+
+**Why Single Dashboard?**
+Financial health requires seeing the big picture. Combining portfolio, budgeting, and transactions in one view helps users understand their complete financial situation without switching between tools.
+
+**Why Local Storage?**
+- **Privacy:** Financial data never leaves your control
+- **Security:** No cloud breaches can expose your data
+- **Control:** You decide when and how to back up
+- **Compliance:** Meets data residency requirements
+
+**Why Multi-Currency?**
+Modern users often have assets across currencies. Proper currency support enables accurate net worth calculation and meaningful spending analysis regardless of transaction currency.
+
+**Why CSV/OFX Import?**
+Most banks don't offer APIs. CSV/OFX files are universal formats that allow users to import transaction history from any financial institution, making the tool truly platform-agnostic.
+
+**Why Raspberry Pi Optimized?**
+Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.  
 
 ## Core Features (MVP - Implemented)  
 - ✅ Transaction tracking with categories and types (income, expense, transfer)
@@ -45,12 +65,28 @@ pip install -r requirements.txt
 PYTHONPATH=/path/to/ledger-light python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
 ```
 
+**Why PYTHONPATH?**
+Python needs to find the `backend` module for absolute imports (`from backend.api import ...`). Setting PYTHONPATH to project root allows imports to work regardless of current directory.
+
+**Why `--reload`?**
+Enables auto-reload on code changes during development, speeding up iteration. Remove in production for better performance.
+
+**Why `0.0.0.0`?**
+Binds to all network interfaces, allowing access from other devices on your network (e.g., testing on mobile). Use `127.0.0.1` for localhost-only access.
+
 ### Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
+**Why Separate Processes?**
+Backend and frontend are independent services. Separating them allows:
+- Independent scaling
+- Different deployment strategies
+- Team members to work on one without affecting the other
+- Technology choices (Python backend, Node.js frontend)
 
 ### Testing
 Run the test script to verify all functionality:

@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed currency conversion endpoint returning 500 error
+  - **Why:** Pydantic v2 deprecated `dict()` method in favor of `model_dump()`. The error occurred because code was using deprecated API.
+  - **Solution:** Updated to use `model_dump()` with fallback to `dict()` for backward compatibility.
 - Updated to use `model_dump()` for Pydantic v2 compatibility in transaction currency conversion
 - Added fallback to `dict()` for Pydantic v1 support
 - Currency conversion query parameter now works correctly (`/v1/transactions/?currency=CAD`)
@@ -14,8 +16,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Integrated transaction and currency routers into server.py
+  - **Why:** Feature branches created routers separately. Integration ensures all endpoints are accessible.
+  - **Solution:** Conditional import pattern allows routers to work even if some are missing.
 - Added CORS middleware for frontend-backend communication
+  - **Why:** Browser Same-Origin Policy blocks cross-origin requests. Frontend (port 3000) needs to call backend (port 8000).
+  - **Solution:** CORS middleware explicitly allows frontend origin.
 - Added missing transaction model to dev branch
+  - **Why:** Transaction API requires Transaction model but it was only in feature branch.
+  - **Solution:** Added model to dev branch to ensure complete functionality.
 - Verified all API endpoints working correctly
 - Stable application state with full functionality
 
