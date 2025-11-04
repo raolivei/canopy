@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2025-11-04
+
+### Fixed
+- Integrated transaction and currency routers into server.py
+- Added CORS middleware for frontend-backend communication
+- Added missing transaction model to dev branch
+- Verified all API endpoints working correctly
+- Stable application state with full functionality
+
 ## [Unreleased]
 
 ### Added
