@@ -165,7 +165,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Dashboard - LedgerLight</title>
+        <title>Dashboard - Canopy</title>
         <meta name="description" content="Privacy-first personal finance dashboard" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>

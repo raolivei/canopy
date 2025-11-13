@@ -8,7 +8,7 @@ export default function Portfolio() {
   return (
     <>
       <Head>
-        <title>Portfolio - LedgerLight</title>
+        <title>Portfolio - Canopy</title>
       </Head>
       <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
         <Sidebar />

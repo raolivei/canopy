@@ -7,10 +7,14 @@ frontend/out
 __pycache__/
 *.pyc
 .venv/
+venv/
 
 # Env files
 .env
 backend/.env
+
+# K8s secrets
+k8s/secrets.yaml
 
 # macOS
 .DS_Store

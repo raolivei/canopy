@@ -1,6 +1,8 @@
-# LedgerLight  
+# Canopy  
 
-LedgerLight is a self-hosted personal finance & investment dashboard that merges portfolio analytics, budgeting, and transaction tracking into one unified platform. It is designed to run on a Raspberry Pi cluster with a lean footprint, storing all data locally without cloud dependencies.  
+**Your financial life. Under one canopy.**
+
+Canopy is a self-hosted personal finance, investment, and budgeting dashboard inspired by Monarch Money, Ghostfolio, and Firefly III. It runs fully local on Raspberry Pi k3s clusters with a lean footprint, storing all data locally without cloud dependencies.  
 
 ## Project Objectives  
 - Combine portfolio, budgeting, and net-worth views into a single dashboard.  
@@ -56,9 +58,10 @@ See [CHANGELOG.md](./CHANGELOG.md) for detailed release notes.
 ## Quick Start
 
 ### Prerequisites
-- Python 3.10+ with venv
+- Python 3.11+ with venv
 - Node.js 18+ and npm
 - Docker and Docker Compose (for PostgreSQL and Redis)
+- k3s cluster (optional, for production deployment)
 
 ### Backend Setup
 ```bash
@@ -66,7 +69,7 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-PYTHONPATH=/path/to/ledger-light python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
+PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **Why PYTHONPATH?**
@@ -105,21 +108,22 @@ Run the test script to verify all functionality:
 
 ## Repo Structure  
 ```
-ledgerlight/  
+canopy/  
  ├── backend/  
- │   ├── api/          # API endpoints (transactions, currency)
- │   ├── models/       # Pydantic models (transaction, currency)
+ │   ├── api/          # API endpoints (transactions, currency, budgets, goals)
+ │   ├── models/       # Pydantic models (transaction, budget, goal, holdings)
  │   ├── app/          # FastAPI application
- │   └── ingest/       # CSV/OFX import handlers (planned)
+ │   ├── ingest/       # CSV/OFX import handlers + Celery tasks
+ │   └── celery/       # Celery config and workers
  ├── frontend/  
- │   ├── components/   # React components (Sidebar, StatCard, etc.)
- │   ├── pages/        # Next.js pages (dashboard, transactions, etc.)
- │   └── utils/        # Utility functions (currency formatting)
- ├── k8s/              # Kubernetes manifests
+ │   ├── components/   # React components (Sidebar, StatCard, Charts, etc.)
+ │   ├── pages/        # Next.js pages (dashboard, transactions, budget, goals, etc.)
+ │   └── utils/        # Utility functions (currency, formatting, charts)
+ ├── k8s/              # Kubernetes manifests for Pi cluster
  ├── .github/workflows/  
- │   └── deploy.yml  
+ │   └── deploy.yml    # Self-hosted runner CI/CD
  ├── CHANGELOG.md      # Version history
- ├── MASTER_PROMPT.md  # Comprehensive recreation guide
+ ├── ARCHITECTURE.md   # Architecture decisions
  └── README.md  
 ```
 

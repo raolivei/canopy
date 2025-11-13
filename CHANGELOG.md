@@ -2,6 +2,80 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2025-11-13 - 🌳 **Canopy Launch**
+
+### BREAKING CHANGE - Project Rebranded
+
+**LedgerLight is now Canopy** - Complete rebrand and vision expansion.
+
+### What's New in Canopy
+
+**Tagline**: "Your financial life. Under one canopy."
+
+**Vision**: Self-hosted personal finance, investment, and budgeting dashboard inspired by Monarch Money, Ghostfolio, and Firefly III. Fully local on Raspberry Pi k3s clusters.
+
+### Changed
+
+- **Project Name**: LedgerLight → Canopy
+- **Branding**: New logo featuring tree canopy forming the letter "C"
+- **Description**: Expanded vision to emphasize budgeting, investment tracking, and Monarch-level UX
+- **Documentation**: Updated README, ARCHITECTURE with Canopy vision
+- **Backend**: Renamed API title to "Canopy API"
+- **Frontend**: All page titles, meta tags, and OG images updated
+- **Database**: Connection strings updated from ledgerlight to canopy
+- **Package Names**:
+  - `ledgerlight-backend` → `canopy-backend`
+  - `ledgerlight-frontend` → `canopy-frontend`
+
+### Migration Guide
+
+See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for complete migration instructions including:
+
+- GitHub repository renaming
+- Local environment updates
+- Brand asset replacement
+- Pi cluster deployment updates
+
+### Planned Features (Roadmap)
+
+**MVP+** (In Development):
+
+- Budget management (Fixed/Flexible/Non-monthly envelopes)
+- Investment portfolio tracking (stocks, ETFs, crypto)
+- Goals tracking (retirement, savings)
+- Recurring transaction detection
+- Net worth snapshots and charts
+- Cash flow analysis (enhanced)
+- Celery background tasks for price ingestion
+
+**Deployment**:
+
+- K8s manifests for Pi cluster (eldertree control plane)
+- GitHub Actions with self-hosted runner
+- Minimal YAML, yearly maintenance philosophy
+
+### Architecture Highlights
+
+**Backend**: FastAPI + Celery + Redis + PostgreSQL  
+**Frontend**: Next.js + Tailwind + shadcn  
+**Infra**: k3s on Raspberry Pi (eldertree + fleet-worker nodes)  
+**Deployment**: kubectl apply (no Helm, no ArgoCD)
+
+### Design Philosophy
+
+- **Self-hosted**: Full privacy, no cloud dependencies
+- **Offline-friendly**: Works without internet
+- **Multi-currency**: CAD, USD, BRL, EUR, GBP
+- **Monarch-level UX**: Polished, calm, premium design
+- **Pi-optimized**: Lean, efficient, minimal resource usage
+- **Modular**: Easy to fork and extend
+
+### Credits
+
+Built by Rafael Oliveira (@raolivei) for the Pi fleet homelab.
+
+---
+
 ## [0.2.2-dev] - 2025-11-04 (Pre-release)
 
 ### Fixed

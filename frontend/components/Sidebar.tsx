@@ -24,16 +24,16 @@ export default function Sidebar() {
           <div className="flex flex-col">
             <div className="relative h-12 w-44">
               <Image
-                src="/brand/ledgerlight-logo-light.svg"
-                alt="LedgerLight logo"
+                src="/brand/canopy-logo-light.svg"
+                alt="Canopy logo"
                 fill
                 sizes="176px"
                 priority
                 className="object-contain object-left dark:hidden"
               />
               <Image
-                src="/brand/ledgerlight-logo-dark.svg"
-                alt="LedgerLight logo"
+                src="/brand/canopy-logo-dark.svg"
+                alt="Canopy logo"
                 fill
                 sizes="176px"
                 priority

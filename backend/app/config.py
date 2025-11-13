@@ -7,12 +7,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Central configuration for the LedgerLight backend."""
+    """Central configuration for the Canopy backend."""
 
-    app_name: str = "LedgerLight API"
+    app_name: str = "Canopy API"
     debug: bool = False
     allowed_hosts: List[str] = ["*"]
-    database_url: str = "postgresql+psycopg://ledgerlight:ledgerlight@db/ledgerlight"
+    database_url: str = "postgresql+psycopg://canopy:canopy@db/canopy"
     redis_url: str = "redis://redis:6379/0"
     secret_key: str = "change-me"
     environment: str = "development"

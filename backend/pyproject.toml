@@ -1,7 +1,7 @@
 [project]
-name = "ledgerlight-backend"
-version = "0.1.0"
-description = "LedgerLight FastAPI backend service."
+name = "canopy-backend"
+version = "1.0.0"
+description = "Canopy - Self-hosted personal finance, investment, and budgeting dashboard."
 readme = "../README.md"
 requires-python = ">=3.11"
 dependencies = [

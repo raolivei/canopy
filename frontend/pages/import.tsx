@@ -174,7 +174,7 @@ export default function Import() {
   return (
     <>
       <Head>
-        <title>Import Transactions - LedgerLight</title>
+        <title>Import Transactions - Canopy</title>
       </Head>
       <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
         <Sidebar />
