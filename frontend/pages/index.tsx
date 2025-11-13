@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense, useMemo, useCallback } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import StatCard from "@/components/StatCard";
 import CurrencySelector from "@/components/CurrencySelector";
 import DarkModeToggle from "@/components/DarkModeToggle";
+import AnimatedCard from "@/components/AnimatedCard";
+import { StatCardSkeleton, ChartSkeleton, TransactionSkeleton } from "@/components/SkeletonLoader";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   DollarSign,
   TrendingUp,
@@ -129,102 +132,139 @@ export default function Home() {
     setConvertedAmounts(converted);
   };
 
-  const getConvertedAmount = (tx: Transaction): number | null => {
+  const getConvertedAmount = useCallback((tx: Transaction): number | null => {
     if (!showConverted || tx.currency === displayCurrency) return null;
     return convertedAmounts[tx.id] || null;
-  };
+  }, [showConverted, displayCurrency, convertedAmounts]);
 
-  // Calculate totals - convert all to display currency for summary
-  const totalIncome = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+  // Calculate totals - convert all to display currency for summary (memoized)
+  const { totalIncome, totalExpenses, net } = useMemo(() => {
+    const income = transactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
 
-  const totalExpenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+    const expenses = transactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
 
-  const net = totalIncome - totalExpenses;
+    return {
+      totalIncome: income,
+      totalExpenses: expenses,
+      net: income - expenses,
+    };
+  }, [transactions, displayCurrency, convertedAmounts]);
 
-  // Calculate month-over-month and year-over-year comparisons
-  const now = new Date();
-  const currentMonthStart = startOfMonth(now);
-  const lastMonthStart = startOfMonth(subMonths(now, 1));
-  const lastMonthEnd = endOfMonth(subMonths(now, 1));
-  const lastYearMonthStart = startOfMonth(subMonths(now, 12));
+  // Calculate month-over-month and year-over-year comparisons (memoized)
+  const now = useMemo(() => new Date(), []);
+  const currentMonthStart = useMemo(() => startOfMonth(now), [now]);
+  const lastMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
+  const lastMonthEnd = useMemo(() => endOfMonth(subMonths(now, 1)), [now]);
 
-  const currentMonthTransactions = transactions.filter((t) => {
-    const txDate = new Date(t.date);
-    return txDate >= currentMonthStart;
-  });
+  const { currentMonthTransactions, lastMonthTransactions, lastYearMonthTransactions } = useMemo(() => {
+    const current = transactions.filter((t) => {
+      const txDate = new Date(t.date);
+      return txDate >= currentMonthStart;
+    });
 
-  const lastMonthTransactions = transactions.filter((t) => {
-    const txDate = new Date(t.date);
-    return txDate >= lastMonthStart && txDate <= lastMonthEnd;
-  });
+    const last = transactions.filter((t) => {
+      const txDate = new Date(t.date);
+      return txDate >= lastMonthStart && txDate <= lastMonthEnd;
+    });
 
-  const lastYearMonthTransactions = transactions.filter((t) => {
-    const txDate = new Date(t.date);
-    return (
-      isSameMonth(txDate, subMonths(now, 12)) &&
-      isSameYear(txDate, subMonths(now, 12))
-    );
-  });
+    const lastYear = transactions.filter((t) => {
+      const txDate = new Date(t.date);
+      return (
+        isSameMonth(txDate, subMonths(now, 12)) &&
+        isSameYear(txDate, subMonths(now, 12))
+      );
+    });
 
-  const currentMonthIncome = currentMonthTransactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+    return {
+      currentMonthTransactions: current,
+      lastMonthTransactions: last,
+      lastYearMonthTransactions: lastYear,
+    };
+  }, [transactions, currentMonthStart, lastMonthStart, lastMonthEnd, now]);
 
-  const currentMonthExpenses = currentMonthTransactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+  const {
+    currentMonthIncome,
+    currentMonthExpenses,
+    lastMonthIncome,
+    lastMonthExpenses,
+    lastYearMonthIncome,
+    lastYearMonthExpenses,
+  } = useMemo(() => {
+    const currentIncome = currentMonthTransactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
 
-  const lastMonthIncome = lastMonthTransactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+    const currentExpenses = currentMonthTransactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
 
-  const lastMonthExpenses = lastMonthTransactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+    const lastIncome = lastMonthTransactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
 
-  const lastYearMonthIncome = lastYearMonthTransactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+    const lastExpenses = lastMonthTransactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
 
-  const lastYearMonthExpenses = lastYearMonthTransactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
+    const lastYearIncome = lastYearMonthTransactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
+
+    const lastYearExpenses = lastYearMonthTransactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        return sum + amount;
+      }, 0);
+
+    return {
+      currentMonthIncome: currentIncome,
+      currentMonthExpenses: currentExpenses,
+      lastMonthIncome: lastIncome,
+      lastMonthExpenses: lastExpenses,
+      lastYearMonthIncome: lastYearIncome,
+      lastYearMonthExpenses: lastYearExpenses,
+    };
+  }, [
+    currentMonthTransactions,
+    lastMonthTransactions,
+    lastYearMonthTransactions,
+    displayCurrency,
+    convertedAmounts,
+  ]);
 
   const incomeChangeMoM =
     lastMonthIncome > 0
@@ -264,7 +304,7 @@ export default function Home() {
     }
   };
 
-  const getChartData = (range: TimeRange) => {
+  const getChartData = useCallback((range: TimeRange) => {
     const days = getDaysForRange(range);
     const isDaily = days <= 30;
     const interval = isDaily ? 1 : Math.ceil(days / 30);
@@ -308,52 +348,61 @@ export default function Home() {
         net: income - expenses,
       };
     }).filter((d) => d.fullDate <= now);
-  };
+  }, [transactions, displayCurrency, convertedAmounts, now]);
 
-  const cashFlowData = getChartData(cashFlowRange);
-
-  // Category breakdown (using converted amounts)
-  const categoryData = transactions
-    .filter((t) => t.type === "expense" && t.category)
-    .reduce((acc, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      acc[t.category!] = (acc[t.category!] || 0) + amount;
-      return acc;
-    }, {} as Record<string, number>);
-
-  // Group small categories into "Others" (categories less than 5% of total)
-  const totalExpensesForChart = Object.values(categoryData).reduce(
-    (sum, val) => sum + val,
-    0
+  const cashFlowData = useMemo(
+    () => getChartData(cashFlowRange),
+    [getChartData, cashFlowRange]
   );
-  const threshold = totalExpensesForChart * 0.05; // 5% threshold
 
-  const pieData = Object.entries(categoryData)
-    .sort(([, a], [, b]) => b - a) // Sort by value descending
-    .reduce((acc, [name, value]) => {
-      if (value >= threshold) {
-        acc.push({ name, value });
-      } else {
-        // Add to "Others" category
-        const othersIndex = acc.findIndex((item) => item.name === "Others");
-        if (othersIndex >= 0) {
-          acc[othersIndex].value += value;
+  // Category breakdown (using converted amounts) - memoized
+  const { categoryData, totalExpensesForChart, pieData } = useMemo(() => {
+    const catData = transactions
+      .filter((t) => t.type === "expense" && t.category)
+      .reduce((acc, t) => {
+        const amount =
+          t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+        acc[t.category!] = (acc[t.category!] || 0) + amount;
+        return acc;
+      }, {} as Record<string, number>);
+
+    const total = Object.values(catData).reduce((sum, val) => sum + val, 0);
+    const threshold = total * 0.05; // 5% threshold
+
+    const pie = Object.entries(catData)
+      .sort(([, a], [, b]) => b - a) // Sort by value descending
+      .reduce((acc, [name, value]) => {
+        if (value >= threshold) {
+          acc.push({ name, value });
         } else {
-          acc.push({ name: "Others", value });
+          // Add to "Others" category
+          const othersIndex = acc.findIndex((item) => item.name === "Others");
+          if (othersIndex >= 0) {
+            acc[othersIndex].value += value;
+          } else {
+            acc.push({ name: "Others", value });
+          }
         }
-      }
-      return acc;
-    }, [] as Array<{ name: string; value: number }>);
+        return acc;
+      }, [] as Array<{ name: string; value: number }>);
 
+    return {
+      categoryData: catData,
+      totalExpensesForChart: total,
+      pieData: pie,
+    };
+  }, [transactions, displayCurrency, convertedAmounts]);
+
+  // Warm golden color palette for charts
   const COLORS = [
-    "#0ea5e9",
-    "#8b5cf6",
-    "#ec4899",
-    "#f59e0b",
-    "#10b981",
-    "#ef4444",
-    "#6b7280",
+    "#D4AF37", // Primary gold
+    "#F4D03F", // Light gold
+    "#C9A961", // Muted gold
+    "#B8941F", // Dark gold
+    "#f59e0b", // Amber
+    "#10b981", // Green
+    "#ef4444", // Red
+    "#9C9580", // Warm gray
   ];
 
   // Calculate net worth change percentage
@@ -364,8 +413,8 @@ export default function Home() {
         100
       : 0;
 
-  // Get recurring-like transactions (same merchant, similar amount, regular intervals)
-  const getRecurringTransactions = () => {
+  // Get recurring-like transactions (same merchant, similar amount, regular intervals) - memoized
+  const recurringTransactions = useMemo(() => {
     const merchantGroups = transactions.reduce((acc, tx) => {
       if (!tx.category) return acc;
       const key = `${tx.description.toLowerCase().substring(0, 20)}`;
@@ -383,34 +432,19 @@ export default function Home() {
         return sorted[0];
       })
       .slice(0, 3);
-  };
+  }, [transactions]);
 
-  const recurringTransactions = getRecurringTransactions();
-
-  // Budget simulation (based on average spending)
-  const avgMonthlyExpenses =
-    transactions.length > 0
-      ? totalExpenses /
-        Math.max(
-          1,
-          Math.ceil(
-            (now.getTime() -
-              new Date(
-                Math.min(...transactions.map((t) => new Date(t.date).getTime()))
-              ).getTime()) /
-              (1000 * 60 * 60 * 24 * 30)
-          )
-        )
-      : 0;
-
-  const budgetCategories = Object.entries(categoryData)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([name, spent]) => ({
-      name,
-      spent,
-      budget: Math.max(spent * 1.2, spent + 100), // Simulated budget (20% buffer)
-    }));
+  // Budget simulation (based on average spending) - memoized
+  const budgetCategories = useMemo(() => {
+    return Object.entries(categoryData)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, spent]) => ({
+        name,
+        spent,
+        budget: Math.max(spent * 1.2, spent + 100), // Simulated budget (20% buffer)
+      }));
+  }, [categoryData]);
 
   return (
     <>
@@ -422,20 +456,21 @@ export default function Home() {
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex min-h-screen bg-warm-gray-50 dark:bg-warm-gray-900">
         <Sidebar />
         <main className="flex-1 ml-64 p-8">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                  Dashboard
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Welcome back! Here's your financial overview.
-                </p>
-              </div>
+            <AnimatedCard delay={0}>
+              <div className="mb-8 flex items-center justify-between">
+                <div>
+                  <h1 className="text-4xl font-bold text-warm-gray-900 dark:text-warm-gray-50 mb-2">
+                    Dashboard
+                  </h1>
+                  <p className="text-warm-gray-600 dark:text-warm-gray-400">
+                    Welcome back! Here's your financial overview.
+                  </p>
+                </div>
               <div className="flex items-center gap-4">
                 <DarkModeToggle />
                 <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2">
@@ -461,10 +496,17 @@ export default function Home() {
                   />
                 )}
               </div>
-            </div>
+            </AnimatedCard>
 
             {/* Stats Grid - Enhanced with trends */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Suspense fallback={
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {[0, 1, 2].map((i) => (
+                  <StatCardSkeleton key={i} />
+                ))}
+              </div>
+            }>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <StatCard
                 title="Net Worth"
                 value={formatCurrency(net, displayCurrency)}
@@ -510,17 +552,19 @@ export default function Home() {
                 icon={TrendingDown}
                 gradient="bg-gradient-to-br from-red-400 to-rose-500"
               />
-            </div>
+              </div>
+            </Suspense>
 
             {/* Budget Overview Section */}
             {budgetCategories.length > 0 && (
-              <div className="card p-6 mb-8">
+              <AnimatedCard delay={0.1}>
+                <div className="card p-6 mb-8">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
                       Budget {format(now, "MMMM yyyy")}
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
                       Track your spending by category
                     </p>
                   </div>
@@ -532,7 +576,7 @@ export default function Home() {
                     return (
                       <div key={category.name} className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                          <span className="font-medium text-warm-gray-700 dark:text-warm-gray-300">
                             {category.name}
                           </span>
                           <div className="flex items-center gap-3">
@@ -540,20 +584,20 @@ export default function Home() {
                               className={`font-semibold ${
                                 isOverBudget
                                   ? "text-red-600 dark:text-red-400"
-                                  : "text-gray-700 dark:text-gray-300"
+                                  : "text-warm-gray-700 dark:text-warm-gray-300"
                               }`}
                             >
                               {formatCurrency(category.spent, displayCurrency)}
                             </span>
-                            <span className="text-gray-400 dark:text-gray-500">
+                            <span className="text-warm-gray-400 dark:text-warm-gray-500">
                               of
                             </span>
-                            <span className="text-gray-600 dark:text-gray-400">
+                            <span className="text-warm-gray-600 dark:text-warm-gray-400">
                               {formatCurrency(category.budget, displayCurrency)}
                             </span>
                           </div>
                         </div>
-                        <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className="relative h-2 bg-warm-gray-200 dark:bg-warm-gray-700 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${
                               isOverBudget
@@ -565,7 +609,7 @@ export default function Home() {
                             style={{ width: `${Math.min(percentage, 100)}%` }}
                           />
                         </div>
-                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center justify-between text-xs text-warm-gray-500 dark:text-warm-gray-400">
                           <span>{percentage.toFixed(0)}% used</span>
                           <span>
                             {isOverBudget
@@ -583,19 +627,26 @@ export default function Home() {
                     );
                   })}
                 </div>
-              </div>
+              </AnimatedCard>
             )}
 
             {/* Charts Grid - Enhanced */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Cash Flow Chart with Time Range Selector */}
-              <div className="card p-6">
+            <Suspense fallback={
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <ChartSkeleton />
+                <ChartSkeleton />
+              </div>
+            }>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Cash Flow Chart with Time Range Selector */}
+                <AnimatedCard delay={0.15}>
+                  <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
                       Cash Flow
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
                       {formatCurrency(
                         currentMonthIncome - currentMonthExpenses,
                         displayCurrency
@@ -609,11 +660,11 @@ export default function Home() {
                         <button
                           key={range}
                           onClick={() => setCashFlowRange(range)}
-                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                            cashFlowRange === range
-                              ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                          }`}
+                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                          cashFlowRange === range
+                            ? "bg-white dark:bg-warm-gray-700 text-warm-gray-900 dark:text-warm-gray-50 shadow-sm"
+                            : "text-warm-gray-600 dark:text-warm-gray-400 hover:text-warm-gray-900 dark:hover:text-warm-gray-50"
+                        }`}
                         >
                           {range === "7d"
                             ? "7D"
@@ -669,30 +720,30 @@ export default function Home() {
                       <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
                         <stop
                           offset="5%"
-                          stopColor="#3b82f6"
-                          stopOpacity={0.3}
+                          stopColor="#D4AF37"
+                          stopOpacity={0.4}
                         />
                         <stop
                           offset="95%"
-                          stopColor="#3b82f6"
+                          stopColor="#D4AF37"
                           stopOpacity={0}
                         />
                       </linearGradient>
                     </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#f0f0f0"
-                      className="dark:stroke-gray-700"
+                      stroke="#E8E4D8"
+                      className="dark:stroke-warm-gray-700"
                     />
                     <XAxis
                       dataKey="date"
-                      stroke="#6b7280"
-                      className="dark:stroke-gray-400"
+                      stroke="#9C9580"
+                      className="dark:stroke-warm-gray-400"
                       tick={{ fontSize: 12 }}
                     />
                     <YAxis
-                      stroke="#6b7280"
-                      className="dark:stroke-gray-400"
+                      stroke="#9C9580"
+                      className="dark:stroke-warm-gray-400"
                       tick={{ fontSize: 12 }}
                       tickFormatter={(value) =>
                         formatCurrencyCompact(value, displayCurrency)
@@ -700,13 +751,13 @@ export default function Home() {
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: isDarkMode ? "#1f2937" : "white",
+                        backgroundColor: isDarkMode ? "#1C1810" : "#FAF9F6",
                         border: `1px solid ${
-                          isDarkMode ? "#374151" : "#e5e7eb"
+                          isDarkMode ? "#3E3A30" : "#E8E4D8"
                         }`,
                         borderRadius: "12px",
-                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                        color: isDarkMode ? "#f3f4f6" : "#111827",
+                        boxShadow: "0 4px 6px -1px rgba(212, 175, 55, 0.1)",
+                        color: isDarkMode ? "#F5F3ED" : "#1C1810",
                       }}
                       formatter={(value: number, name: string) => [
                         formatCurrency(value, displayCurrency),
@@ -749,23 +800,25 @@ export default function Home() {
                     <Line
                       type="monotone"
                       dataKey="net"
-                      stroke="#3b82f6"
+                      stroke="#D4AF37"
                       strokeWidth={2}
                       dot={false}
                       name="net"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
-              </div>
+                </div>
+              </AnimatedCard>
 
               {/* Spending by Category - Enhanced */}
-              <div className="card p-6">
+              <AnimatedCard delay={0.2}>
+                <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
                       Spending by Category
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
                       {formatCurrency(currentMonthExpenses, displayCurrency)}{" "}
                       this month
                     </p>
@@ -831,12 +884,12 @@ export default function Home() {
                                       : COLORS[index % (COLORS.length - 1)],
                                 }}
                               />
-                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              <span className="text-sm font-medium text-warm-gray-700 dark:text-warm-gray-300">
                                 {entry.name}
                               </span>
                             </div>
                             <div className="flex items-center gap-4">
-                              <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div className="w-24 h-2 bg-warm-gray-200 dark:bg-warm-gray-700 rounded-full overflow-hidden">
                                 <div
                                   className="h-full rounded-full"
                                   style={{
@@ -849,10 +902,10 @@ export default function Home() {
                                 />
                               </div>
                               <div className="text-right min-w-[100px]">
-                                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                <div className="text-sm font-semibold text-warm-gray-900 dark:text-warm-gray-50">
                                   {formatCurrency(entry.value, displayCurrency)}
                                 </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                <div className="text-xs text-warm-gray-500 dark:text-warm-gray-400">
                                   {percentage.toFixed(1)}%
                                 </div>
                               </div>
@@ -873,13 +926,14 @@ export default function Home() {
             {/* Additional Sections Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               {/* Spending Comparison Chart */}
-              <div className="card p-6">
+              <AnimatedCard delay={0.25}>
+                <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
                       Spending Comparison
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
                       This month vs last month
                     </p>
                   </div>
@@ -901,29 +955,29 @@ export default function Home() {
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="#f0f0f0"
-                      className="dark:stroke-gray-700"
+                      stroke="#E8E4D8"
+                      className="dark:stroke-warm-gray-700"
                     />
                     <XAxis
                       dataKey="name"
-                      stroke="#6b7280"
-                      className="dark:stroke-gray-400"
+                      stroke="#9C9580"
+                      className="dark:stroke-warm-gray-400"
                     />
                     <YAxis
-                      stroke="#6b7280"
-                      className="dark:stroke-gray-400"
+                      stroke="#9C9580"
+                      className="dark:stroke-warm-gray-400"
                       tickFormatter={(value) =>
                         formatCurrencyCompact(value, displayCurrency)
                       }
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: isDarkMode ? "#1f2937" : "white",
+                        backgroundColor: isDarkMode ? "#1C1810" : "#FAF9F6",
                         border: `1px solid ${
-                          isDarkMode ? "#374151" : "#e5e7eb"
+                          isDarkMode ? "#3E3A30" : "#E8E4D8"
                         }`,
                         borderRadius: "12px",
-                        color: isDarkMode ? "#f3f4f6" : "#111827",
+                        color: isDarkMode ? "#F5F3ED" : "#1C1810",
                       }}
                       formatter={(value: number) =>
                         formatCurrency(value, displayCurrency)
@@ -944,20 +998,22 @@ export default function Home() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+                </div>
+              </AnimatedCard>
 
               {/* Recurring Transactions Preview */}
-              <div className="card p-6">
+              <AnimatedCard delay={0.3}>
+                <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
                       Recurring Transactions
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
                       Upcoming recurring payments
                     </p>
                   </div>
-                  <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <Clock className="w-5 h-5 text-warm-gray-400 dark:text-warm-gray-500" />
                 </div>
                 {recurringTransactions.length > 0 ? (
                   <div className="space-y-4">
@@ -966,7 +1022,7 @@ export default function Home() {
                       return (
                         <div
                           key={tx.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+                          className="flex items-center justify-between p-3 bg-warm-gray-50 dark:bg-warm-gray-800/50 rounded-lg"
                         >
                           <div className="flex items-center gap-3">
                             <div
@@ -983,12 +1039,12 @@ export default function Home() {
                               )}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900 dark:text-white text-sm">
+                              <p className="font-medium text-warm-gray-900 dark:text-warm-gray-50 text-sm">
                                 {tx.description.length > 30
                                   ? `${tx.description.substring(0, 30)}...`
                                   : tx.description}
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                              <p className="text-xs text-warm-gray-500 dark:text-warm-gray-400">
                                 {tx.category || "Uncategorized"} • Monthly
                               </p>
                             </div>
@@ -1007,13 +1063,13 @@ export default function Home() {
                             {showConverted &&
                               convertedAmount &&
                               tx.currency !== displayCurrency && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  ≈{" "}
-                                  {formatCurrency(
-                                    Math.abs(convertedAmount),
-                                    displayCurrency
-                                  )}
-                                </p>
+                              <p className="text-xs text-warm-gray-500 dark:text-warm-gray-400">
+                                ≈{" "}
+                                {formatCurrency(
+                                  Math.abs(convertedAmount),
+                                  displayCurrency
+                                )}
+                              </p>
                               )}
                           </div>
                         </div>
@@ -1030,13 +1086,15 @@ export default function Home() {
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
+              </AnimatedCard>
             </div>
 
             {/* Recent Transactions */}
-            <div className="card">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <AnimatedCard delay={0.35}>
+              <div className="card">
+              <div className="p-6 border-b border-warm-gray-100 dark:border-warm-gray-700 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
                   Recent Transactions
                 </h2>
                 <Link
@@ -1048,12 +1106,15 @@ export default function Home() {
                 </Link>
               </div>
               {loading ? (
-                <div className="p-12 text-center text-gray-400 dark:text-gray-500">
-                  Loading...
-                </div>
+                <Suspense fallback={<TransactionSkeleton />}>
+                  <div className="p-12 text-center text-warm-gray-400 dark:text-warm-gray-500">
+                    <LoadingSpinner size="lg" className="mx-auto mb-4" />
+                    <p>Loading transactions...</p>
+                  </div>
+                </Suspense>
               ) : transactions.length === 0 ? (
                 <div className="p-12 text-center">
-                  <p className="text-gray-400 dark:text-gray-500 mb-4">
+                  <p className="text-warm-gray-400 dark:text-warm-gray-500 mb-4">
                     No transactions yet
                   </p>
                   <Link
@@ -1064,7 +1125,7 @@ export default function Home() {
                   </Link>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                <div className="divide-y divide-warm-gray-100 dark:divide-warm-gray-700">
                   {transactions
                     .sort(
                       (a, b) =>
@@ -1076,7 +1137,7 @@ export default function Home() {
                       return (
                         <div
                           key={tx.id}
-                          className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                          className="p-6 hover:bg-warm-gray-50 dark:hover:bg-warm-gray-700/50 transition-colors"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
@@ -1098,10 +1159,10 @@ export default function Home() {
                                 )}
                               </div>
                               <div>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">
+                                <h3 className="font-semibold text-warm-gray-900 dark:text-warm-gray-50">
                                   {tx.description}
                                 </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400">
                                   {format(new Date(tx.date), "MMM dd, yyyy")}
                                   {tx.category && ` • ${tx.category}`}
                                 </p>
@@ -1126,11 +1187,11 @@ export default function Home() {
                                   convertedAmount &&
                                   tx.currency !== displayCurrency && (
                                     <>
-                                      <span className="text-gray-400 dark:text-gray-500">
-                                        ≈
-                                      </span>
-                                      <p
-                                        className={`text-base font-semibold text-gray-600 dark:text-gray-300 ${
+                                    <span className="text-warm-gray-400 dark:text-warm-gray-500">
+                                      ≈
+                                    </span>
+                                    <p
+                                      className={`text-base font-semibold text-warm-gray-600 dark:text-warm-gray-300 ${
                                           tx.type === "income"
                                             ? "text-green-600 dark:text-green-400"
                                             : "text-red-600 dark:text-red-400"
@@ -1144,7 +1205,7 @@ export default function Home() {
                                     </>
                                   )}
                               </div>
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                              <p className="text-xs text-warm-gray-400 dark:text-warm-gray-500 mt-1">
                                 {tx.currency}
                                 {showConverted &&
                                   convertedAmount &&
@@ -1154,14 +1215,15 @@ export default function Home() {
                                     </span>
                                   )}
                               </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                 </div>
               )}
-            </div>
+              </div>
+            </AnimatedCard>
           </div>
         </main>
       </div>

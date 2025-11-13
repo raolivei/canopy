@@ -1,17 +1,18 @@
 import '@/styles/globals.css'
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <>
+    <ErrorBoundary>
       <Head>
         <link rel="icon" href="/brand/canopy-icon-32.png" sizes="32x32" type="image/png" />
         <link rel="icon" href="/brand/canopy-icon-64.png" sizes="64x64" type="image/png" />
         <link rel="icon" href="/brand/canopy-icon-192.png" sizes="192x192" type="image/png" />
         <link rel="icon" href="/brand/canopy-icon-256.png" sizes="256x256" type="image/png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/brand/canopy-icon-180.png" />
-        <meta name="theme-color" content="#0C2650" />
+        <meta name="theme-color" content="#D4AF37" />
         <meta property="og:site_name" content="Canopy" />
         <meta property="og:title" content="Canopy - Your financial life under one canopy" />
         <meta
@@ -31,6 +32,6 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="twitter:image" content="/brand/canopy-banner-dark-og.png" />
       </Head>
       <Component {...pageProps} />
-    </>
+    </ErrorBoundary>
   )
 }
