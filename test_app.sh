@@ -1,6 +1,6 @@
 #!/bin/bash
-# LedgerLight Application Test Script
-# This script tests all functionality of the LedgerLight application
+# Canopy Application Test Script
+# This script tests all functionality of the Canopy application
 
 set -e
 
@@ -16,7 +16,7 @@ FRONTEND_URL="http://localhost:3000"
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
 
-echo -e "${GREEN}=== LedgerLight Application Test Suite ===${NC}\n"
+echo -e "${GREEN}=== Canopy Application Test Suite ===${NC}\n"
 
 # Function to check if a command exists
 command_exists() {
@@ -222,7 +222,7 @@ echo ""
 
 # Test API Integration
 echo -e "${YELLOW}Testing Frontend-Backend Integration...${NC}"
-frontend_health=$(curl -s "$FRONTEND_URL" | grep -i "ledgerlight\|dashboard" > /dev/null && echo "OK" || echo "FAIL")
+frontend_health=$(curl -s "$FRONTEND_URL" | grep -i "canopy\|dashboard" > /dev/null && echo "OK" || echo "FAIL")
 if [ "$frontend_health" = "OK" ]; then
     echo -e "${GREEN}✓${NC} Frontend loads successfully"
 else

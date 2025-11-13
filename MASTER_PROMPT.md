@@ -1,10 +1,10 @@
-# LedgerLight - Master Prompt for Recreation
+# Canopy - Master Prompt for Recreation
 
-This document provides a comprehensive guide to recreate the LedgerLight application from scratch. Use this as a master prompt for AI assistants or developers.
+This document provides a comprehensive guide to recreate the Canopy application from scratch. Use this as a master prompt for AI assistants or developers.
 
 ## Project Overview
 
-**LedgerLight** is a self-hosted personal finance & investment dashboard that merges portfolio analytics, budgeting, and transaction tracking into one unified platform. It is designed to run on a Raspberry Pi cluster with a lean footprint, storing all data locally without cloud dependencies.
+**Canopy** is a self-hosted personal finance & investment dashboard that merges portfolio analytics, budgeting, and transaction tracking into one unified platform. It is designed to run on a Raspberry Pi cluster with a lean footprint, storing all data locally without cloud dependencies.
 
 ### Core Objectives
 - Combine portfolio, budgeting, and net-worth views into a single dashboard
@@ -105,7 +105,7 @@ This document provides a comprehensive guide to recreate the LedgerLight applica
 ## Project Structure
 
 ```
-ledger-light/
+canopy/
 ├── backend/
 │   ├── api/
 │   │   ├── __init__.py
@@ -169,7 +169,7 @@ from backend.api import transactions, currency
 load_dotenv()
 
 app = FastAPI(
-    title="LedgerLight API",
+    title="Canopy API",
     description="Privacy-first personal finance and investment cockpit",
     version="0.1.0",
 )
@@ -195,7 +195,7 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    return {"message": "LedgerLight API", "version": "0.1.0"}
+    return {"message": "Canopy API", "version": "0.1.0"}
 ```
 
 **Key Points:**
@@ -746,9 +746,9 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 # OR with pyenv:
-pyenv local ledger-light
-pyenv virtualenv ledger-light
-pyenv activate ledger-light
+pyenv local canopy
+pyenv virtualenv canopy
+pyenv activate canopy
 ```
 
 2. **Install dependencies:**
@@ -758,7 +758,7 @@ pip install -r requirements.txt
 
 3. **Create `.env` file:**
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/ledgerlight
+DATABASE_URL=postgresql://user:password@localhost:5432/canopy
 REDIS_URL=redis://localhost:6379/0
 SECRET_KEY=your-secret-key-here
 DEBUG=True
@@ -780,7 +780,7 @@ alembic upgrade head
 6. **Start backend server:**
 ```bash
 cd backend
-PYTHONPATH=/path/to/ledger-light/backend python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
+PYTHONPATH=/path/to/canopy/backend python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Frontend Setup
@@ -1013,7 +1013,7 @@ docker compose up -d
 ```bash
 cd backend
 source venv/bin/activate
-PYTHONPATH=/path/to/ledger-light/backend python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
+PYTHONPATH=/path/to/canopy/backend python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
 ```
 
 3. **Start frontend (terminal 2):**
@@ -1055,7 +1055,7 @@ npm start
 
 ## Complete Feature Roadmap
 
-LedgerLight is designed to be a comprehensive personal finance management application. The following is the complete list of functionalities that LedgerLight supports or will support:
+Canopy is designed to be a comprehensive personal finance management application. The following is the complete list of functionalities that Canopy supports or will support:
 
 ### Core Features (MVP - Partially Implemented)
 - ✅ **Dashboard**: View an overall summary of finances, insights, and activity reports
@@ -1194,7 +1194,7 @@ LedgerLight is designed to be a comprehensive personal finance management applic
 
 ## Contact & Contribution
 
-This master prompt should provide everything needed to recreate LedgerLight. For questions or contributions, refer to the main README.md.
+This master prompt should provide everything needed to recreate Canopy. For questions or contributions, refer to the main README.md.
 
 ---
 

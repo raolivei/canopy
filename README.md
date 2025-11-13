@@ -129,7 +129,7 @@ canopy/
 
 ## CSV Import
 
-LedgerLight now supports importing transactions from CSV files with smart format detection:
+Canopy now supports importing transactions from CSV files with smart format detection:
 
 ### Supported Formats
 - **Monarch Money** - Full support including merchant names, categories, tags, and investment transactions
