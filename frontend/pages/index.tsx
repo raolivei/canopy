@@ -1,172 +1,425 @@
-import { useEffect, useState } from 'react'
-import Head from 'next/head'
-import Link from 'next/link'
-import Sidebar from '@/components/Sidebar'
-import StatCard from '@/components/StatCard'
-import CurrencySelector from '@/components/CurrencySelector'
-import DarkModeToggle from '@/components/DarkModeToggle'
-import { DollarSign, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react'
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { format, subDays } from 'date-fns'
-import { formatCurrency, convertCurrency } from '@/utils/currency'
+import { useEffect, useState } from "react";
+import Head from "next/head";
+import Link from "next/link";
+import Sidebar from "@/components/Sidebar";
+import StatCard from "@/components/StatCard";
+import CurrencySelector from "@/components/CurrencySelector";
+import DarkModeToggle from "@/components/DarkModeToggle";
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  Calendar,
+  Clock,
+  Target,
+  BarChart3,
+} from "lucide-react";
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
+} from "recharts";
+import {
+  format,
+  subDays,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  isSameMonth,
+  isSameYear,
+  startOfYear,
+} from "date-fns";
+import {
+  formatCurrency,
+  convertCurrency,
+  formatCurrencyCompact,
+} from "@/utils/currency";
 
 interface Transaction {
-  id: number
-  description: string
-  amount: number
-  currency: string
-  type: 'income' | 'expense' | 'transfer'
-  category?: string
-  date: string
+  id: number;
+  description: string;
+  amount: number;
+  currency: string;
+  type: "income" | "expense" | "transfer";
+  category?: string;
+  date: string;
 }
 
+type TimeRange = "7d" | "30d" | "90d" | "1y" | "all";
+
 export default function Home() {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [loading, setLoading] = useState(true)
-  const [displayCurrency, setDisplayCurrency] = useState('USD')
-  const [showConverted, setShowConverted] = useState(true)
-  const [convertedAmounts, setConvertedAmounts] = useState<Record<number, number>>({})
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [displayCurrency, setDisplayCurrency] = useState("USD");
+  const [showConverted, setShowConverted] = useState(true);
+  const [convertedAmounts, setConvertedAmounts] = useState<
+    Record<number, number>
+  >({});
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [cashFlowRange, setCashFlowRange] = useState<TimeRange>("30d");
+  const [spendingRange, setSpendingRange] = useState<TimeRange>("30d");
 
   useEffect(() => {
-    fetchTransactions()
+    fetchTransactions();
     // Check dark mode status
     const checkDarkMode = () => {
-      if (typeof window !== 'undefined') {
-        setIsDarkMode(document.documentElement.classList.contains('dark'))
+      if (typeof window !== "undefined") {
+        setIsDarkMode(document.documentElement.classList.contains("dark"));
       }
-    }
-    checkDarkMode()
+    };
+    checkDarkMode();
     // Watch for dark mode changes
-    const observer = new MutationObserver(checkDarkMode)
-    if (typeof window !== 'undefined') {
+    const observer = new MutationObserver(checkDarkMode);
+    if (typeof window !== "undefined") {
       observer.observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ['class']
-      })
+        attributeFilter: ["class"],
+      });
     }
-    return () => observer.disconnect()
-  }, [])
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (transactions.length > 0 && showConverted) {
-      convertAllAmounts()
+      convertAllAmounts();
     }
-  }, [transactions, displayCurrency, showConverted])
+  }, [transactions, displayCurrency, showConverted]);
 
   const fetchTransactions = async () => {
     try {
-      const res = await fetch('http://localhost:8000/v1/transactions/')
-      const data = await res.json()
-      setTransactions(data)
-      setLoading(false)
+      const res = await fetch("http://localhost:8000/v1/transactions/");
+      const data = await res.json();
+      setTransactions(data);
+      setLoading(false);
     } catch (err) {
-      console.error('Failed to fetch transactions:', err)
-      setLoading(false)
+      console.error("Failed to fetch transactions:", err);
+      setLoading(false);
     }
-  }
+  };
 
   const convertAllAmounts = async () => {
-    const converted: Record<number, number> = {}
+    const converted: Record<number, number> = {};
     await Promise.all(
       transactions.map(async (tx) => {
         if (tx.currency === displayCurrency) {
-          converted[tx.id] = tx.amount
+          converted[tx.id] = tx.amount;
         } else {
-          const convertedAmount = await convertCurrency(tx.amount, tx.currency, displayCurrency)
-          converted[tx.id] = convertedAmount
+          const convertedAmount = await convertCurrency(
+            tx.amount,
+            tx.currency,
+            displayCurrency
+          );
+          converted[tx.id] = convertedAmount;
         }
       })
-    )
-    setConvertedAmounts(converted)
-  }
+    );
+    setConvertedAmounts(converted);
+  };
 
   const getConvertedAmount = (tx: Transaction): number | null => {
-    if (!showConverted || tx.currency === displayCurrency) return null
-    return convertedAmounts[tx.id] || null
-  }
+    if (!showConverted || tx.currency === displayCurrency) return null;
+    return convertedAmounts[tx.id] || null;
+  };
 
   // Calculate totals - convert all to display currency for summary
   const totalIncome = transactions
-    .filter(t => t.type === 'income')
+    .filter((t) => t.type === "income")
     .reduce((sum, t) => {
-      const amount = t.currency === displayCurrency ? t.amount : (convertedAmounts[t.id] || 0)
-      return sum + amount
-    }, 0)
-  
-  const totalExpenses = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => {
-      const amount = t.currency === displayCurrency ? t.amount : (convertedAmounts[t.id] || 0)
-      return sum + amount
-    }, 0)
-  
-  const net = totalIncome - totalExpenses
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
 
-  // Generate chart data for last 7 days (using converted amounts)
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const date = subDays(new Date(), 6 - i)
-    const dayTransactions = transactions.filter(
-      t => format(new Date(t.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-    )
-    const income = dayTransactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => {
-        const amount = t.currency === displayCurrency ? t.amount : (convertedAmounts[t.id] || 0)
-        return sum + amount
-      }, 0)
-    const expenses = dayTransactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => {
-        const amount = t.currency === displayCurrency ? t.amount : (convertedAmounts[t.id] || 0)
-        return sum + amount
-      }, 0)
-    return {
-      date: format(date, 'MMM dd'),
-      income,
-      expenses,
-      net: income - expenses,
+  const totalExpenses = transactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => {
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
+
+  const net = totalIncome - totalExpenses;
+
+  // Calculate month-over-month and year-over-year comparisons
+  const now = new Date();
+  const currentMonthStart = startOfMonth(now);
+  const lastMonthStart = startOfMonth(subMonths(now, 1));
+  const lastMonthEnd = endOfMonth(subMonths(now, 1));
+  const lastYearMonthStart = startOfMonth(subMonths(now, 12));
+
+  const currentMonthTransactions = transactions.filter((t) => {
+    const txDate = new Date(t.date);
+    return txDate >= currentMonthStart;
+  });
+
+  const lastMonthTransactions = transactions.filter((t) => {
+    const txDate = new Date(t.date);
+    return txDate >= lastMonthStart && txDate <= lastMonthEnd;
+  });
+
+  const lastYearMonthTransactions = transactions.filter((t) => {
+    const txDate = new Date(t.date);
+    return (
+      isSameMonth(txDate, subMonths(now, 12)) &&
+      isSameYear(txDate, subMonths(now, 12))
+    );
+  });
+
+  const currentMonthIncome = currentMonthTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => {
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
+
+  const currentMonthExpenses = currentMonthTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => {
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
+
+  const lastMonthIncome = lastMonthTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => {
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
+
+  const lastMonthExpenses = lastMonthTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => {
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
+
+  const lastYearMonthIncome = lastYearMonthTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => {
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
+
+  const lastYearMonthExpenses = lastYearMonthTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => {
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      return sum + amount;
+    }, 0);
+
+  const incomeChangeMoM =
+    lastMonthIncome > 0
+      ? ((currentMonthIncome - lastMonthIncome) / lastMonthIncome) * 100
+      : 0;
+  const expensesChangeMoM =
+    lastMonthExpenses > 0
+      ? ((currentMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
+      : 0;
+  const netChangeMoM =
+    currentMonthIncome -
+    currentMonthExpenses -
+    (lastMonthIncome - lastMonthExpenses);
+
+  // Generate chart data based on selected range
+  const getDaysForRange = (range: TimeRange): number => {
+    switch (range) {
+      case "7d":
+        return 7;
+      case "30d":
+        return 30;
+      case "90d":
+        return 90;
+      case "1y":
+        return 365;
+      case "all":
+        if (transactions.length === 0) return 30;
+        const oldestTx = Math.min(
+          ...transactions.map((t) => new Date(t.date).getTime())
+        );
+        const daysDiff = Math.ceil(
+          (now.getTime() - oldestTx) / (1000 * 60 * 60 * 24)
+        );
+        return Math.min(365, daysDiff);
+      default:
+        return 30;
     }
-  })
+  };
+
+  const getChartData = (range: TimeRange) => {
+    const days = getDaysForRange(range);
+    const isDaily = days <= 30;
+    const interval = isDaily ? 1 : Math.ceil(days / 30);
+
+    return Array.from({ length: Math.ceil(days / interval) }, (_, i) => {
+      const date = subDays(now, days - i * interval - 1);
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dayTransactions = transactions.filter((t) => {
+        const txDate = new Date(t.date);
+        return txDate >= dayStart && txDate <= dayEnd;
+      });
+
+      const income = dayTransactions
+        .filter((t) => t.type === "income")
+        .reduce((sum, t) => {
+          const amount =
+            t.currency === displayCurrency
+              ? t.amount
+              : convertedAmounts[t.id] || 0;
+          return sum + amount;
+        }, 0);
+      const expenses = dayTransactions
+        .filter((t) => t.type === "expense")
+        .reduce((sum, t) => {
+          const amount =
+            t.currency === displayCurrency
+              ? t.amount
+              : convertedAmounts[t.id] || 0;
+          return sum + amount;
+        }, 0);
+
+      return {
+        date: isDaily ? format(date, "MMM dd") : format(date, "MMM dd"),
+        fullDate: date,
+        income,
+        expenses,
+        net: income - expenses,
+      };
+    }).filter((d) => d.fullDate <= now);
+  };
+
+  const cashFlowData = getChartData(cashFlowRange);
 
   // Category breakdown (using converted amounts)
   const categoryData = transactions
-    .filter(t => t.type === 'expense' && t.category)
+    .filter((t) => t.type === "expense" && t.category)
     .reduce((acc, t) => {
-      const amount = t.currency === displayCurrency ? t.amount : (convertedAmounts[t.id] || 0)
-      acc[t.category!] = (acc[t.category!] || 0) + amount
-      return acc
-    }, {} as Record<string, number>)
+      const amount =
+        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
+      acc[t.category!] = (acc[t.category!] || 0) + amount;
+      return acc;
+    }, {} as Record<string, number>);
 
   // Group small categories into "Others" (categories less than 5% of total)
-  const totalExpensesForChart = Object.values(categoryData).reduce((sum, val) => sum + val, 0)
-  const threshold = totalExpensesForChart * 0.05 // 5% threshold
-  
+  const totalExpensesForChart = Object.values(categoryData).reduce(
+    (sum, val) => sum + val,
+    0
+  );
+  const threshold = totalExpensesForChart * 0.05; // 5% threshold
+
   const pieData = Object.entries(categoryData)
     .sort(([, a], [, b]) => b - a) // Sort by value descending
     .reduce((acc, [name, value]) => {
       if (value >= threshold) {
-        acc.push({ name, value })
+        acc.push({ name, value });
       } else {
         // Add to "Others" category
-        const othersIndex = acc.findIndex(item => item.name === 'Others')
+        const othersIndex = acc.findIndex((item) => item.name === "Others");
         if (othersIndex >= 0) {
-          acc[othersIndex].value += value
+          acc[othersIndex].value += value;
         } else {
-          acc.push({ name: 'Others', value })
+          acc.push({ name: "Others", value });
         }
       }
-      return acc
-    }, [] as Array<{ name: string; value: number }>)
+      return acc;
+    }, [] as Array<{ name: string; value: number }>);
 
-  const COLORS = ['#0ea5e9', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#6b7280']
+  const COLORS = [
+    "#0ea5e9",
+    "#8b5cf6",
+    "#ec4899",
+    "#f59e0b",
+    "#10b981",
+    "#ef4444",
+    "#6b7280",
+  ];
 
+  // Calculate net worth change percentage
+  const netWorthChangePercent =
+    lastMonthIncome + lastMonthExpenses > 0
+      ? ((net - (lastMonthIncome - lastMonthExpenses)) /
+          Math.abs(lastMonthIncome - lastMonthExpenses)) *
+        100
+      : 0;
+
+  // Get recurring-like transactions (same merchant, similar amount, regular intervals)
+  const getRecurringTransactions = () => {
+    const merchantGroups = transactions.reduce((acc, tx) => {
+      if (!tx.category) return acc;
+      const key = `${tx.description.toLowerCase().substring(0, 20)}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(tx);
+      return acc;
+    }, {} as Record<string, Transaction[]>);
+
+    return Object.entries(merchantGroups)
+      .filter(([_, txs]) => txs.length >= 2)
+      .map(([_, txs]) => {
+        const sorted = txs.sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        return sorted[0];
+      })
+      .slice(0, 3);
+  };
+
+  const recurringTransactions = getRecurringTransactions();
+
+  // Budget simulation (based on average spending)
+  const avgMonthlyExpenses =
+    transactions.length > 0
+      ? totalExpenses /
+        Math.max(
+          1,
+          Math.ceil(
+            (now.getTime() -
+              new Date(
+                Math.min(...transactions.map((t) => new Date(t.date).getTime()))
+              ).getTime()) /
+              (1000 * 60 * 60 * 24 * 30)
+          )
+        )
+      : 0;
+
+  const budgetCategories = Object.entries(categoryData)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([name, spent]) => ({
+      name,
+      spent,
+      budget: Math.max(spent * 1.2, spent + 100), // Simulated budget (20% buffer)
+    }));
 
   return (
     <>
       <Head>
         <title>Dashboard - Canopy</title>
-        <meta name="description" content="Privacy-first personal finance dashboard" />
+        <meta
+          name="description"
+          content="Privacy-first personal finance dashboard"
+        />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -176,8 +429,12 @@ export default function Home() {
             {/* Header */}
             <div className="mb-8 flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
-                <p className="text-gray-600 dark:text-gray-400">Welcome back! Here's your financial overview.</p>
+                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                  Dashboard
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Welcome back! Here's your financial overview.
+                </p>
               </div>
               <div className="flex items-center gap-4">
                 <DarkModeToggle />
@@ -189,7 +446,10 @@ export default function Home() {
                     onChange={(e) => setShowConverted(e.target.checked)}
                     className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
                   />
-                  <label htmlFor="showConvertedDashboard" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label
+                    htmlFor="showConvertedDashboard"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
                     Show converted
                   </label>
                 </div>
@@ -203,104 +463,405 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Stats Grid */}
+            {/* Stats Grid - Enhanced with trends */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <StatCard
                 title="Net Worth"
                 value={formatCurrency(net, displayCurrency)}
-                change={net >= 0 ? `+${formatCurrency(net, displayCurrency)}` : formatCurrency(net, displayCurrency)}
-                changeType={net >= 0 ? 'positive' : 'negative'}
+                change={
+                  netChangeMoM !== 0
+                    ? `${netChangeMoM >= 0 ? "+" : ""}${formatCurrency(
+                        netChangeMoM,
+                        displayCurrency
+                      )} (${
+                        netWorthChangePercent >= 0 ? "+" : ""
+                      }${netWorthChangePercent.toFixed(1)}%)`
+                    : undefined
+                }
+                changeType={netChangeMoM >= 0 ? "positive" : "negative"}
                 icon={TrendingUp}
                 gradient="bg-gradient-to-br from-green-400 to-emerald-500"
               />
               <StatCard
                 title="Total Income"
-                value={formatCurrency(totalIncome, displayCurrency)}
+                value={formatCurrency(currentMonthIncome, displayCurrency)}
+                change={
+                  incomeChangeMoM !== 0
+                    ? `${
+                        incomeChangeMoM >= 0 ? "+" : ""
+                      }${incomeChangeMoM.toFixed(1)}% vs last month`
+                    : undefined
+                }
+                changeType={incomeChangeMoM >= 0 ? "positive" : "negative"}
                 icon={DollarSign}
                 gradient="bg-gradient-to-br from-blue-400 to-cyan-500"
               />
               <StatCard
                 title="Total Expenses"
-                value={formatCurrency(totalExpenses, displayCurrency)}
+                value={formatCurrency(currentMonthExpenses, displayCurrency)}
+                change={
+                  expensesChangeMoM !== 0
+                    ? `${
+                        expensesChangeMoM >= 0 ? "+" : ""
+                      }${expensesChangeMoM.toFixed(1)}% vs last month`
+                    : undefined
+                }
+                changeType={expensesChangeMoM <= 0 ? "positive" : "negative"}
                 icon={TrendingDown}
                 gradient="bg-gradient-to-br from-red-400 to-rose-500"
               />
             </div>
 
-            {/* Charts Grid */}
+            {/* Budget Overview Section */}
+            {budgetCategories.length > 0 && (
+              <div className="card p-6 mb-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Budget {format(now, "MMMM yyyy")}
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Track your spending by category
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {budgetCategories.map((category) => {
+                    const percentage = (category.spent / category.budget) * 100;
+                    const isOverBudget = percentage > 100;
+                    return (
+                      <div key={category.name} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                            {category.name}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`font-semibold ${
+                                isOverBudget
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-gray-700 dark:text-gray-300"
+                              }`}
+                            >
+                              {formatCurrency(category.spent, displayCurrency)}
+                            </span>
+                            <span className="text-gray-400 dark:text-gray-500">
+                              of
+                            </span>
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {formatCurrency(category.budget, displayCurrency)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              isOverBudget
+                                ? "bg-red-500"
+                                : percentage > 80
+                                ? "bg-yellow-500"
+                                : "bg-green-500"
+                            }`}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>{percentage.toFixed(0)}% used</span>
+                          <span>
+                            {isOverBudget
+                              ? `${formatCurrency(
+                                  category.spent - category.budget,
+                                  displayCurrency
+                                )} over budget`
+                              : `${formatCurrency(
+                                  category.budget - category.spent,
+                                  displayCurrency
+                                )} remaining`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Charts Grid - Enhanced */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Income vs Expenses Chart */}
+              {/* Cash Flow Chart with Time Range Selector */}
               <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Cash Flow</h2>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Last 7 days</span>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Cash Flow
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {formatCurrency(
+                        currentMonthIncome - currentMonthExpenses,
+                        displayCurrency
+                      )}{" "}
+                      this month
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                    {(["7d", "30d", "90d", "1y"] as TimeRange[]).map(
+                      (range) => (
+                        <button
+                          key={range}
+                          onClick={() => setCashFlowRange(range)}
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            cashFlowRange === range
+                              ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                          }`}
+                        >
+                          {range === "7d"
+                            ? "7D"
+                            : range === "30d"
+                            ? "30D"
+                            : range === "90d"
+                            ? "90D"
+                            : "1Y"}
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={last7Days}>
+                  <AreaChart data={cashFlowData}>
                     <defs>
-                      <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      <linearGradient
+                        id="colorIncome"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#10b981"
+                          stopOpacity={0.4}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#10b981"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
-                      <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      <linearGradient
+                        id="colorExpenses"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#ef4444"
+                          stopOpacity={0.4}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#ef4444"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                      <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor="#3b82f6"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#3b82f6"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-700" />
-                    <XAxis dataKey="date" stroke="#6b7280" className="dark:stroke-gray-400" />
-                    <YAxis stroke="#6b7280" className="dark:stroke-gray-400" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: isDarkMode ? '#1f2937' : 'white',
-                        border: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                        color: isDarkMode ? '#f3f4f6' : '#111827'
-                      }}
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f0f0f0"
+                      className="dark:stroke-gray-700"
                     />
-                    <Area type="monotone" dataKey="income" stroke="#10b981" fillOpacity={1} fill="url(#colorIncome)" />
-                    <Area type="monotone" dataKey="expenses" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpenses)" />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#6b7280"
+                      className="dark:stroke-gray-400"
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis
+                      stroke="#6b7280"
+                      className="dark:stroke-gray-400"
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) =>
+                        formatCurrencyCompact(value, displayCurrency)
+                      }
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: isDarkMode ? "#1f2937" : "white",
+                        border: `1px solid ${
+                          isDarkMode ? "#374151" : "#e5e7eb"
+                        }`,
+                        borderRadius: "12px",
+                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                        color: isDarkMode ? "#f3f4f6" : "#111827",
+                      }}
+                      formatter={(value: number, name: string) => [
+                        formatCurrency(value, displayCurrency),
+                        name === "income"
+                          ? "Income"
+                          : name === "expenses"
+                          ? "Expenses"
+                          : "Net",
+                      ]}
+                    />
+                    <Legend
+                      wrapperStyle={{ paddingTop: "20px" }}
+                      iconType="circle"
+                      formatter={(value) =>
+                        value === "income"
+                          ? "Income"
+                          : value === "expenses"
+                          ? "Expenses"
+                          : "Net"
+                      }
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="income"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorIncome)"
+                      name="income"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorExpenses)"
+                      name="expenses"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="net"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={false}
+                      name="net"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
-              {/* Category Breakdown */}
+              {/* Spending by Category - Enhanced */}
               <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Spending by Category</h2>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Spending by Category
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {formatCurrency(currentMonthExpenses, displayCurrency)}{" "}
+                      this month
+                    </p>
+                  </div>
                 </div>
                 {pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.name === 'Others' ? '#6b7280' : COLORS[index % (COLORS.length - 1)]} 
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    <div className="flex-1">
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={
+                                  entry.name === "Others"
+                                    ? "#6b7280"
+                                    : COLORS[index % (COLORS.length - 1)]
+                                }
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) =>
+                              formatCurrency(value, displayCurrency)
+                            }
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? "#1f2937" : "white",
+                              border: `1px solid ${
+                                isDarkMode ? "#374151" : "#e5e7eb"
+                              }`,
+                              borderRadius: "12px",
+                              color: isDarkMode ? "#f3f4f6" : "#111827",
+                            }}
                           />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value: number) => formatCurrency(value, displayCurrency)}
-                        contentStyle={{ 
-                          backgroundColor: isDarkMode ? '#1f2937' : 'white',
-                          border: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
-                          borderRadius: '12px',
-                          color: isDarkMode ? '#f3f4f6' : '#111827'
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      {pieData.slice(0, 5).map((entry, index) => {
+                        const percentage =
+                          (entry.value / totalExpensesForChart) * 100;
+                        return (
+                          <div
+                            key={entry.name}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    entry.name === "Others"
+                                      ? "#6b7280"
+                                      : COLORS[index % (COLORS.length - 1)],
+                                }}
+                              />
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {entry.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${percentage}%`,
+                                    backgroundColor:
+                                      entry.name === "Others"
+                                        ? "#6b7280"
+                                        : COLORS[index % (COLORS.length - 1)],
+                                  }}
+                                />
+                              </div>
+                              <div className="text-right min-w-[100px]">
+                                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  {formatCurrency(entry.value, displayCurrency)}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {percentage.toFixed(1)}%
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-gray-400 dark:text-gray-500">
                     No category data yet
@@ -309,56 +870,239 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Additional Sections Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              {/* Spending Comparison Chart */}
+              <div className="card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Spending Comparison
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      This month vs last month
+                    </p>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      {
+                        name: "This Month",
+                        income: currentMonthIncome,
+                        expenses: currentMonthExpenses,
+                      },
+                      {
+                        name: "Last Month",
+                        income: lastMonthIncome,
+                        expenses: lastMonthExpenses,
+                      },
+                    ]}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f0f0f0"
+                      className="dark:stroke-gray-700"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      stroke="#6b7280"
+                      className="dark:stroke-gray-400"
+                    />
+                    <YAxis
+                      stroke="#6b7280"
+                      className="dark:stroke-gray-400"
+                      tickFormatter={(value) =>
+                        formatCurrencyCompact(value, displayCurrency)
+                      }
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: isDarkMode ? "#1f2937" : "white",
+                        border: `1px solid ${
+                          isDarkMode ? "#374151" : "#e5e7eb"
+                        }`,
+                        borderRadius: "12px",
+                        color: isDarkMode ? "#f3f4f6" : "#111827",
+                      }}
+                      formatter={(value: number) =>
+                        formatCurrency(value, displayCurrency)
+                      }
+                    />
+                    <Legend />
+                    <Bar
+                      dataKey="income"
+                      fill="#10b981"
+                      name="Income"
+                      radius={[8, 8, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="expenses"
+                      fill="#ef4444"
+                      name="Expenses"
+                      radius={[8, 8, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Recurring Transactions Preview */}
+              <div className="card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Recurring Transactions
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Upcoming recurring payments
+                    </p>
+                  </div>
+                  <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                </div>
+                {recurringTransactions.length > 0 ? (
+                  <div className="space-y-4">
+                    {recurringTransactions.map((tx) => {
+                      const convertedAmount = getConvertedAmount(tx);
+                      return (
+                        <div
+                          key={tx.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                tx.type === "expense"
+                                  ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                  : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                              }`}
+                            >
+                              {tx.type === "expense" ? (
+                                <TrendingDown size={18} />
+                              ) : (
+                                <TrendingUp size={18} />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white text-sm">
+                                {tx.description.length > 30
+                                  ? `${tx.description.substring(0, 30)}...`
+                                  : tx.description}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {tx.category || "Uncategorized"} • Monthly
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p
+                              className={`font-semibold text-sm ${
+                                tx.type === "expense"
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-green-600 dark:text-green-400"
+                              }`}
+                            >
+                              {tx.type === "expense" ? "-" : "+"}
+                              {formatCurrency(Math.abs(tx.amount), tx.currency)}
+                            </p>
+                            {showConverted &&
+                              convertedAmount &&
+                              tx.currency !== displayCurrency && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  ≈{" "}
+                                  {formatCurrency(
+                                    Math.abs(convertedAmount),
+                                    displayCurrency
+                                  )}
+                                </p>
+                              )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
+                    <div className="text-center">
+                      <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">
+                        No recurring transactions detected
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Recent Transactions */}
             <div className="card">
               <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
-                <Link href="/transactions" className="btn-secondary text-sm flex items-center gap-2">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Recent Transactions
+                </h2>
+                <Link
+                  href="/transactions"
+                  className="btn-secondary text-sm flex items-center gap-2"
+                >
                   View All
                   <ArrowUpRight size={16} />
                 </Link>
               </div>
               {loading ? (
-                <div className="p-12 text-center text-gray-400 dark:text-gray-500">Loading...</div>
+                <div className="p-12 text-center text-gray-400 dark:text-gray-500">
+                  Loading...
+                </div>
               ) : transactions.length === 0 ? (
                 <div className="p-12 text-center">
-                  <p className="text-gray-400 dark:text-gray-500 mb-4">No transactions yet</p>
-                  <Link href="/transactions" className="btn-primary inline-block">
+                  <p className="text-gray-400 dark:text-gray-500 mb-4">
+                    No transactions yet
+                  </p>
+                  <Link
+                    href="/transactions"
+                    className="btn-primary inline-block"
+                  >
                     Add Your First Transaction
                   </Link>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
                   {transactions
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .sort(
+                      (a, b) =>
+                        new Date(b.date).getTime() - new Date(a.date).getTime()
+                    )
                     .slice(0, 5)
                     .map((tx) => {
-                      const convertedAmount = getConvertedAmount(tx)
+                      const convertedAmount = getConvertedAmount(tx);
                       return (
-                        <div key={tx.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <div
+                          key={tx.id}
+                          className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                               <div
                                 className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                  tx.type === 'income'
-                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                                    : tx.type === 'expense'
-                                    ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                  tx.type === "income"
+                                    ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                                    : tx.type === "expense"
+                                    ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                    : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                                 }`}
                               >
-                                {tx.type === 'income' ? (
+                                {tx.type === "income" ? (
                                   <TrendingUp size={20} />
-                                ) : tx.type === 'expense' ? (
+                                ) : tx.type === "expense" ? (
                                   <TrendingDown size={20} />
                                 ) : (
                                   <DollarSign size={20} />
                                 )}
                               </div>
                               <div>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">{tx.description}</h3>
+                                <h3 className="font-semibold text-gray-900 dark:text-white">
+                                  {tx.description}
+                                </h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  {format(new Date(tx.date), 'MMM dd, yyyy')}
+                                  {format(new Date(tx.date), "MMM dd, yyyy")}
                                   {tx.category && ` • ${tx.category}`}
                                 </p>
                               </div>
@@ -367,35 +1111,53 @@ export default function Home() {
                               <div className="flex items-baseline gap-2">
                                 <p
                                   className={`text-lg font-bold ${
-                                    tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                    tx.type === "income"
+                                      ? "text-green-600 dark:text-green-400"
+                                      : "text-red-600 dark:text-red-400"
                                   }`}
                                 >
-                                  {tx.type === 'expense' ? '-' : '+'}
-                                  {formatCurrency(Math.abs(tx.amount), tx.currency)}
+                                  {tx.type === "expense" ? "-" : "+"}
+                                  {formatCurrency(
+                                    Math.abs(tx.amount),
+                                    tx.currency
+                                  )}
                                 </p>
-                                {showConverted && convertedAmount && tx.currency !== displayCurrency && (
-                                  <>
-                                    <span className="text-gray-400 dark:text-gray-500">≈</span>
-                                    <p
-                                      className={`text-base font-semibold text-gray-600 dark:text-gray-300 ${
-                                        tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                      }`}
-                                    >
-                                      {formatCurrency(Math.abs(convertedAmount), displayCurrency)}
-                                    </p>
-                                  </>
-                                )}
+                                {showConverted &&
+                                  convertedAmount &&
+                                  tx.currency !== displayCurrency && (
+                                    <>
+                                      <span className="text-gray-400 dark:text-gray-500">
+                                        ≈
+                                      </span>
+                                      <p
+                                        className={`text-base font-semibold text-gray-600 dark:text-gray-300 ${
+                                          tx.type === "income"
+                                            ? "text-green-600 dark:text-green-400"
+                                            : "text-red-600 dark:text-red-400"
+                                        }`}
+                                      >
+                                        {formatCurrency(
+                                          Math.abs(convertedAmount),
+                                          displayCurrency
+                                        )}
+                                      </p>
+                                    </>
+                                  )}
                               </div>
                               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                 {tx.currency}
-                                {showConverted && convertedAmount && tx.currency !== displayCurrency && (
-                                  <span className="ml-1">→ {displayCurrency}</span>
-                                )}
+                                {showConverted &&
+                                  convertedAmount &&
+                                  tx.currency !== displayCurrency && (
+                                    <span className="ml-1">
+                                      → {displayCurrency}
+                                    </span>
+                                  )}
                               </p>
                             </div>
                           </div>
                         </div>
-                      )
+                      );
                     })}
                 </div>
               )}
@@ -404,5 +1166,5 @@ export default function Home() {
         </main>
       </div>
     </>
-  )
+  );
 }
