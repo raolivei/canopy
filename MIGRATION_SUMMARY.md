@@ -48,13 +48,13 @@
 
 ### 1. GitHub Migration
 ```bash
-# On GitHub: Settings → Rename "ledger-light" to "canopy"
+# On GitHub: Settings → Repository name is now "canopy"
 
 # Locally:
-cd ~/WORKSPACE/raolivei/ledger-light
+cd ~/WORKSPACE/raolivei/canopy
 git remote set-url origin git@github.com:raolivei/canopy.git
 cd ..
-mv ledger-light canopy
+# Directory already renamed to canopy
 cd canopy
 ```
 

@@ -7,7 +7,7 @@ import sys
 import os
 
 # Add project root to path
-sys.path.insert(0, '/Users/roliveira/WORKSPACE/raolivei/ledger-light')
+sys.path.insert(0, '/Users/roliveira/WORKSPACE/raolivei/canopy')
 
 from backend.services.csv_parser import CSVParserService
 from backend.models.csv_import import CSVImportConfig, BankFormat

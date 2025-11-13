@@ -1,6 +1,6 @@
 # CSV Import Guide
 
-LedgerLight provides comprehensive CSV import functionality to help you import transactions from various financial institutions and apps like Monarch Money, Chase, Bank of America, and more.
+Canopy provides comprehensive CSV import functionality to help you import transactions from various financial institutions and apps like Monarch Money, Chase, Bank of America, and more.
 
 ## Quick Start
 
@@ -61,7 +61,7 @@ Use this option for any CSV file and manually map columns using the custom mappi
 ## Features
 
 ### 🎯 Smart Format Detection
-LedgerLight automatically detects your bank's CSV format based on column headers.
+Canopy automatically detects your bank's CSV format based on column headers.
 
 ### 🔍 Duplicate Detection
 The system checks for duplicate transactions based on:

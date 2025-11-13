@@ -14,8 +14,11 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy application code (copy backend directory structure)
+COPY . /app/backend/
+
+# Set PYTHONPATH to include parent directory so backend imports work
+ENV PYTHONPATH=/app
 
 # Create non-root user
 RUN useradd -m -u 1000 canopy && chown -R canopy:canopy /app
@@ -29,5 +32,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"
 
 # Run application
-CMD ["uvicorn", "app.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.app.server:app", "--host", "0.0.0.0", "--port", "8000"]
 

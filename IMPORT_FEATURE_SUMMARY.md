@@ -93,7 +93,7 @@
 ```bash
 cd backend
 source venv/bin/activate
-PYTHONPATH=/Users/roliveira/WORKSPACE/raolivei/ledger-light python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
+PYTHONPATH=/Users/roliveira/WORKSPACE/raolivei/canopy python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 2. Start the Frontend

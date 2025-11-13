@@ -42,8 +42,8 @@ export default function Settings() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Choose your preferred currency</p>
                   </div>
                   <CurrencySelector 
-                    value={displayCurrency} 
-                    onChange={setDisplayCurrency}
+                    selectedCurrency={displayCurrency} 
+                    onCurrencyChange={setDisplayCurrency}
                   />
                 </div>
 

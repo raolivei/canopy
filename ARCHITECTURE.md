@@ -1,6 +1,6 @@
-# LedgerLight Architecture & Design Decisions
+# Canopy Architecture & Design Decisions
 
-This document explains the "why" behind key architectural and design decisions in LedgerLight.
+This document explains the "why" behind key architectural and design decisions in Canopy.
 
 ## Table of Contents
 - [Architecture Overview](#architecture-overview)
