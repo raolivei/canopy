@@ -24,9 +24,9 @@ GitHub preserves redirects from the old name, so links won't break.
 
 # 2. Scroll to "Repository name" section
 
-# 3. Change name from "ledger-light" to "canopy"
+# 3. Repository name is now "canopy" (migration complete)
 
-# 4. Click "Rename"
+# 4. Migration already completed
 
 # 5. Update your local remote:
 cd ~/WORKSPACE/raolivei/canopy
@@ -35,10 +35,8 @@ git remote set-url origin git@github.com:raolivei/canopy.git
 # 6. Verify:
 git remote -v
 
-# 7. Rename local directory:
-cd ~/WORKSPACE/raolivei
-mv ledger-light canopy
-cd canopy
+# 7. Local directory already renamed to canopy:
+cd ~/WORKSPACE/raolivei/canopy
 ```
 
 ### Option 2: Create New Repository
@@ -62,7 +60,7 @@ git push -u origin --all
 git push -u origin --tags
 
 # 5. Archive old repository (optional):
-# Go to https://github.com/raolivei/ledger-light/settings
+# Repository is now at https://github.com/raolivei/canopy/settings
 # Scroll down to "Archive this repository"
 ```
 
@@ -205,7 +203,7 @@ If something goes wrong:
 
 ```bash
 # GitHub will keep the redirect, but you can rename back:
-# Settings → Rename back to "ledger-light"
+# Migration complete - repository is now "canopy"
 
 # Revert local changes:
 git reset --hard HEAD~1  # If you've committed
