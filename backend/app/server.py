@@ -19,9 +19,10 @@ def create_app() -> FastAPI:
 
     settings = get_settings()
     app = FastAPI(
-        title=settings.app_name,
+        title="Canopy API",
+        description="Self-hosted personal finance, investment, and budgeting dashboard",
         debug=settings.debug,
-        version="0.1.0",
+        version="1.0.0",
     )
     
     # Add CORS middleware for frontend communication

@@ -11,7 +11,7 @@ export default function Settings() {
   return (
     <>
       <Head>
-        <title>Settings - LedgerLight</title>
+        <title>Settings - Canopy</title>
       </Head>
       <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar />

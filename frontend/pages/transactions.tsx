@@ -162,7 +162,7 @@ export default function Transactions() {
   return (
     <>
       <Head>
-        <title>Transactions - LedgerLight</title>
+        <title>Transactions - Canopy</title>
       </Head>
       <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
         <Sidebar />
