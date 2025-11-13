@@ -77,11 +77,8 @@ Or use an online SVG converter / design tool.
 ```bash
 # On GitHub: Settings → Rename to "canopy"
 # Then locally:
-cd ~/WORKSPACE/raolivei/ledger-light
+cd ~/WORKSPACE/raolivei/canopy
 git remote set-url origin git@github.com:raolivei/canopy.git
-cd ..
-mv ledger-light canopy
-cd canopy
 git push
 ```
 

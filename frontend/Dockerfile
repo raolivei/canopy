@@ -27,10 +27,11 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
-# Create non-root user
-RUN addgroup -g 1000 canopy && adduser -D -u 1000 -G canopy canopy
-RUN chown -R canopy:canopy /app
-USER canopy
+# Use existing user 1000 or create new non-root user
+RUN chown -R 1000:1000 /app 2>/dev/null || \
+    (adduser -D -u 1001 canopy && chown -R canopy:canopy /app) || \
+    chown -R node:node /app || true
+USER 1000
 
 # Expose port
 EXPOSE 3000

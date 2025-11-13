@@ -1,6 +1,6 @@
 # Migration Guide: ledger-light → canopy
 
-Complete guide for migrating the repository from `ledger-light` to `canopy`.
+**Migration Complete** ✅ - This guide documents the completed migration from `ledger-light` to `canopy`.
 
 ## Pre-Migration Checklist
 
@@ -20,7 +20,7 @@ GitHub preserves redirects from the old name, so links won't break.
 
 ```bash
 # 1. Go to GitHub repository settings
-# https://github.com/raolivei/ledger-light/settings
+# https://github.com/raolivei/canopy/settings (migration complete)
 
 # 2. Scroll to "Repository name" section
 
@@ -29,7 +29,7 @@ GitHub preserves redirects from the old name, so links won't break.
 # 4. Click "Rename"
 
 # 5. Update your local remote:
-cd ~/WORKSPACE/raolivei/ledger-light
+cd ~/WORKSPACE/raolivei/canopy
 git remote set-url origin git@github.com:raolivei/canopy.git
 
 # 6. Verify:
@@ -51,7 +51,7 @@ If you want a clean slate:
 # Description: Self-hosted personal finance, investment, and budgeting dashboard
 
 # 2. Update remote in your local repo:
-cd ~/WORKSPACE/raolivei/ledger-light
+cd ~/WORKSPACE/raolivei/canopy
 git remote set-url origin git@github.com:raolivei/canopy.git
 
 # 3. Push all branches:
@@ -212,7 +212,7 @@ git reset --hard HEAD~1  # If you've committed
 git checkout main        # If on a branch
 
 # Revert remote:
-git remote set-url origin git@github.com:raolivei/ledger-light.git
+git remote set-url origin git@github.com:raolivei/canopy.git
 ```
 
 ## Migration Completion Checklist
