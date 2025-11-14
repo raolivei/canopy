@@ -46,6 +46,7 @@ canopy/
 - Feature branches: `feature/<name>`
 - Keep backend and frontend changes in separate commits when possible
 - **Version Consistency**: Git tag versions must match Docker image tag versions. When creating a release, ensure the git tag (e.g., `v1.2.3`) matches the Docker image tag used in deployment manifests
+- **Image Changes**: Any changes to Docker images (Dockerfile, base images, image tags, etc.) must always update the CHANGELOG.md file
 
 ### Kubernetes Manifests
 
