@@ -1,9 +1,11 @@
 # Canopy - Cursor Rules
 
 ## Project Overview
+
 Self-hosted personal finance dashboard combining portfolio, budgeting, and transaction tracking. Runs on Raspberry Pi k3s clusters.
 
 ## Project Structure
+
 ```
 canopy/
 ├── backend/              # FastAPI backend (Python)
@@ -22,6 +24,7 @@ canopy/
 ## Code Conventions
 
 ### Python (Backend)
+
 - Follow PEP 8
 - Use type hints everywhere
 - Pydantic models for data validation
@@ -30,6 +33,7 @@ canopy/
 - Set `PYTHONPATH` to project root for development
 
 ### TypeScript (Frontend)
+
 - Use TypeScript strictly
 - Functional components with hooks
 - Next.js App Router patterns
@@ -37,11 +41,15 @@ canopy/
 - Use `utils/` for reusable functions
 
 ### Git Workflow
+
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`
 - Feature branches: `feature/<name>`
 - Keep backend and frontend changes in separate commits when possible
+- **Version Consistency**: Git tag versions must match Docker image tag versions. When creating a release, ensure the git tag (e.g., `v1.2.3`) matches the Docker image tag used in deployment manifests
 
 ### Kubernetes Manifests
+
+- **Use Helm charts where applicable** - Prefer Helm charts over raw YAML manifests when suitable charts exist
 - Namespace: `canopy`
 - Resource naming: `canopy-<component>`
 - Include resource limits (Raspberry Pi optimized)
@@ -50,31 +58,37 @@ canopy/
 ## Common Tasks
 
 ### Adding Transaction Endpoint
+
 1. Add route in `backend/api/transactions.py`
 2. Add Pydantic model in `backend/models/transaction.py`
 3. Add database model if needed
 4. Update API docs (auto-generated from FastAPI)
 
 ### Adding CSV Import Format
+
 1. Add parser in `backend/ingest/csv_parsers.py`
 2. Add format detection logic
 3. Add example CSV in `examples/`
 4. Update `CSV_IMPORT_GUIDE.md`
 
 ### Adding Frontend Component
+
 1. Create component in `frontend/components/`
 2. Add types if needed
 3. Use Tailwind for styling
 4. Follow existing component patterns
 
 ### Updating Kubernetes Deployment
-1. Update manifests in `k8s/`
-2. Test: `kubectl apply -f k8s/ --dry-run=client`
-3. Update `DEPLOYMENT.md` if needed
+
+1. **Use Helm charts where applicable** - Prefer Helm charts for deployments
+2. Update manifests in `k8s/` (or Helm charts in `helm/` if using Helm)
+3. Test: `kubectl apply -f k8s/ --dry-run=client` or `helm template` for Helm charts
+4. Update `DEPLOYMENT.md` if needed
 
 ## Development Setup
 
 ### Backend
+
 ```bash
 cd backend
 python3 -m venv venv
@@ -86,6 +100,7 @@ PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload
 **Why PYTHONPATH?** Python needs to find `backend` module for absolute imports.
 
 ### Frontend
+
 ```bash
 cd frontend
 npm install
@@ -93,6 +108,7 @@ npm run dev
 ```
 
 ### Testing
+
 ```bash
 ./test_app.sh  # Runs comprehensive tests
 ```
@@ -100,32 +116,38 @@ npm run dev
 ## Key Design Decisions
 
 ### Why Separate Processes?
+
 - Independent scaling
 - Different deployment strategies
 - Technology fit (Python for data, TypeScript for UI)
 
 ### Why Local Storage?
+
 - Privacy: Financial data never leaves control
 - Security: No cloud breaches
 - Compliance: Data residency requirements
 
 ### Why Multi-Currency?
+
 - Modern users have assets across currencies
 - Accurate net worth calculation
 - Meaningful spending analysis
 
 ### Why CSV/OFX Import?
+
 - Most banks don't offer APIs
 - Universal formats
 - Platform-agnostic
 
 ### Why Raspberry Pi Optimized?
+
 - Affordable hardware
 - Low power consumption
 - 24/7 operation
 - Full data control
 
 ## Important Notes
+
 - **Self-hosted only** - No cloud dependencies
 - **Privacy-first** - All data stored locally
 - **Multi-currency** - CAD, USD, BRL, EUR, GBP supported
@@ -133,9 +155,9 @@ npm run dev
 - **Raspberry Pi** - Optimized for low-power hardware
 
 ## Documentation
+
 - `README.md` - Overview and quick start
 - `ARCHITECTURE.md` - Design decisions
 - `CSV_IMPORT_GUIDE.md` - CSV import documentation
 - `MASTER_PROMPT.md` - Complete recreation guide
 - `DEPLOYMENT.md` - Kubernetes deployment
-

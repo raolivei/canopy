@@ -96,7 +96,7 @@ This document provides a comprehensive guide to recreate the Canopy application 
 
 ### Infrastructure
 - **Containerization**: Docker & Docker Compose
-- **Orchestration**: Kubernetes (k8s manifests included)
+- **Orchestration**: Kubernetes (k8s manifests included, **use Helm charts where applicable**)
 - **Database**: PostgreSQL
 - **Cache**: Redis
 
@@ -839,7 +839,7 @@ echo "Frontend: cd frontend && npm run dev"
 
 ### Overview
 
-Canopy is deployed to a Raspberry Pi k3s cluster (eldertree) using Kubernetes manifests. **ALL secrets are managed through Vault** and automatically synced to Kubernetes via External Secrets Operator. This ensures no hardcoded secrets in deployment files and centralized secret management.
+Canopy is deployed to a Raspberry Pi k3s cluster (eldertree) using Kubernetes manifests. **Use Helm charts where applicable** for better maintainability and reusability. When Helm charts are not available or not suitable, use raw YAML manifests. **ALL secrets are managed through Vault** and automatically synced to Kubernetes via External Secrets Operator. This ensures no hardcoded secrets in deployment files and centralized secret management.
 
 ### Prerequisites
 
