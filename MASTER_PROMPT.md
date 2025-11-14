@@ -835,6 +835,221 @@ echo "Frontend: cd frontend && npm run dev"
 
 ---
 
+## Kubernetes Deployment with Vault Secrets Management
+
+### Overview
+
+Canopy is deployed to a Raspberry Pi k3s cluster (eldertree) using Kubernetes manifests. **ALL secrets are managed through Vault** and automatically synced to Kubernetes via External Secrets Operator. This ensures no hardcoded secrets in deployment files and centralized secret management.
+
+### Prerequisites
+
+- k3s cluster running (eldertree control plane)
+- Vault deployed and accessible
+- External Secrets Operator installed and configured
+- ClusterSecretStore configured for Vault
+- kubectl configured with `~/.kube/config-eldertree`
+
+### Vault Secrets Configuration
+
+**All Canopy secrets are stored in Vault at these paths:**
+
+- `secret/canopy/postgres` - PostgreSQL password
+- `secret/canopy/app` - Application secret key
+- `secret/canopy/database` - Complete database URL
+
+**Setting Secrets in Vault:**
+
+```bash
+# Get Vault pod
+VAULT_POD=$(kubectl get pods -n vault -l app.kubernetes.io/name=vault -o jsonpath='{.items[0].metadata.name}')
+
+# Set PostgreSQL password
+kubectl exec -n vault $VAULT_POD -- sh -c "export VAULT_ADDR=http://127.0.0.1:8200 && export VAULT_TOKEN=root && vault kv put secret/canopy/postgres password=\$(python3 -c 'import secrets; print(secrets.token_urlsafe(16))')"
+
+# Set application secret key
+kubectl exec -n vault $VAULT_POD -- sh -c "export VAULT_ADDR=http://127.0.0.1:8200 && export VAULT_TOKEN=root && vault kv put secret/canopy/app secret-key=\$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+
+# Set database URL (use password from postgres secret)
+POSTGRES_PWD=$(kubectl exec -n vault $VAULT_POD -- sh -c "export VAULT_ADDR=http://127.0.0.1:8200 && export VAULT_TOKEN=root && vault kv get -field=password secret/canopy/postgres")
+kubectl exec -n vault $VAULT_POD -- sh -c "export VAULT_ADDR=http://127.0.0.1:8200 && export VAULT_TOKEN=root && vault kv put secret/canopy/database url=postgresql+psycopg://canopy:$POSTGRES_PWD@canopy-postgres:5432/canopy"
+```
+
+### ExternalSecret Resource
+
+The ExternalSecret resource automatically syncs secrets from Vault to Kubernetes:
+
+```yaml
+# Located at: pi-fleet/clusters/eldertree/infrastructure/external-secrets/externalsecrets/canopy-secrets.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: canopy-secrets
+  namespace: canopy
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  target:
+    name: canopy-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: postgres-password
+      remoteRef:
+        key: secret/canopy/postgres
+        property: password
+    - secretKey: secret-key
+      remoteRef:
+        key: secret/canopy/app
+        property: secret-key
+    - secretKey: database-url
+      remoteRef:
+        key: secret/canopy/database
+        property: url
+```
+
+**Important:** This ExternalSecret is managed by Flux GitOps in the pi-fleet repository. It automatically syncs secrets every 24 hours.
+
+### Kubernetes Deployment Configuration
+
+**Deployment File:** `k8s/deploy.yaml`
+
+**Key Features:**
+- API deployment with 2 replicas
+- Frontend deployment with 2 replicas
+- PostgreSQL StatefulSet with persistent storage (10Gi)
+- Redis deployment for caching
+- All secrets referenced via `secretKeyRef` from `canopy-secrets`
+- Resource limits configured for Raspberry Pi constraints
+
+**Environment Variables from Secrets:**
+
+```yaml
+env:
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: canopy-secrets
+        key: database-url
+  - name: SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: canopy-secrets
+        key: secret-key
+  - name: POSTGRES_PASSWORD  # For PostgreSQL container
+    valueFrom:
+      secretKeyRef:
+        name: canopy-secrets
+        key: postgres-password
+```
+
+### Deployment Steps
+
+1. **Ensure Vault secrets are set** (see above)
+
+2. **Verify ExternalSecret is syncing:**
+```bash
+kubectl get externalsecret canopy-secrets -n canopy
+kubectl get secret canopy-secrets -n canopy
+```
+
+3. **Deploy application:**
+```bash
+export KUBECONFIG=~/.kube/config-eldertree
+kubectl apply -f k8s/deploy.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+```
+
+4. **Verify deployment:**
+```bash
+kubectl get pods -n canopy
+kubectl get svc -n canopy
+kubectl get ingress -n canopy
+kubectl logs -f deployment/canopy-api -n canopy
+```
+
+### Ingress Configuration
+
+**File:** `k8s/ingress.yaml`
+
+- Host: `canopy.eldertree.local`
+- TLS: Managed by cert-manager with self-signed certificates
+- Paths:
+  - `/api` → canopy-api service (port 8000)
+  - `/` → canopy-frontend service (port 3000)
+
+### Resource Requirements
+
+**Per Replica:**
+- API: 256Mi RAM, 250m CPU (limits: 512Mi, 500m)
+- Frontend: 128Mi RAM, 100m CPU (limits: 256Mi, 200m)
+- Redis: 64Mi RAM, 50m CPU (limits: 128Mi, 100m)
+- PostgreSQL: 256Mi RAM, 250m CPU (limits: 512Mi, 500m)
+
+**Total (2 API + 2 Frontend):**
+- ~1.2Gi RAM
+- ~1 CPU
+
+### Security Best Practices
+
+✅ **All secrets in Vault** - Single source of truth  
+✅ **External Secrets Operator** - Automatic sync every 24 hours  
+✅ **No hardcoded secrets** - All deployments use `secretKeyRef`  
+✅ **Safe defaults** - Config files have development defaults only  
+✅ **Production overrides** - Environment variables from secrets override defaults  
+
+### Troubleshooting
+
+**Secrets not syncing:**
+```bash
+# Check ExternalSecret status
+kubectl describe externalsecret canopy-secrets -n canopy
+
+# Check External Secrets Operator logs
+kubectl logs -n external-secrets deployment/external-secrets
+
+# Verify secrets exist in Vault
+VAULT_POD=$(kubectl get pods -n vault -l app.kubernetes.io/name=vault -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n vault $VAULT_POD -- sh -c "export VAULT_ADDR=http://127.0.0.1:8200 && export VAULT_TOKEN=root && vault kv list secret/canopy/"
+```
+
+**Pods failing to start:**
+```bash
+# Check pod logs
+kubectl logs deployment/canopy-api -n canopy
+
+# Check if secrets exist
+kubectl get secret canopy-secrets -n canopy -o yaml
+
+# Verify environment variables
+kubectl exec deployment/canopy-api -n canopy -- env | grep -E "DATABASE_URL|SECRET_KEY"
+```
+
+**Database connection issues:**
+```bash
+# Verify PostgreSQL is running
+kubectl get pods -n canopy | grep postgres
+
+# Check PostgreSQL logs
+kubectl logs statefulset/canopy-postgres -n canopy
+
+# Test database connection from API pod
+kubectl exec deployment/canopy-api -n canopy -- python3 -c "import os; print(os.getenv('DATABASE_URL'))"
+```
+
+### CI/CD Integration
+
+Canopy uses GitHub Actions with a self-hosted runner on the Pi cluster. The workflow:
+1. Builds Docker images
+2. Pushes to GHCR (ghcr.io/raolivei/canopy-api:v1.0.0)
+3. Applies Kubernetes manifests
+4. Restarts deployments to pull latest images
+
+**Important:** Secrets are NOT managed by CI/CD. They are set manually in Vault and synced automatically by External Secrets Operator.
+
+---
+
 ## API Specifications
 
 ### Base URL
