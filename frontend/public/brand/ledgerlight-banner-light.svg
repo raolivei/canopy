@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>LedgerLight Banner · Light</title>
+  <defs>
+    <linearGradient id="bgGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fafbfc"/>
+      <stop offset="50%" stop-color="#f5f7fa"/>
+      <stop offset="100%" stop-color="#fafbfc"/>
+    </linearGradient>
+    <linearGradient id="accentGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7FE0D4"/>
+      <stop offset="100%" stop-color="#57C5B6"/>
+    </linearGradient>
+    <linearGradient id="accentGrad2Light" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#57C5B6"/>
+      <stop offset="100%" stop-color="#3a9d8f"/>
+    </linearGradient>
+    <radialGradient id="spotGlowLight">
+      <stop offset="0%" stop-color="rgba(127,224,212,0.06)"/>
+      <stop offset="100%" stop-color="rgba(127,224,212,0)"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1600" height="900" fill="url(#bgGradLight)"/>
+  
+  <!-- Abstract geometric elements -->
+  <!-- Large circle background glow -->
+  <circle cx="1200" cy="200" r="400" fill="url(#spotGlowLight)"/>
+  <circle cx="400" cy="700" r="350" fill="url(#spotGlowLight)"/>
+  
+  <!-- Subtle grid pattern -->
+  <g opacity="0.04">
+    <path d="M0,300 L1600,300 M0,600 L1600,600" stroke="#7FE0D4" stroke-width="1"/>
+    <path d="M400,0 L400,900 M800,0 L800,900 M1200,0 L1200,900" stroke="#7FE0D4" stroke-width="1"/>
+  </g>
+  
+  <!-- Floating geometric shapes -->
+  <g opacity="0.3">
+    <!-- Top right accent -->
+    <rect x="1300" y="100" width="180" height="180" rx="20" fill="none" stroke="url(#accentGradLight)" stroke-width="2"/>
+    <circle cx="1390" cy="190" r="40" fill="url(#accentGradLight)" opacity="0.2"/>
+    
+    <!-- Bottom left accent -->
+    <circle cx="200" cy="750" r="80" fill="none" stroke="url(#accentGrad2Light)" stroke-width="2"/>
+    <circle cx="200" cy="750" r="50" fill="url(#accentGrad2Light)" opacity="0.15"/>
+    
+    <!-- Middle decorative elements -->
+    <path d="M 900 150 L 950 100 L 1000 150 L 950 200 Z" fill="none" stroke="url(#accentGradLight)" stroke-width="2"/>
+    <path d="M 600 700 L 650 680 L 680 730 Z" fill="url(#accentGradLight)" opacity="0.15"/>
+  </g>
+  
+  <!-- Main coin icon - smaller and better positioned -->
+  <g transform="translate(700, 350)">
+    <circle cx="100" cy="100" r="80" fill="url(#accentGradLight)" opacity="0.95"/>
+    <circle cx="100" cy="100" r="65" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2.5"/>
+    
+    <!-- Dollar sign -->
+    <g transform="translate(100, 100)">
+      <rect x="-4.5" y="-48" width="9" height="96" rx="4.5" fill="white"/>
+      <path d="M -20 -26 C -28 -26 -28 -15 -20 -15 L 20 -15 C 28 -15 28 -6 20 -6 L -9 -6" 
+            fill="none" stroke="white" stroke-width="14" stroke-linecap="round"/>
+      <path d="M 20 6 C 28 6 28 15 20 15 L -20 15 C -28 15 -28 26 -20 26 L 9 26" 
+            fill="none" stroke="white" stroke-width="14" stroke-linecap="round"/>
+    </g>
+  </g>
+  
+  <!-- Horizontal accent lines -->
+  <g opacity="0.12">
+    <rect x="0" y="440" width="600" height="2" fill="url(#accentGradLight)"/>
+    <rect x="1000" y="460" width="600" height="2" fill="url(#accentGradLight)"/>
+  </g>
+  
+  <!-- Subtle dots pattern -->
+  <g opacity="0.15" fill="url(#accentGradLight)">
+    <circle cx="150" cy="200" r="3"/>
+    <circle cx="250" cy="250" r="2"/>
+    <circle cx="1400" cy="650" r="3"/>
+    <circle cx="1300" cy="700" r="2"/>
+    <circle cx="500" cy="150" r="2"/>
+    <circle cx="1100" cy="800" r="3"/>
+  </g>
+</svg>

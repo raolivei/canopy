@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="320" viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>LedgerLight Logo · Dark</title>
+  <defs>
+    <linearGradient id="logoBgDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#2d2d2d"/>
+    </linearGradient>
+    <linearGradient id="coinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7FE0D4"/>
+      <stop offset="100%" stop-color="#57C5B6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Dark background -->
+  <rect width="960" height="320" rx="16" fill="url(#logoBgDark)"/>
+  
+  <!-- Icon -->
+  <g transform="translate(80, 80)">
+    <!-- Circular coin -->
+    <circle cx="80" cy="80" r="75" fill="url(#coinGrad)"/>
+    <circle cx="80" cy="80" r="62" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+    
+    <!-- Simplified Dollar sign -->
+    <g transform="translate(80, 80)">
+      <!-- Vertical bar -->
+      <rect x="-4" y="-46" width="8" height="92" rx="4" fill="white"/>
+      
+      <!-- Top S curve -->
+      <path d="M -19 -24 C -27 -24 -27 -14 -19 -14 L 19 -14 C 27 -14 27 -5 19 -5 L -8 -5" 
+            fill="none" stroke="white" stroke-width="13" stroke-linecap="round"/>
+      
+      <!-- Bottom S curve -->
+      <path d="M 19 5 C 27 5 27 14 19 14 L -19 14 C -27 14 -27 24 -19 24 L 8 24" 
+            fill="none" stroke="white" stroke-width="13" stroke-linecap="round"/>
+    </g>
+  </g>
+  
+  <!-- Text -->
+  <g transform="translate(260, 160)">
+    <text x="0" y="0" 
+          font-family="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif" 
+          font-size="72" 
+          font-weight="400" 
+          letter-spacing="-0.02em" 
+          fill="#7FE0D4">LedgerLight</text>
+  </g>
+</svg>

@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-warm-gray-200 dark:border-warm-gray-800;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    @apply bg-warm-gray-50 dark:bg-warm-gray-900;
+    @apply text-warm-gray-900 dark:text-warm-gray-50;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(212, 175, 55, 0.03) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(212, 175, 55, 0.03) 0px, transparent 50%);
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-warm-gray-100 dark:bg-warm-gray-800;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-warm-gray-400 dark:bg-warm-gray-600 rounded-full;
+    @apply hover:bg-primary-500 dark:hover:bg-primary-500;
+    transition: background-color 300ms ease-out;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-primary-200 dark:bg-primary-800 text-warm-gray-900 dark:text-warm-gray-50;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white dark:bg-warm-gray-800 rounded-card shadow-warm border border-warm-gray-200 dark:border-warm-gray-700;
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  .card-hover {
+    @apply card hover:shadow-warm-lg hover:border-primary-300 dark:hover:border-primary-700;
+    @apply hover:-translate-y-0.5;
+  }
+
+  .card-glass {
+    @apply bg-white/80 dark:bg-warm-gray-800/80 backdrop-blur-lg;
+    @apply border border-warm-gray-200/50 dark:border-warm-gray-700/50;
+    @apply shadow-warm-lg;
+  }
+  
+  .btn-primary {
+    @apply bg-golden-gradient text-white font-semibold px-6 py-3 rounded-button;
+    @apply shadow-warm hover:shadow-warm-lg;
+    @apply transition-all duration-300 ease-out;
+    @apply hover:scale-[1.02] active:scale-[0.98];
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+  }
+  
+  .btn-secondary {
+    @apply bg-white dark:bg-warm-gray-800 text-warm-gray-700 dark:text-warm-gray-300 font-medium px-6 py-3 rounded-button;
+    @apply border border-warm-gray-300 dark:border-warm-gray-600;
+    @apply shadow-sm hover:shadow-warm;
+    @apply transition-all duration-300 ease-out;
+    @apply hover:bg-warm-gray-50 dark:hover:bg-warm-gray-700;
+    @apply hover:border-primary-300 dark:hover:border-primary-700;
+  }
+  
+  .input-modern {
+    @apply w-full px-4 py-3 border border-warm-gray-300 dark:border-warm-gray-600 rounded-input;
+    @apply focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+    @apply transition-all duration-300 ease-out;
+    @apply bg-white dark:bg-warm-gray-800;
+    @apply text-warm-gray-900 dark:text-warm-gray-50;
+    @apply placeholder-warm-gray-400 dark:placeholder-warm-gray-500;
+  }
+
+  /* Golden accent glow */
+  .glow-golden {
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.3), 0 0 40px rgba(212, 175, 55, 0.1);
+  }
+
+  /* Organic fade-in animation */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* Stagger animation delay utilities */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+}
+

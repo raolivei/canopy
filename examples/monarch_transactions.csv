@@ -1,0 +1,12 @@
+Date,Merchant,Category,Account,Original Statement,Notes,Amount,Tags
+2025-01-15,Starbucks,Coffee Shops,Checking Account (...1234),STARBUCKS STORE #12345,,-5.75,
+2025-01-15,Target,Shopping,Visa Card (...5678),TARGET 00012345 TORONTO,,-87.32,
+2025-01-14,Salary Deposit,Paychecks,Checking Account (...1234),ACME CORP - Direct deposit,,3500.00,
+2025-01-14,Apple,Shopping,Visa Card (...5678),APPLECOMBILL,,-14.99,
+2025-01-13,Shell,Gas,Visa Card (...5678),SHELL C02197 TORONTO,,-65.00,
+2025-01-13,VTI - Limit Buy,Buy,Investment Account (...9012),VTI - Limit buy,,-1250.00,
+2025-01-12,Uber Eats,Restaurants & Bars,Visa Card (...5678),UBER EATS,,-42.50,
+2025-01-11,Rent Payment,Rent,Checking Account (...1234),LANDLORD PAYMENT,,-2000.00,
+2025-01-10,Grocery Store,Groceries,Checking Account (...1234),WHOLE FOODS MARKET,Monthly grocery shopping,-156.78,food
+2025-01-10,Transfer,Transfer,Savings Account (...3456),TRANSFER TO SAVINGS,,500.00,
+

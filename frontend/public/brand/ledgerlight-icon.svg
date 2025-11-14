@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>LedgerLight Icon</title>
+  <defs>
+    <linearGradient id="coinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7FE0D4"/>
+      <stop offset="100%" stop-color="#57C5B6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Main circular coin -->
+  <circle cx="256" cy="256" r="220" fill="url(#coinGradient)"/>
+  
+  <!-- Subtle inner circle for depth -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="6"/>
+  
+  <!-- Simplified Dollar sign -->
+  <g transform="translate(256, 256)">
+    <!-- Vertical bar -->
+    <rect x="-12" y="-135" width="24" height="270" rx="12" fill="white"/>
+    
+    <!-- Top S curve -->
+    <path d="M -55 -70 C -80 -70 -80 -40 -55 -40 L 55 -40 C 80 -40 80 -15 55 -15 L -25 -15" 
+          fill="none" stroke="white" stroke-width="38" stroke-linecap="round"/>
+    
+    <!-- Bottom S curve -->
+    <path d="M 55 15 C 80 15 80 40 55 40 L -55 40 C -80 40 -80 70 -55 70 L 25 70" 
+          fill="none" stroke="white" stroke-width="38" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Outer glow effect -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="rgba(127,224,212,0.3)" stroke-width="8"/>
+</svg>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>LedgerLight Cover · Dark</title>
+  <defs>
+    <linearGradient id="coverBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="50%" stop-color="#2d2d2d"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="coinCover" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7FE0D4"/>
+      <stop offset="100%" stop-color="#57C5B6"/>
+    </linearGradient>
+    <radialGradient id="glowCover">
+      <stop offset="0%" stop-color="rgba(127,224,212,0.3)"/>
+      <stop offset="100%" stop-color="rgba(127,224,212,0)"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#coverBg)"/>
+  
+  <!-- Glow effect -->
+  <circle cx="300" cy="315" r="250" fill="url(#glowCover)"/>
+  
+  <!-- Icon -->
+  <g transform="translate(150, 190)">
+    <circle cx="150" cy="125" r="110" fill="url(#coinCover)"/>
+    <circle cx="150" cy="125" r="90" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
+    
+    <!-- Simplified Dollar sign -->
+    <g transform="translate(150, 125)">
+      <!-- Vertical bar -->
+      <rect x="-6" y="-67" width="12" height="134" rx="6" fill="white"/>
+      
+      <!-- Top S curve -->
+      <path d="M -28 -35 C -40 -35 -40 -20 -28 -20 L 28 -20 C 40 -20 40 -8 28 -8 L -12 -8" 
+            fill="none" stroke="white" stroke-width="19" stroke-linecap="round"/>
+      
+      <!-- Bottom S curve -->
+      <path d="M 28 8 C 40 8 40 20 28 20 L -28 20 C -40 20 -40 35 -28 35 L 12 35" 
+            fill="none" stroke="white" stroke-width="19" stroke-linecap="round"/>
+    </g>
+  </g>
+  
+  <!-- Text -->
+  <g transform="translate(480, 315)">
+    <text x="0" y="0" 
+          font-family="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif" 
+          font-size="96" 
+          font-weight="400" 
+          letter-spacing="-0.02em" 
+          fill="#7FE0D4">LedgerLight</text>
+    <text x="0" y="65" 
+          font-family="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif" 
+          font-size="28" 
+          font-weight="300" 
+          letter-spacing="0.05em" 
+          fill="#999999">Illuminate Your Finance</text>
+  </g>
+</svg>
