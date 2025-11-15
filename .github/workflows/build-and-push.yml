@@ -114,54 +114,56 @@ jobs:
           echo "Frontend image tags:"
           echo "${{ steps.meta-frontend.outputs.tags }}" | tr ' ' '\n'
 
-  deploy-to-pi:
-    needs: build-and-push
-    runs-on: self-hosted
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        run: |
-          # Kubectl should be pre-installed on self-hosted runner
-          kubectl version --client
-
-      - name: Configure kubeconfig
-        env:
-          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_ELDERTREE }}
-        run: |
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG_CONTENT" > ~/.kube/config
-          chmod 600 ~/.kube/config
-
-      - name: Verify cluster connection
-        run: |
-          kubectl cluster-info
-          kubectl get nodes
-
-      - name: Apply Kubernetes manifests
-        run: |
-          kubectl apply -f k8s/deploy.yaml
-          kubectl apply -f k8s/service.yaml
-          kubectl apply -f k8s/ingress.yaml
-
-      - name: Restart deployments to pull latest images
-        run: |
-          kubectl rollout restart deployment/canopy-api -n canopy
-          kubectl rollout restart deployment/canopy-frontend -n canopy
-
-      - name: Wait for rollout to complete
-        run: |
-          kubectl rollout status deployment/canopy-api -n canopy --timeout=5m
-          kubectl rollout status deployment/canopy-frontend -n canopy --timeout=5m
-
-      - name: Verify deployment
-        run: |
-          kubectl get pods -n canopy
-          kubectl get svc -n canopy
-          kubectl get ingress -n canopy
+  # DISABLED: Requires self-hosted runner on Raspberry Pi
+  # Uncomment and configure self-hosted runner when ready to deploy
+  # deploy-to-pi:
+  #   needs: build-and-push
+  #   runs-on: self-hosted
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Set up kubectl
+  #       run: |
+  #         # Kubectl should be pre-installed on self-hosted runner
+  #         kubectl version --client
+  #
+  #     - name: Configure kubeconfig
+  #       env:
+  #         KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_ELDERTREE }}
+  #       run: |
+  #         mkdir -p ~/.kube
+  #         echo "$KUBECONFIG_CONTENT" > ~/.kube/config
+  #         chmod 600 ~/.kube/config
+  #
+  #     - name: Verify cluster connection
+  #       run: |
+  #         kubectl cluster-info
+  #         kubectl get nodes
+  #
+  #     - name: Apply Kubernetes manifests
+  #       run: |
+  #         kubectl apply -f k8s/deploy.yaml
+  #         kubectl apply -f k8s/service.yaml
+  #         kubectl apply -f k8s/ingress.yaml
+  #
+  #     - name: Restart deployments to pull latest images
+  #       run: |
+  #         kubectl rollout restart deployment/canopy-api -n canopy
+  #         kubectl rollout restart deployment/canopy-frontend -n canopy
+  #
+  #     - name: Wait for rollout to complete
+  #       run: |
+  #         kubectl rollout status deployment/canopy-api -n canopy --timeout=5m
+  #         kubectl rollout status deployment/canopy-frontend -n canopy --timeout=5m
+  #
+  #     - name: Verify deployment
+  #       run: |
+  #         kubectl get pods -n canopy
+  #         kubectl get svc -n canopy
+  #         kubectl get ingress -n canopy
 
   test:
     runs-on: ubuntu-latest
