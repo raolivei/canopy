@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Versioning
+
+**Current Status**: Pre-release (0.x.x versions)
+
+- **0.x.x**: Development versions - features are being built and tested  
+- **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
+
 ## [0.2.3-dev] - 2025-01-XX
 
 ### Changed
@@ -12,11 +19,12 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Claude AI settings configuration (.claude/settings.local.json)
 
-## [1.0.0] - 2025-11-13 - 🌳 **Canopy Launch**
+## [0.3.0] - 2025-11-13 - 🌳 **Canopy Launch** (Pre-release)
 
 ### BREAKING CHANGE - Project Rebranded
 
 **LedgerLight is now Canopy** - Complete rebrand and vision expansion.
+**Note**: Still in pre-1.0 development. Version 1.0.0 will be the first production-ready release.
 
 ### What's New in Canopy
 
