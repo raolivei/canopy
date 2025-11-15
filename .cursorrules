@@ -18,6 +18,17 @@ When starting services locally, always use the assigned ports from `workspace-co
 
 Self-hosted personal finance dashboard combining portfolio, budgeting, and transaction tracking. Runs on the **`eldertree`** Raspberry Pi k3s cluster.
 
+## Security Requirements
+
+### ALWAYS USE HTTPS
+
+- ✅ **Production**: ALL endpoints MUST use HTTPS (financial data!)
+- ✅ **Authentication**: OAuth providers REQUIRE HTTPS
+- ✅ **Development**: Use `localhost` or ngrok for HTTPS tunnels
+- ✅ **Kubernetes Ingress**: TLS certificates required
+- ❌ **NEVER**: Expose financial data over HTTP
+- ❌ **NEVER**: Use private IPs for OAuth callbacks
+
 ## Project Structure
 
 ```
