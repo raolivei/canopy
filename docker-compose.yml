@@ -1,0 +1,87 @@
+# Canopy - Docker Compose for Local Development
+# Uses port assignments from workspace-config
+
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: canopy-postgres
+    environment:
+      POSTGRES_DB: canopy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "${CANOPY_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: canopy-redis
+    ports:
+      - "${CANOPY_REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: canopy-api
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/canopy
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+    ports:
+      - "${CANOPY_API_PORT:-8001}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Hot reload: mount source code
+      - ./backend:/app/backend
+      - /app/backend/venv
+      - /app/backend/__pycache__
+    command: uvicorn backend.app.server:app --host 0.0.0.0 --port 8000 --reload
+    stdin_open: true
+    tty: true
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: canopy-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${CANOPY_API_PORT:-8001}
+      NODE_ENV: development
+    ports:
+      - "${CANOPY_FRONTEND_PORT:-3001}:3000"
+    volumes:
+      # Hot reload: mount source code
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npm install --legacy-peer-deps && npm run dev"
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
+

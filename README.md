@@ -58,18 +58,46 @@ See [CHANGELOG.md](./CHANGELOG.md) for detailed release notes.
 ## Quick Start
 
 ### Prerequisites
-- Python 3.11+ with venv
-- Node.js 18+ and npm
-- Docker and Docker Compose (for PostgreSQL and Redis)
+- Docker and Docker Compose (recommended)
+- Python 3.11+ with venv (for local development fallback)
+- Node.js 18+ and npm (for local development fallback)
 - k3s cluster (optional, for production deployment)
 
-### Backend Setup
+### Recommended: Docker Compose (Primary Method)
+
+```bash
+# Load port assignments from workspace-config
+source ../workspace-config/ports/.env.ports
+
+# Start all services with hot reload
+docker-compose up
+
+# Or start in detached mode
+docker-compose up -d
+```
+
+**Access:**
+- Frontend: http://localhost:3001
+- API: http://localhost:8001
+- API Docs: http://localhost:8001/docs
+
+**Benefits:**
+- Consistent environment (matches production)
+- Hot reload enabled via volume mounts
+- No local Python/Node version conflicts
+- Single command to start everything
+
+See `../workspace-config/docs/DOCKER_COMPOSE_GUIDE.md` for complete guide.
+
+### Alternative: Local Development (Fallback)
+
+#### Backend Setup
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
+PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8001
 ```
 
 **Why PYTHONPATH?**
@@ -81,7 +109,7 @@ Enables auto-reload on code changes during development, speeding up iteration. R
 **Why `0.0.0.0`?**
 Binds to all network interfaces, allowing access from other devices on your network (e.g., testing on mobile). Use `127.0.0.1` for localhost-only access.
 
-### Frontend Setup
+#### Frontend Setup
 ```bash
 cd frontend
 npm install

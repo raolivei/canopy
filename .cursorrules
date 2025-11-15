@@ -1,5 +1,19 @@
 # Canopy - Cursor Rules
 
+## Workspace Configuration
+
+**IMPORTANT**: This project is part of the `raolivei` workspace. Workspace-level configuration is managed in the `workspace-config` repository.
+
+- **Port Assignments**: See `../workspace-config/ports/.env.ports` for assigned ports
+  - Frontend: Port `3001` (assigned to avoid conflicts)
+  - API: Port `8001` (assigned to avoid conflicts)
+  - PostgreSQL: Port `5433`, Redis: Port `6380`
+- **Workspace Conventions**: See `../workspace-config/docs/PROJECT_CONVENTIONS.md`
+- **Port Conflict Checker**: Run `../workspace-config/scripts/check-ports.sh` before starting services
+- **Workspace Scripts**: Available in `../workspace-config/scripts/`
+
+When starting services locally, always use the assigned ports from `workspace-config` to prevent conflicts with other projects.
+
 ## Project Overview
 
 Self-hosted personal finance dashboard combining portfolio, budgeting, and transaction tracking. Runs on Raspberry Pi k3s clusters.
@@ -104,29 +118,57 @@ canopy/
 
 ## Development Setup
 
-### Backend
+### Recommended: Docker Compose (Primary Method)
 
 ```bash
+# Load port assignments
+source ../workspace-config/ports/.env.ports
+
+# Start all services with hot reload
+docker-compose up
+
+# Or start in detached mode
+docker-compose up -d
+```
+
+**Access:**
+- Frontend: http://localhost:3001
+- API: http://localhost:8001
+- API Docs: http://localhost:8001/docs
+
+**Benefits:**
+- Consistent environment (matches production)
+- Hot reload enabled via volume mounts
+- No local Python/Node version conflicts
+- Single command to start everything
+
+See `../workspace-config/docs/DOCKER_COMPOSE_GUIDE.md` for complete guide.
+
+### Alternative: Local Development (Fallback)
+
+```bash
+# Backend
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload
-```
 
-**Why PYTHONPATH?** Python needs to find `backend` module for absolute imports.
-
-### Frontend
-
-```bash
+# Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
+**Why PYTHONPATH?** Python needs to find `backend` module for absolute imports.
+
 ### Testing
 
 ```bash
+# With docker-compose
+docker-compose exec api pytest
+
+# Or locally
 ./test_app.sh  # Runs comprehensive tests
 ```
 
