@@ -44,9 +44,11 @@ canopy/
 
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`
 - Feature branches: `feature/<name>`
+- **CRITICAL**: Create different branches for different work. Do not mix up work - each branch should focus on a single feature, fix, or task. Keep branches focused and separate.
 - Keep backend and frontend changes in separate commits when possible
 - **Version Consistency**: Git tag versions must match Docker image tag versions. When creating a release, ensure the git tag (e.g., `v1.2.3`) matches the Docker image tag used in deployment manifests
 - **Image Changes**: Any changes to Docker images (Dockerfile, base images, image tags, etc.) must always update the CHANGELOG.md file
+- **Never run git commands at workspace root**: Always ensure you are in the project directory (`canopy/`) before running any git commands. Never run git commands at `/Users/roliveira/WORKSPACE/raolivei`
 
 ### Kubernetes Manifests
 
