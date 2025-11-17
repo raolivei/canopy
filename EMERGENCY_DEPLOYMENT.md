@@ -31,6 +31,7 @@ Use emergency deployment **ONLY** when:
 ```
 
 This will:
+
 1. Suspend Flux reconciliation
 2. Apply all manifests from `k8s/` directory
 3. Show deployment status
@@ -44,6 +45,7 @@ This will:
 ```
 
 This will:
+
 1. Resume Flux reconciliation
 2. Force immediate sync
 3. Restore GitOps control
@@ -92,6 +94,7 @@ cd ../canopy && git add . && git commit -m "Update k8s manifests"
 ## 🔧 How It Works
 
 ### Normal Flow (Flux)
+
 ```
 Git Push → FluxCD → Cluster
 ```
@@ -102,6 +105,7 @@ Git Push → FluxCD → Cluster
 4. Drift is automatically corrected
 
 ### Emergency Flow (Direct)
+
 ```
 kubectl apply → Cluster
 ```
@@ -114,12 +118,14 @@ kubectl apply → Cluster
 ## 📊 Monitoring
 
 ### Check Flux Status
+
 ```bash
 flux get kustomizations -A
 flux logs --follow
 ```
 
 ### Check Deployment Status
+
 ```bash
 kubectl get pods -n canopy
 kubectl logs -n canopy -l app=canopy-backend
@@ -136,6 +142,7 @@ kubectl logs -n canopy -l app=canopy-frontend
 ## 🆘 Troubleshooting
 
 ### Flux Won't Suspend
+
 ```bash
 # Check if Flux is running
 kubectl get pods -n flux-system
@@ -145,6 +152,7 @@ kubectl apply -f k8s/
 ```
 
 ### Manifests Out of Sync
+
 ```bash
 # See differences
 ./scripts/validate-k8s-sync.sh
@@ -154,6 +162,7 @@ diff -r k8s/ ../pi-fleet/clusters/eldertree/canopy/
 ```
 
 ### Can't Resume Flux
+
 ```bash
 # Check Flux status
 flux check
@@ -167,4 +176,5 @@ kubectl annotate -n flux-system kustomization/flux-system reconcile.fluxcd.io/re
 - [FluxCD Documentation](https://fluxcd.io/docs/)
 - [pi-fleet README](../pi-fleet/README.md)
 - [Cluster Documentation](../pi-fleet/clusters/eldertree/README.md)
+
 
