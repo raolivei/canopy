@@ -78,3 +78,7 @@ echo "💡 To check logs:"
 echo "    kubectl logs -n $NAMESPACE -l app=canopy-backend"
 echo "    kubectl logs -n $NAMESPACE -l app=canopy-frontend"
 
+
+
+
+
