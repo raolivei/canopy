@@ -1,386 +1,95 @@
-# Canopy - Cursor Rules
+## Workspace
 
-## Workspace Configuration
+See `../workspace-config/docs/PROJECT_CONVENTIONS.md` for shared conventions (git workflow, CHANGELOG, Docker/GHCR, K8s, security).
 
-**IMPORTANT**: This project is part of the `raolivei` workspace. Workspace-level configuration is managed in the `workspace-config` repository.
+**Ports** (from `../workspace-config/ports/.env.ports`):
 
-- **Port Assignments**: See `../workspace-config/ports/.env.ports` for assigned ports
-  - Frontend: Port `3001` (assigned to avoid conflicts)
-  - API: Port `8001` (assigned to avoid conflicts)
-  - PostgreSQL: Port `5433`, Redis: Port `6380`
-- **Workspace Conventions**: See `../workspace-config/docs/PROJECT_CONVENTIONS.md`
-- **Port Conflict Checker**: Run `../workspace-config/scripts/check-ports.sh` before starting services
-- **Workspace Scripts**: Available in `../workspace-config/scripts/`
+- Frontend: `3001`
+- API: `8001`
+- PostgreSQL: `5433`
+- Redis: `6380`
 
-When starting services locally, always use the assigned ports from `workspace-config` to prevent conflicts with other projects.
+## Commands
+
+```bash
+# Development (Docker Compose - recommended)
+source ../workspace-config/ports/.env.ports
+docker-compose up                    # Start all services
+docker-compose up -d                 # Start detached
+
+# Testing
+docker-compose exec api pytest       # Run backend tests
+cd frontend && npm test              # Run frontend tests
+
+# Database
+docker-compose exec api alembic upgrade head           # Run migrations
+docker-compose exec api alembic revision --autogenerate -m "desc"  # New migration
+docker-compose exec postgres psql -U postgres -d canopy  # PostgreSQL shell
+
+# Linting (run after changes)
+cd backend && ruff check . && ruff format .  # Python
+cd frontend && npm run lint                   # TypeScript
+```
+
+## Workflow
+
+1. Always lint/format after code changes
+2. Run tests before committing
+3. Update CHANGELOG.md for all changes
+4. Never run git commands at workspace root
 
 ## Project Overview
 
-Self-hosted personal finance dashboard combining portfolio, budgeting, and transaction tracking. Runs on the **`eldertree`** Raspberry Pi k3s cluster.
-
-## Security Requirements
-
-### ALWAYS USE HTTPS
-
-- ✅ **Production**: ALL endpoints MUST use HTTPS (financial data!)
-- ✅ **Authentication**: OAuth providers REQUIRE HTTPS
-- ✅ **Development**: Use `localhost` or ngrok for HTTPS tunnels
-- ✅ **Kubernetes Ingress**: TLS certificates required
-- ❌ **NEVER**: Expose financial data over HTTP
-- ❌ **NEVER**: Use private IPs for OAuth callbacks
-
-## Project Structure
+Self-hosted personal finance dashboard. Runs on **eldertree** k3s cluster.
 
 ```
 canopy/
-├── backend/              # FastAPI backend (Python)
-│   ├── api/             # API endpoints
-│   ├── models/          # Pydantic models
-│   ├── app/             # FastAPI application
-│   ├── ingest/          # CSV/OFX import handlers
-│   └── services/        # Business logic
-├── frontend/            # Next.js frontend (TypeScript)
-│   ├── components/      # React components
-│   ├── pages/           # Next.js pages
-│   └── utils/           # Utility functions
-└── k8s/                 # Kubernetes manifests
+├── backend/           # FastAPI (Python)
+│   ├── api/          # API endpoints
+│   ├── models/       # Pydantic models
+│   ├── app/          # FastAPI app
+│   ├── ingest/       # CSV/OFX import
+│   └── services/     # Business logic
+├── frontend/         # Next.js (TypeScript)
+│   ├── components/   # React components
+│   ├── pages/        # Next.js pages
+│   └── utils/        # Utilities
+└── k8s/              # Kubernetes manifests
 ```
 
-## Code Conventions
+## Code Style
 
-### Python (Backend)
+**Python**: See `backend/api/transactions.py` for route patterns, `backend/models/transaction.py` for Pydantic models.
 
-- Follow PEP 8
-- Use type hints everywhere
-- Pydantic models for data validation
-- SQLAlchemy for database models
-- Use absolute imports: `from backend.api import ...`
-- Set `PYTHONPATH` to project root for development
-
-### TypeScript (Frontend)
-
-- Use TypeScript strictly
-- Functional components with hooks
-- Next.js App Router patterns
-- Tailwind CSS for styling
-- Use `utils/` for reusable functions
-
-### Git Workflow
-
-- Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`
-- Feature branches: `feature/<name>`
-- **CRITICAL**: Create different branches for different work. Do not mix up work - each branch should focus on a single feature, fix, or task. Keep branches focused and separate.
-- Keep backend and frontend changes in separate commits when possible
-- **Version Consistency**: Git tag versions must match Docker image tag versions. When creating a release, ensure the git tag (e.g., `v1.2.3`) matches the Docker image tag used in deployment manifests
-- **Image Changes**: Any changes to Docker images (Dockerfile, base images, image tags, etc.) must always update the CHANGELOG.md file
-- **Never run git commands at workspace root**: Always ensure you are in the project directory (`canopy/`) before running any git commands. Never run git commands at `/Users/roliveira/WORKSPACE/raolivei`
-
-**CHANGELOG Requirements:**
-
-**ALWAYS update CHANGELOG.md when:**
-
-- ✅ Adding new features (user-facing or internal)
-- ✅ Fixing bugs or issues
-- ✅ Changing behavior, UI, or UX
-- ✅ Modifying Docker images, Dockerfiles, or deployment configs
-- ✅ Making breaking changes or deprecations
-- ✅ Updating dependencies that affect functionality
-
-**Format:** Follow [Keep a Changelog](https://keepachangelog.com/) format:
-
-- Version header: `## [X.Y.Z] - YYYY-MM-DD`
-- Categories: `Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`
-- Each entry starts with a dash and describes the change clearly
-- Link related PRs/issues when applicable
-
-### Kubernetes Manifests
-
-- **Use Helm charts where applicable** - Prefer Helm charts over raw YAML manifests when suitable charts exist
-- Namespace: `canopy`
-- Resource naming: `canopy-<component>`
-- Include resource limits (Raspberry Pi optimized)
-- Use ConfigMaps for configuration
-
-### Docker Images & GitHub Container Registry (GHCR)
-
-- **Image Locations**:
-  - Backend: `ghcr.io/raolivei/canopy-api:<tag>`
-  - Frontend: `ghcr.io/raolivei/canopy-frontend:<tag>`
-- **Image Tagging**: GitHub Actions automatically creates multiple tags per push:
-  - Push to `main`: Creates `main`, `latest`, `sha-<commit-hash>` tags
-  - Push to `dev`: Creates `dev`, `sha-<commit-hash>` tags
-  - Push git tag (e.g., `v1.0.1`): Creates `v1.0.1`, `1.0`, `sha-<commit-hash>` tags
-- **When Images Are Pushed**: Only on pushes to `main`/`dev` branches or git tag pushes. PR builds test but don't push images.
-- **Viewing Images**: Check https://github.com/users/raolivei/packages
-- **Testing Images Locally**: Build and test Docker images locally before pushing to ensure they work correctly
-- **Deployment**: Use `latest` tag for automatic updates, or specific version tags (e.g., `v1.0.1`) for production stability
+**TypeScript**: See `frontend/components/` for component patterns. Use Tailwind CSS.
 
 ## Common Tasks
 
-### Adding Transaction Endpoint
+### Adding API Endpoint
 
-1. Add route in `backend/api/transactions.py`
-2. Add Pydantic model in `backend/models/transaction.py`
-3. Add database model if needed
-4. Update API docs (auto-generated from FastAPI)
+1. Add route in `backend/api/`
+2. Add Pydantic model in `backend/models/`
+3. Update API docs (auto-generated)
 
 ### Adding CSV Import Format
 
 1. Add parser in `backend/ingest/csv_parsers.py`
-2. Add format detection logic
-3. Add example CSV in `examples/`
-4. Update `CSV_IMPORT_GUIDE.md`
+2. Add example CSV in `examples/`
 
 ### Adding Frontend Component
 
-1. Create component in `frontend/components/`
-2. Add types if needed
-3. Use Tailwind for styling
-4. Follow existing component patterns
+1. Create in `frontend/components/`
+2. Use Tailwind for styling
+3. Follow existing patterns
 
-### Updating Kubernetes Deployment
+## Docker Images
 
-1. **Use Helm charts where applicable** - Prefer Helm charts for deployments
-2. Update manifests in `k8s/` (or Helm charts in `helm/` if using Helm)
-3. Test: `kubectl apply -f k8s/ --dry-run=client` or `helm template` for Helm charts
-4. Update `DEPLOYMENT.md` if needed
-
-## Development Setup
-
-### Recommended: Docker Compose (Primary Method)
-
-```bash
-# Load port assignments
-source ../workspace-config/ports/.env.ports
-
-# Start all services with hot reload
-docker-compose up
-
-# Or start in detached mode
-docker-compose up -d
-```
-
-**Access:**
-
-- Frontend: http://localhost:3001
-- API: http://localhost:8001
-- API Docs: http://localhost:8001/docs
-
-**Benefits:**
-
-- Consistent environment (matches production)
-- Hot reload enabled via volume mounts
-- No local Python/Node version conflicts
-- Single command to start everything
-
-See `../workspace-config/docs/DOCKER_COMPOSE_GUIDE.md` for complete guide.
-
-### Alternative: Local Development (Fallback)
-
-```bash
-# Backend
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload
-
-# Frontend
-cd frontend
-npm install
-npm run dev
-```
-
-**Why PYTHONPATH?** Python needs to find `backend` module for absolute imports.
-
-### Testing
-
-```bash
-# With docker-compose
-docker-compose exec api pytest
-
-# Or locally
-./test_app.sh  # Runs comprehensive tests
-```
-
-## Testing Locally
-
-### Pre-flight Checks
-
-```bash
-# 1. Check for port conflicts
-../workspace-config/scripts/check-ports.sh
-
-# 2. Ensure Docker is running
-docker ps
-
-# 3. Load port assignments
-source ../workspace-config/ports/.env.ports
-```
-
-### Starting Services
-
-```bash
-# Start all services
-docker-compose up
-
-# Start in detached mode (background)
-docker-compose up -d
-
-# Start specific services only
-docker-compose up postgres redis api
-```
-
-### Verifying Services
-
-```bash
-# Check running containers
-docker-compose ps
-
-# View logs
-docker-compose logs -f [service-name]
-
-# Test API health endpoint
-curl http://localhost:8001/v1/health
-
-# Test frontend
-curl http://localhost:3001
-```
-
-### Hot Reload Verification
-
-1. Make a small code change (e.g., add a comment)
-2. Save the file
-3. Check docker-compose logs - should see reload message
-4. Refresh browser - changes should appear
-
-### Common Issues & Solutions
-
-**Port conflicts:**
-
-```bash
-# Find what's using a port
-lsof -i :<PORT>
-
-# Kill process if needed
-kill -9 <PID>
-```
-
-**Container won't start:**
-
-```bash
-# Rebuild containers
-docker-compose build --no-cache
-
-# Check logs
-docker-compose logs [service-name]
-```
-
-**Database connection issues:**
-
-```bash
-# Wait for health checks
-docker-compose ps  # Check health status
-
-# Restart services
-docker-compose restart [service-name]
-```
-
-**Hot reload not working:**
-
-- Verify volume mounts in docker-compose.yml
-- Check file permissions
-- Ensure source code directory matches volume path
-
-## Environment Variables
-
-### Required for Docker Compose
-
-Always source port assignments before running docker-compose:
-
-```bash
-# From project root
-source ../workspace-config/ports/.env.ports
-
-# Or set WORKSPACE_CONFIG variable
-export WORKSPACE_CONFIG="$HOME/WORKSPACE/raolivei/workspace-config"
-source "$WORKSPACE_CONFIG/ports/.env.ports"
-```
-
-### Project-Specific Variables
-
-See `.env.local.example` for required variables. Copy to `.env.local` and configure as needed.
-
-## Database Migrations
-
-### With Docker Compose
-
-```bash
-# Run migrations
-docker-compose exec api alembic upgrade head
-
-# Create new migration
-docker-compose exec api alembic revision --autogenerate -m "description"
-
-# Rollback
-docker-compose exec api alembic downgrade -1
-```
-
-### Accessing Database
-
-```bash
-# PostgreSQL shell
-docker-compose exec postgres psql -U postgres -d canopy
-
-# Redis CLI
-docker-compose exec redis redis-cli
-```
+- API: `ghcr.io/raolivei/canopy-api:<tag>`
+- Frontend: `ghcr.io/raolivei/canopy-frontend:<tag>`
 
 ## Key Design Decisions
 
-### Why Separate Processes?
-
-- Independent scaling
-- Different deployment strategies
-- Technology fit (Python for data, TypeScript for UI)
-
-### Why Local Storage?
-
-- Privacy: Financial data never leaves control
-- Security: No cloud breaches
-- Compliance: Data residency requirements
-
-### Why Multi-Currency?
-
-- Modern users have assets across currencies
-- Accurate net worth calculation
-- Meaningful spending analysis
-
-### Why CSV/OFX Import?
-
-- Most banks don't offer APIs
-- Universal formats
-- Platform-agnostic
-
-### Why Raspberry Pi Optimized?
-
-- Affordable hardware
-- Low power consumption
-- 24/7 operation
-- Full data control
-
-## Important Notes
-
-- **Self-hosted only** - No cloud dependencies
-- **Privacy-first** - All data stored locally
-- **Multi-currency** - CAD, USD, BRL, EUR, GBP supported
-- **CSV import** - Smart format detection
-- **Raspberry Pi** - Optimized for low-power hardware
-
-## Documentation
-
-- `README.md` - Overview and quick start
-- `ARCHITECTURE.md` - Design decisions
-- `CSV_IMPORT_GUIDE.md` - CSV import documentation
-- `MASTER_PROMPT.md` - Complete recreation guide
-- `DEPLOYMENT.md` - Kubernetes deployment
+- **Self-hosted only**: No cloud dependencies
+- **Privacy-first**: All data stored locally
+- **Multi-currency**: CAD, USD, BRL, EUR, GBP
+- **Raspberry Pi optimized**: Low-power hardware
