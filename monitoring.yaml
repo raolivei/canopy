@@ -1,0 +1,32 @@
+# Monitoring Configuration for Canopy
+# Personal finance and transaction tracking application
+# Dashboard: https://grafana.eldertree.local/d/canopy-dashboard
+
+app:
+  name: "Canopy"
+  namespace: "canopy"
+  type: web-service
+
+  components:
+    api:
+      service: canopy-api
+      port: 8000
+      metrics: false
+
+    web:
+      service: canopy-frontend
+      port: 3000
+
+    postgres:
+      service: canopy-postgres
+      port: 5432
+
+    redis:
+      service: canopy-redis
+      port: 6379
+
+  alerts:
+    cpu_threshold: 80
+    memory_threshold: 85
+    enabled: true
+    severity: warning

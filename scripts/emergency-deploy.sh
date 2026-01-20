@@ -82,3 +82,4 @@ echo "    kubectl logs -n $NAMESPACE -l app=canopy-frontend"
 
 
 
+
