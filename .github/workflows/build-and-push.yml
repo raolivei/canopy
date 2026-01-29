@@ -14,7 +14,7 @@ on:
 
 jobs:
   build-api:
-    uses: raolivei/github-workflows/.github/workflows/docker-build.yml@1-implement-reusable-workflows
+    uses: raolivei/github-workflows/.github/workflows/docker-build.yml@main
     with:
       image-name: canopy-api
       context: ./backend
@@ -22,7 +22,7 @@ jobs:
       REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-frontend:
-    uses: raolivei/github-workflows/.github/workflows/docker-build.yml@1-implement-reusable-workflows
+    uses: raolivei/github-workflows/.github/workflows/docker-build.yml@main
     with:
       image-name: canopy-frontend
       context: ./frontend
@@ -30,7 +30,7 @@ jobs:
       REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   test-backend:
-    uses: raolivei/github-workflows/.github/workflows/python-ci.yml@1-implement-reusable-workflows
+    uses: raolivei/github-workflows/.github/workflows/python-ci.yml@main
     with:
       python-version: "3.11"
       working-directory: ./backend
@@ -40,7 +40,7 @@ jobs:
       run-pytest: false  # Enable when tests are implemented
 
   test-frontend:
-    uses: raolivei/github-workflows/.github/workflows/node-ci.yml@1-implement-reusable-workflows
+    uses: raolivei/github-workflows/.github/workflows/node-ci.yml@main
     with:
       node-version: "18"
       working-directory: ./frontend
