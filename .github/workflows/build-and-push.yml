@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   push:
@@ -11,209 +11,39 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Image tag (e.g., v1.0.0)"
-        required: false
-        default: "latest"
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME_API: ghcr.io/raolivei/canopy-api
-  IMAGE_NAME_FRONTEND: ghcr.io/raolivei/canopy-frontend
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+  build-api:
+    uses: raolivei/github-workflows/.github/workflows/docker-build.yml@main
+    with:
+      image-name: canopy-api
+      context: ./backend
+    secrets:
+      REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  build-frontend:
+    uses: raolivei/github-workflows/.github/workflows/docker-build.yml@main
+    with:
+      image-name: canopy-frontend
+      context: ./frontend
+    secrets:
+      REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version
-        id: package-version
-        run: |
-          VERSION=$(cat VERSION | tr -d '[:space:]')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: v$VERSION"
+  test-backend:
+    uses: raolivei/github-workflows/.github/workflows/python-ci.yml@main
+    with:
+      python-version: "3.11"
+      working-directory: ./backend
+      package-manager: pip
+      run-ruff: false
+      run-mypy: false
+      run-pytest: false  # Enable when tests are implemented
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
-
-      - name: Extract metadata for API
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME_API }}
-          tags: |
-            type=semver,pattern=v{{version}},value=v${{ steps.package-version.outputs.version }}
-            type=semver,pattern=v{{major}}.{{minor}},value=v${{ steps.package-version.outputs.version }}
-            type=semver,pattern=v{{major}},value=v${{ steps.package-version.outputs.version }}
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-,enable={{is_default_branch}}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
-
-      - name: Extract metadata for Frontend
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME_FRONTEND }}
-          tags: |
-            type=semver,pattern=v{{version}},value=v${{ steps.package-version.outputs.version }}
-            type=semver,pattern=v{{major}}.{{minor}},value=v${{ steps.package-version.outputs.version }}
-            type=semver,pattern=v{{major}},value=v${{ steps.package-version.outputs.version }}
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-,enable={{is_default_branch}}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push API image
-        id: build-api
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push Frontend image
-        id: build-frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Image digest
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "API image pushed with digest ${{ steps.build-api.outputs.digest }}"
-          echo "Frontend image pushed with digest ${{ steps.build-frontend.outputs.digest }}"
-
-      - name: Output image tags
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "API image tags:"
-          echo "${{ steps.meta-api.outputs.tags }}" | tr ' ' '\n'
-          echo "Frontend image tags:"
-          echo "${{ steps.meta-frontend.outputs.tags }}" | tr ' ' '\n'
-
-  # DISABLED: Requires self-hosted runner on Raspberry Pi
-  # Uncomment and configure self-hosted runner when ready to deploy
-  # deploy-to-pi:
-  #   needs: build-and-push
-  #   runs-on: self-hosted
-  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Set up kubectl
-  #       run: |
-  #         # Kubectl should be pre-installed on self-hosted runner
-  #         kubectl version --client
-  #
-  #     - name: Configure kubeconfig
-  #       env:
-  #         KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_ELDERTREE }}
-  #       run: |
-  #         mkdir -p ~/.kube
-  #         echo "$KUBECONFIG_CONTENT" > ~/.kube/config
-  #         chmod 600 ~/.kube/config
-  #
-  #     - name: Verify cluster connection
-  #       run: |
-  #         kubectl cluster-info
-  #         kubectl get nodes
-  #
-  #     - name: Apply Kubernetes manifests
-  #       run: |
-  #         kubectl apply -f k8s/deploy.yaml
-  #         kubectl apply -f k8s/service.yaml
-  #         kubectl apply -f k8s/ingress.yaml
-  #
-  #     - name: Restart deployments to pull latest images
-  #       run: |
-  #         kubectl rollout restart deployment/canopy-api -n canopy
-  #         kubectl rollout restart deployment/canopy-frontend -n canopy
-  #
-  #     - name: Wait for rollout to complete
-  #       run: |
-  #         kubectl rollout status deployment/canopy-api -n canopy --timeout=5m
-  #         kubectl rollout status deployment/canopy-frontend -n canopy --timeout=5m
-  #
-  #     - name: Verify deployment
-  #       run: |
-  #         kubectl get pods -n canopy
-  #         kubectl get svc -n canopy
-  #         kubectl get ingress -n canopy
-
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install backend dependencies
-        run: |
-          cd backend
-          pip install -r requirements.txt
-
-      - name: Run backend tests
-        run: |
-          cd backend
-          # pytest tests/ (when tests are implemented)
-          echo "Backend tests placeholder"
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "18"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Run frontend lint
-        run: |
-          cd frontend
-          npm run lint
-
-      - name: Build frontend
-        run: |
-          cd frontend
-          npm run build
+  test-frontend:
+    uses: raolivei/github-workflows/.github/workflows/node-ci.yml@main
+    with:
+      node-version: "18"
+      working-directory: ./frontend
+      run-lint: true
+      run-test: false
+      run-build: true
