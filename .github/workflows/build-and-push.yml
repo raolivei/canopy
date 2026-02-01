@@ -18,6 +18,9 @@ concurrency:
 jobs:
   build-api:
     uses: raolivei/github-workflows/.github/workflows/docker-build.yml@main
+    permissions:
+      contents: read
+      packages: write
     with:
       image-name: canopy-api
       context: ./backend
@@ -26,6 +29,9 @@ jobs:
 
   build-frontend:
     uses: raolivei/github-workflows/.github/workflows/docker-build.yml@main
+    permissions:
+      contents: read
+      packages: write
     with:
       image-name: canopy-frontend
       context: ./frontend
