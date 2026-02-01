@@ -9,6 +9,91 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested  
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [0.4.0] - 2026-01-31 - 🎯 **Insights & FIRE Planning**
+
+### Major Features
+
+#### Portfolio Insights Dashboard
+- **Net Worth Tracking**: Multi-currency net worth calculation with USD as base currency
+- **Asset Allocation**: Breakdown by type, currency, country, and institution
+- **Currency Exposure**: Risk assessment (concentrated/balanced/diversified)
+- **Growth Metrics**: Monthly/yearly rates, best/worst months
+- **Historical Snapshots**: Track portfolio value over time
+
+#### FIRE Calculator
+- **FIRE Number**: Calculate target net worth based on expenses and SWR
+- **Years to FIRE**: Projection based on current savings rate
+- **What-If Scenarios**: Compare different savings/return scenarios
+- **30-Year Projections**: Visualize path to financial independence
+- **Customizable Parameters**: SWR (4% default), return rate (7% default)
+
+#### Real Estate Tracking
+- **Property Management**: Track properties with payment schedules
+- **Partnership Support**: 50% ownership split with partners (e.g., apartment with Alex)
+- **Payment Series**: Track ATO, SINAL, MENSAIS, SEMESTRAIS payments
+- **Equity Calculation**: Track how much of the property is paid off
+
+#### Liability Management
+- **Credit Cards**: Track balances, limits, APR, rewards programs
+- **Loans**: Car loans, personal loans with amortization tracking
+- **Balance History**: Historical balance tracking
+- **Utilization Alerts**: Warn when credit utilization exceeds 30%
+
+### New Files
+
+**Backend Models:**
+- `backend/db/models/asset.py` - Enhanced with 20+ asset types, institution/country tracking
+- `backend/db/models/real_estate.py` - Property and payment schedule models
+- `backend/db/models/liability.py` - Liability and payment tracking models
+
+**Backend Services:**
+- `backend/services/insights_calculator.py` - Net worth, allocation, growth calculations
+- `backend/services/fire_calculator.py` - FIRE planning calculations
+
+**Backend API:**
+- `backend/api/insights.py` - Insights endpoints (/v1/insights/*)
+
+**Frontend Pages:**
+- `frontend/pages/insights.tsx` - Insights dashboard with charts
+- `frontend/pages/settings/integrations.tsx` - Integrations settings page
+
+**Database Migrations:**
+- `backend/alembic/versions/20260131_0002_add_insights_models.py`
+
+**Scripts:**
+- `backend/scripts/seed_portfolio.py` - Seed script for portfolio data
+
+### API Endpoints Added
+
+```
+GET  /v1/insights/summary           - Complete insights summary
+GET  /v1/insights/net-worth         - Net worth breakdown
+GET  /v1/insights/allocation        - Asset allocation
+GET  /v1/insights/currency-exposure - Currency exposure analysis
+GET  /v1/insights/growth            - Growth metrics
+GET  /v1/insights/historical        - Historical net worth data
+GET  /v1/insights/fire              - FIRE calculations
+POST /v1/insights/fire/calculate    - Custom FIRE calculations
+GET  /v1/insights/projections       - Net worth projections
+```
+
+### UI Improvements
+- Added Insights page to sidebar navigation
+- Added Integrations page to sidebar navigation
+- Currency switcher (USD/CAD/BRL/EUR) on Insights page
+- Interactive FIRE calculator with sliders
+- Asset allocation pie charts
+- Currency exposure bar charts
+- What-if scenario comparisons
+
+### Technical Improvements
+- Extended Asset model with 20+ asset types
+- Added ownership_percentage for shared assets
+- Added sync_source for API integration tracking
+- Added institution and country fields for better categorization
+
+---
+
 ## [0.2.3-dev] - 2025-01-XX
 
 ### Changed

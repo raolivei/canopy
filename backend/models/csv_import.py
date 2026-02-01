@@ -13,6 +13,7 @@ class ImportStatus(str, Enum):
 class BankFormat(str, Enum):
     GENERIC = "generic"
     MONARCH = "monarch"
+    # US Banks
     CHASE = "chase"
     BANK_OF_AMERICA = "bank_of_america"
     WELLS_FARGO = "wells_fargo"
@@ -20,14 +21,28 @@ class BankFormat(str, Enum):
     CAPITAL_ONE = "capital_one"
     AMEX = "amex"
     DISCOVER = "discover"
+    SCHWAB = "schwab"
+    # Canadian Banks
     TD_BANK = "td_bank"
     RBC = "rbc"
     SCOTIABANK = "scotiabank"
     BMO = "bmo"
+    WEALTHSIMPLE = "wealthsimple"
+    WEALTHSIMPLE_TRADE = "wealthsimple_trade"
+    # Brazilian Banks
+    NUBANK = "nubank"
+    NUBANK_INVESTMENTS = "nubank_investments"
+    CLEAR = "clear"
+    CLEAR_POSITIONS = "clear_positions"
+    XP = "xp"
+    XP_POSITIONS = "xp_positions"
+    B3_CEI = "b3_cei"
     ITAU = "itau"
     BRADESCO = "bradesco"
     SANTANDER = "santander"
-    NUBANK = "nubank"
+    # International
+    WISE = "wise"
+    # Custom
     CUSTOM = "custom"
 
 class FieldMapping(BaseModel):
@@ -52,12 +67,20 @@ class FieldMapping(BaseModel):
     notes_column: Optional[str] = None  # User notes
     tags_column: Optional[str] = None  # Tags (comma-separated or similar)
     
+    # Investment-specific fields
+    ticker_column: Optional[str] = None
+    shares_column: Optional[str] = None
+    price_column: Optional[str] = None
+    fees_column: Optional[str] = None
+    operation_column: Optional[str] = None  # Buy/Sell/Dividend
+    
     # Date parsing configuration
     date_format: str = "%Y-%m-%d"  # Default format
     
     # Amount parsing configuration
     amount_is_absolute: bool = False  # If true, use type to determine sign
     negative_means_expense: bool = True  # If false, negative means income
+    decimal_separator: str = "."  # Some countries use comma
 
 class CSVImportConfig(BaseModel):
     """Configuration for importing a CSV file"""
@@ -89,7 +112,12 @@ class TransactionPreview(BaseModel):
     original_statement: Optional[str] = None
     notes: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-    ticker: Optional[str] = None  # For investment transactions
+    
+    # Investment fields
+    ticker: Optional[str] = None
+    shares: Optional[float] = None
+    price_per_share: Optional[float] = None
+    fees: Optional[float] = None
     
     is_duplicate: bool = False
     duplicate_reason: Optional[str] = None
@@ -146,4 +174,3 @@ class ImportHistoryList(BaseModel):
     """List of import history records"""
     imports: List[ImportHistory]
     total: int
-

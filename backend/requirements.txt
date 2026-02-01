@@ -7,3 +7,13 @@ redis>=5.0.0,<5.1.0
 psycopg[binary]>=3.1.0,<3.2.0
 
 python-multipart==0.0.20
+
+# Database ORM and migrations
+sqlalchemy>=2.0.0,<2.1.0
+alembic>=1.13.0,<1.14.0
+
+# Price fetching
+yfinance>=0.2.36,<0.3.0
+
+# HTTP client for API integrations (Wise, etc.)
+httpx>=0.27.0,<0.28.0

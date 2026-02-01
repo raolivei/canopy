@@ -32,7 +32,9 @@ Most banks don't offer APIs. CSV/OFX files are universal formats that allow user
 **Why Raspberry Pi Optimized?**
 Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.  
 
-## Core Features (MVP - Implemented)  
+## Core Features
+
+### Transaction Management (✅ Implemented)
 - ✅ Transaction tracking with categories and types (income, expense, transfer, buy, sell)
 - ✅ Multi-currency FX conversions with display currency toggle
 - ✅ Modern Monarch Money-inspired UI with dark mode support
@@ -43,15 +45,40 @@ Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 
 - ✅ Duplicate detection and validation
 - ✅ Investment transaction tracking with ticker symbols
 - ✅ Rich transaction data (merchant, notes, tags, original statement)
-- 📈 Investment portfolio tracking (stocks, ETFs, crypto, cash) - Planned
-- 💰 Budgeting with categories and goals - Planned
-- 🧾 OFX import - Planned
-- 📤 Local backup to S3-compatible storage (MinIO/B2) - Planned
-- 🔒 Encrypted secrets (no external vault) - Planned
+
+### Portfolio & Insights (✅ Implemented)
+- ✅ Investment portfolio tracking (stocks, ETFs, crypto, retirement accounts)
+- ✅ Net worth dashboard with multi-currency support (USD/CAD/BRL/EUR base)
+- ✅ Asset allocation by type, currency, country, and institution
+- ✅ Currency exposure analysis with risk assessment
+- ✅ Growth metrics (monthly/yearly rates, best/worst months)
+- ✅ Historical portfolio snapshots and trends
+- ✅ Real estate tracking with payment schedules (50% partnership support)
+- ✅ Liability tracking (credit cards, loans, mortgages)
+
+### FIRE Planning (✅ Implemented)
+- ✅ FIRE number calculation (based on expenses and safe withdrawal rate)
+- ✅ Years-to-FIRE projection with compound growth
+- ✅ 30-year net worth projections
+- ✅ What-if scenarios (save more, different returns, reduce expenses)
+- ✅ Passive income projections at FIRE
+
+### Integrations (🔄 In Progress)
+- 🔄 Questrade API (OAuth 2.0) - UI ready, API pending
+- 🔄 Moomoo/Futu OpenAPI - UI ready, API pending
+- 🔄 Wise API - UI ready, API pending
+- ✅ CSV import for all major institutions
+
+### Planned Features
+- 💰 Budgeting with categories and goals
+- 🧾 OFX import
+- 📤 Local backup to S3-compatible storage (MinIO/B2)
+- 🔒 Encrypted secrets (no external vault)
+- 📊 Dividend calendar and income streams
 
 ## Current Version
 
-**v0.2.2-dev** - Development build with MVP features (pre-release, not for production use).
+**v0.4.0** - Insights & FIRE Planning release with portfolio analytics.
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed release notes.
 
@@ -138,20 +165,48 @@ Run the test script to verify all functionality:
 ```
 canopy/  
  ├── backend/  
- │   ├── api/          # API endpoints (transactions, currency, budgets, goals)
- │   ├── models/       # Pydantic models (transaction, budget, goal, holdings)
- │   ├── app/          # FastAPI application
- │   ├── ingest/       # CSV/OFX import handlers + Celery tasks
- │   └── celery/       # Celery config and workers
+ │   ├── api/              # API endpoints
+ │   │   ├── portfolio.py      # Portfolio CRUD
+ │   │   ├── insights.py       # Insights & FIRE calculations
+ │   │   ├── integrations.py   # External API integrations
+ │   │   ├── transactions.py   # Transaction management
+ │   │   └── currency.py       # Currency conversion
+ │   ├── db/               # Database layer
+ │   │   ├── models/           # SQLAlchemy ORM models
+ │   │   │   ├── asset.py          # Assets (20+ types)
+ │   │   │   ├── real_estate.py    # Real estate & payments
+ │   │   │   ├── liability.py      # Liabilities & tracking
+ │   │   │   └── ...
+ │   │   ├── base.py           # SQLAlchemy base
+ │   │   └── session.py        # Session management
+ │   ├── services/         # Business logic
+ │   │   ├── insights_calculator.py  # Net worth, allocation
+ │   │   ├── fire_calculator.py      # FIRE planning
+ │   │   ├── price_fetcher.py        # Yahoo Finance
+ │   │   └── portfolio_calculator.py # Portfolio metrics
+ │   ├── scripts/          # Utility scripts
+ │   │   └── seed_portfolio.py   # Database seeding
+ │   ├── alembic/          # Database migrations
+ │   ├── models/           # Pydantic schemas
+ │   ├── app/              # FastAPI application
+ │   └── ingest/           # CSV import + Celery tasks
  ├── frontend/  
- │   ├── components/   # React components (Sidebar, StatCard, Charts, etc.)
- │   ├── pages/        # Next.js pages (dashboard, transactions, budget, goals, etc.)
- │   └── utils/        # Utility functions (currency, formatting, charts)
- ├── k8s/              # Kubernetes manifests for Pi cluster
- ├── .github/workflows/  
- │   └── deploy.yml    # Self-hosted runner CI/CD
- ├── CHANGELOG.md      # Version history
- ├── ARCHITECTURE.md   # Architecture decisions
+ │   ├── components/       # React components
+ │   │   ├── AllocationChart.tsx
+ │   │   ├── PerformanceChart.tsx
+ │   │   ├── PortfolioHoldingsTable.tsx
+ │   │   └── ...
+ │   ├── pages/            # Next.js pages
+ │   │   ├── insights.tsx      # Insights dashboard
+ │   │   ├── portfolio.tsx     # Portfolio management
+ │   │   ├── settings/
+ │   │   │   └── integrations.tsx  # API integrations
+ │   │   └── ...
+ │   └── utils/            # Utility functions
+ ├── k8s/                  # Kubernetes manifests
+ ├── .github/workflows/    # CI/CD
+ ├── CHANGELOG.md          # Version history
+ ├── ARCHITECTURE.md       # Architecture decisions
  └── README.md  
 ```
 
@@ -180,10 +235,71 @@ Canopy now supports importing transactions from CSV files with smart format dete
 
 See **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** for detailed instructions and examples.
 
+## Insights & FIRE Planning
+
+The Insights page (`/insights`) provides comprehensive financial analytics:
+
+### Net Worth Dashboard
+- Total net worth with multi-currency support
+- Assets vs liabilities breakdown
+- Currency exposure analysis
+- Growth metrics (monthly, yearly, YTD)
+
+### FIRE Calculator
+Calculate your path to Financial Independence:
+- **FIRE Number**: Target net worth based on your expenses
+- **Years to FIRE**: How long until you reach financial independence
+- **Progress**: Visual progress bar showing % complete
+- **Projections**: 30-year net worth projections
+
+Default assumptions (customizable):
+- Monthly expenses: $5,000 CAD (~$3,600 USD)
+- Safe Withdrawal Rate: 4%
+- Expected Return: 7%
+
+### What-If Scenarios
+Compare different scenarios:
+- Save $500 more per month
+- Save $1000 more per month
+- Reduce expenses by 10%
+- 8% vs 7% vs 5% annual returns
+
+## Database Seeding
+
+To populate the database with sample data:
+
+```bash
+cd backend
+
+# Seed the database
+python -m backend.scripts.seed_portfolio
+
+# Clear and reseed
+python -m backend.scripts.seed_portfolio --clear
+```
+
+The seed script includes:
+- 40+ accounts across Canada, USA, and Brazil
+- Historical snapshots from Sep 2024 to present
+- Real estate (apartment with 50% ownership)
+- Liabilities (credit cards, car loan)
+- Crypto holdings (by platform and aggregated by coin)
+
 ## Documentation
 
 - **[CHANGELOG.md](./CHANGELOG.md)** - Version history and release notes
 - **[MASTER_PROMPT.md](./MASTER_PROMPT.md)** - Complete application recreation guide
 - **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** - CSV import documentation and format guide
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture decisions and rationale
 - **[test_app.sh](./test_app.sh)** - Test script for verifying functionality
 - **[examples/](./examples/)** - Sample CSV files for different formats
+
+## GitHub Issues
+
+Track ongoing development:
+- [#21 - Questrade API Integration](https://github.com/raolivei/canopy/issues/21)
+- [#22 - Moomoo API Integration](https://github.com/raolivei/canopy/issues/22)
+- [#23 - Wise API Integration](https://github.com/raolivei/canopy/issues/23)
+- [#24 - Dividend Tracking](https://github.com/raolivei/canopy/issues/24)
+- [#25 - Real-time Currency Rates](https://github.com/raolivei/canopy/issues/25)
+- [#26 - Property Value Estimation](https://github.com/raolivei/canopy/issues/26)

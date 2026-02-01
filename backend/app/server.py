@@ -13,6 +13,27 @@ try:
 except ImportError:
     HAS_TRANSACTION_ROUTERS = False
 
+# Import portfolio router
+try:
+    from backend.api import portfolio
+    HAS_PORTFOLIO_ROUTER = True
+except ImportError:
+    HAS_PORTFOLIO_ROUTER = False
+
+# Import integrations router
+try:
+    from backend.api import integrations
+    HAS_INTEGRATIONS_ROUTER = True
+except ImportError:
+    HAS_INTEGRATIONS_ROUTER = False
+
+# Import insights router
+try:
+    from backend.api import insights
+    HAS_INSIGHTS_ROUTER = True
+except ImportError:
+    HAS_INSIGHTS_ROUTER = False
+
 
 def create_app() -> FastAPI:
     """Instantiate and configure the FastAPI application."""
@@ -28,7 +49,7 @@ def create_app() -> FastAPI:
     # Add CORS middleware for frontend communication
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -43,8 +64,19 @@ def create_app() -> FastAPI:
         app.include_router(currency.router)
         app.include_router(csv_import.router)
     
+    # Include portfolio router if available
+    if HAS_PORTFOLIO_ROUTER:
+        app.include_router(portfolio.router)
+    
+    # Include integrations router if available
+    if HAS_INTEGRATIONS_ROUTER:
+        app.include_router(integrations.router)
+    
+    # Include insights router if available
+    if HAS_INSIGHTS_ROUTER:
+        app.include_router(insights.router)
+    
     return app
 
 
 app = create_app()
-

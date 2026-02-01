@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from backend.models.csv_import import (
@@ -13,10 +14,11 @@ class CSVParserService:
     
     # Predefined bank formats with common field mappings
     BANK_FORMATS = {
+        # ==================== US Banks ====================
         BankFormat.MONARCH: FieldMapping(
             date_column="Date",
             merchant_column="Merchant",
-            description_column="Merchant",  # Use merchant as description too
+            description_column="Merchant",
             original_statement_column="Original Statement",
             notes_column="Notes",
             tags_column="Tags",
@@ -65,6 +67,20 @@ class CSVParserService:
             category_column="Category",
             date_format="%Y-%m-%d"
         ),
+        BankFormat.SCHWAB: FieldMapping(
+            date_column="Date",
+            description_column="Description",
+            amount_column="Amount",
+            type_column="Action",
+            ticker_column="Symbol",
+            shares_column="Quantity",
+            price_column="Price",
+            fees_column="Fees & Comm",
+            date_format="%m/%d/%Y",
+            negative_means_expense=True
+        ),
+        
+        # ==================== Canadian Banks ====================
         BankFormat.TD_BANK: FieldMapping(
             date_column="Date",
             description_column="Description",
@@ -74,20 +90,132 @@ class CSVParserService:
         ),
         BankFormat.RBC: FieldMapping(
             date_column="Transaction Date",
-            description_column="Description",
-            debit_column="Debit",
-            credit_column="Credit",
+            description_column="Description 1",
+            debit_column="CAD$",
+            credit_column="CAD$",
             account_column="Account Number",
             date_format="%m/%d/%Y"
         ),
+        BankFormat.WEALTHSIMPLE: FieldMapping(
+            date_column="Date",
+            description_column="Description",
+            amount_column="Amount",
+            account_column="Account",
+            currency_column="Currency",
+            date_format="%Y-%m-%d",
+            negative_means_expense=True
+        ),
+        BankFormat.WEALTHSIMPLE_TRADE: FieldMapping(
+            date_column="Date",
+            description_column="Description",
+            amount_column="Market Value",
+            operation_column="Transaction Type",
+            ticker_column="Symbol",
+            shares_column="Quantity",
+            price_column="Price",
+            currency_column="Currency",
+            account_column="Account",
+            date_format="%Y-%m-%d"
+        ),
+        
+        # ==================== Brazilian Banks ====================
         BankFormat.NUBANK: FieldMapping(
             date_column="date",
             description_column="title",
             amount_column="amount",
             category_column="category",
             date_format="%Y-%m-%d",
-            negative_means_expense=False
+            negative_means_expense=False,
+            decimal_separator="."
         ),
+        BankFormat.NUBANK_INVESTMENTS: FieldMapping(
+            date_column="Data",
+            description_column="Descrição",
+            amount_column="Valor",
+            operation_column="Tipo",
+            ticker_column="Ativo",
+            shares_column="Quantidade",
+            price_column="Preço",
+            date_format="%d/%m/%Y",
+            decimal_separator=","
+        ),
+        BankFormat.CLEAR: FieldMapping(
+            date_column="Data Negócio",
+            description_column="Especificação do Título",
+            amount_column="Valor Total",
+            operation_column="C/V",  # C = Compra, V = Venda
+            ticker_column="Código",
+            shares_column="Quantidade",
+            price_column="Preço",
+            fees_column="Taxa",
+            date_format="%d/%m/%Y",
+            decimal_separator=","
+        ),
+        BankFormat.CLEAR_POSITIONS: FieldMapping(
+            date_column="Data",
+            description_column="Produto",
+            amount_column="Valor Atualizado",
+            ticker_column="Código",
+            shares_column="Quantidade",
+            price_column="Preço Médio",
+            date_format="%d/%m/%Y",
+            decimal_separator=","
+        ),
+        BankFormat.XP: FieldMapping(
+            date_column="Data do Negócio",
+            description_column="Especificação do Ativo",
+            amount_column="Valor Líquido",
+            operation_column="Tipo de Movimentação",  # Compra/Venda
+            ticker_column="Código do Ativo",
+            shares_column="Quantidade",
+            price_column="Preço Unitário",
+            fees_column="Taxas",
+            date_format="%d/%m/%Y",
+            decimal_separator=","
+        ),
+        BankFormat.XP_POSITIONS: FieldMapping(
+            date_column="Data Posição",
+            description_column="Produto",
+            amount_column="Valor Bruto",
+            ticker_column="Código",
+            shares_column="Quantidade",
+            price_column="Preço Médio",
+            date_format="%d/%m/%Y",
+            decimal_separator=","
+        ),
+        BankFormat.B3_CEI: FieldMapping(
+            date_column="Data do Negócio",
+            description_column="Especificação do título",
+            amount_column="Valor",
+            operation_column="Tipo de Movimentação",
+            ticker_column="Código de Negociação",
+            shares_column="Quantidade",
+            price_column="Preço",
+            account_column="Instituição",
+            date_format="%d/%m/%Y",
+            decimal_separator=","
+        ),
+        
+        # ==================== International ====================
+        BankFormat.WISE: FieldMapping(
+            date_column="Date",
+            description_column="Description",
+            amount_column="Amount",
+            currency_column="Currency",
+            type_column="TransferWise ID",  # Used to detect type
+            transaction_id_column="TransferWise ID",
+            balance_column="Running Balance",
+            date_format="%Y-%m-%d",
+            negative_means_expense=True
+        ),
+    }
+    
+    # Brazilian format detection patterns
+    BRAZILIAN_HEADER_PATTERNS = {
+        BankFormat.CLEAR: ["data negócio", "c/v", "código", "especificação"],
+        BankFormat.XP: ["data do negócio", "código do ativo", "tipo de movimentação"],
+        BankFormat.B3_CEI: ["código de negociação", "instituição", "data do negócio"],
+        BankFormat.NUBANK_INVESTMENTS: ["ativo", "quantidade", "preço", "tipo"],
     }
     
     def __init__(self):
@@ -103,6 +231,22 @@ class CSVParserService:
             "original statement" in headers_lower):
             return BankFormat.MONARCH
         
+        # Wise detection
+        if "transferwise id" in headers_lower or ("date" in headers_lower and "running balance" in headers_lower and "currency" in headers_lower):
+            return BankFormat.WISE
+        
+        # Wealthsimple Trade detection
+        if "symbol" in headers_lower and "transaction type" in headers_lower and "market value" in headers_lower:
+            return BankFormat.WEALTHSIMPLE_TRADE
+        
+        # Wealthsimple Cash detection
+        if "date" in headers_lower and "description" in headers_lower and "currency" in headers_lower and "amount" in headers_lower:
+            return BankFormat.WEALTHSIMPLE
+        
+        # Schwab detection
+        if "action" in headers_lower and "symbol" in headers_lower and "fees & comm" in headers_lower:
+            return BankFormat.SCHWAB
+        
         # Chase detection
         if "posting date" in headers_lower and "type" in headers_lower:
             return BankFormat.CHASE
@@ -110,16 +254,62 @@ class CSVParserService:
         # Capital One detection
         if "transaction date" in headers_lower and "debit" in headers_lower:
             return BankFormat.CAPITAL_ONE
-            
+        
+        # RBC detection
+        if "account number" in headers_lower and ("description 1" in headers_lower or "transaction date" in headers_lower):
+            return BankFormat.RBC
+        
+        # Brazilian brokerages - check for Portuguese headers
+        headers_joined = " ".join(headers_lower)
+        
+        for format_type, patterns in self.BRAZILIAN_HEADER_PATTERNS.items():
+            if all(pattern in headers_joined for pattern in patterns):
+                return format_type
+        
         # Nubank detection
         if "date" in headers_lower and "title" in headers_lower and "category" in headers_lower:
             return BankFormat.NUBANK
             
-        # RBC detection
-        if "account number" in headers_lower and "transaction date" in headers_lower:
-            return BankFormat.RBC
+        # Clear positions (simpler check)
+        if "código" in headers_lower and "quantidade" in headers_lower and "preço médio" in headers_lower:
+            return BankFormat.CLEAR_POSITIONS
+        
+        # XP positions
+        if "código" in headers_lower and "quantidade" in headers_lower and "produto" in headers_lower:
+            return BankFormat.XP_POSITIONS
             
         return None
+    
+    def _parse_brazilian_amount(self, amount_str: str) -> float:
+        """Parse Brazilian number format (1.234,56 -> 1234.56)"""
+        if not amount_str:
+            return 0.0
+        
+        # Remove currency symbols and whitespace
+        amount_str = amount_str.strip()
+        for symbol in ['R$', 'BRL', ' ']:
+            amount_str = amount_str.replace(symbol, '')
+        
+        # Handle parentheses as negative
+        is_negative = False
+        if amount_str.startswith('(') and amount_str.endswith(')'):
+            is_negative = True
+            amount_str = amount_str[1:-1]
+        if amount_str.startswith('-'):
+            is_negative = True
+            amount_str = amount_str[1:]
+        
+        # Brazilian format: 1.234,56 -> 1234.56
+        # Remove thousand separators (.)
+        amount_str = amount_str.replace('.', '')
+        # Convert decimal separator (, -> .)
+        amount_str = amount_str.replace(',', '.')
+        
+        try:
+            result = float(amount_str)
+            return -result if is_negative else result
+        except ValueError:
+            return 0.0
         
     def parse_csv_file(
         self, 
@@ -214,6 +404,11 @@ class CSVParserService:
         """Parse a single CSV row into a transaction preview"""
         
         mapping = config.field_mapping
+        is_brazilian = config.bank_format in [
+            BankFormat.NUBANK, BankFormat.NUBANK_INVESTMENTS,
+            BankFormat.CLEAR, BankFormat.CLEAR_POSITIONS,
+            BankFormat.XP, BankFormat.XP_POSITIONS, BankFormat.B3_CEI
+        ]
         
         # Extract date
         date_str = row.get(mapping.date_column, "").strip()
@@ -244,8 +439,12 @@ class CSVParserService:
             debit_str = row.get(mapping.debit_column, "").strip()
             credit_str = row.get(mapping.credit_column, "").strip()
             
-            debit = self._parse_amount(debit_str) if debit_str else 0.0
-            credit = self._parse_amount(credit_str) if credit_str else 0.0
+            if is_brazilian:
+                debit = self._parse_brazilian_amount(debit_str) if debit_str else 0.0
+                credit = self._parse_brazilian_amount(credit_str) if credit_str else 0.0
+            else:
+                debit = self._parse_amount(debit_str) if debit_str else 0.0
+                credit = self._parse_amount(credit_str) if credit_str else 0.0
             
             if debit > 0:
                 amount = debit
@@ -258,10 +457,23 @@ class CSVParserService:
         else:
             # Handle single amount column
             amount_str = row.get(mapping.amount_column, "").strip()
-            amount = self._parse_amount(amount_str)
+            if is_brazilian:
+                amount = self._parse_brazilian_amount(amount_str)
+            else:
+                amount = self._parse_amount(amount_str)
             
-            # Determine transaction type
-            if mapping.type_column:
+            # Determine transaction type from operation column (for investment transactions)
+            if mapping.operation_column:
+                op_value = row.get(mapping.operation_column, "").strip().lower()
+                if op_value in ['c', 'compra', 'buy', 'bought', 'deposit', 'contribution']:
+                    transaction_type = TransactionType.BUY
+                elif op_value in ['v', 'venda', 'sell', 'sold', 'withdrawal']:
+                    transaction_type = TransactionType.SELL
+                elif op_value in ['dividendo', 'dividend', 'jcp', 'rendimento']:
+                    transaction_type = TransactionType.INCOME
+                elif op_value in ['transfer', 'transferência']:
+                    transaction_type = TransactionType.TRANSFER
+            elif mapping.type_column:
                 type_value = row.get(mapping.type_column, "").strip().lower()
                 transaction_type = self._infer_type_from_value(type_value, config)
             else:
@@ -273,14 +485,38 @@ class CSVParserService:
                 
                 amount = abs(amount)
         
-        # If we still don't have a type, try to infer from description
-        if not mapping.type_column and config.type_inference_rules:
-            inferred_type = self._infer_type_from_description(
-                description, 
-                config.type_inference_rules
-            )
-            if inferred_type:
-                transaction_type = inferred_type
+        # Extract ticker and investment fields
+        ticker = None
+        shares = None
+        price_per_share = None
+        fees = None
+        
+        if mapping.ticker_column:
+            ticker = row.get(mapping.ticker_column, "").strip().upper() or None
+        
+        if mapping.shares_column:
+            shares_str = row.get(mapping.shares_column, "").strip()
+            if shares_str:
+                if is_brazilian:
+                    shares = self._parse_brazilian_amount(shares_str)
+                else:
+                    shares = self._parse_amount(shares_str)
+        
+        if mapping.price_column:
+            price_str = row.get(mapping.price_column, "").strip()
+            if price_str:
+                if is_brazilian:
+                    price_per_share = self._parse_brazilian_amount(price_str)
+                else:
+                    price_per_share = self._parse_amount(price_str)
+        
+        if mapping.fees_column:
+            fees_str = row.get(mapping.fees_column, "").strip()
+            if fees_str:
+                if is_brazilian:
+                    fees = abs(self._parse_brazilian_amount(fees_str))
+                else:
+                    fees = abs(self._parse_amount(fees_str))
         
         # Extract category
         category = None
@@ -314,21 +550,7 @@ class CSVParserService:
         if mapping.tags_column:
             tags_str = row.get(mapping.tags_column, "").strip()
             if tags_str:
-                # Split by common delimiters
                 tags = [t.strip() for t in tags_str.replace(';', ',').split(',') if t.strip()]
-        
-        # Infer investment transactions and extract ticker
-        ticker = None
-        if category and category.lower() in ['buy', 'sell']:
-            # Change type to investment type
-            transaction_type = TransactionType.BUY if category.lower() == 'buy' else TransactionType.SELL
-            
-            # Try to extract ticker from description or original statement
-            # Monarch format often has "TICKER - Action" in original statement
-            if original_statement:
-                ticker = self._extract_ticker(original_statement)
-            if not ticker and description:
-                ticker = self._extract_ticker(description)
         
         # Check for duplicates
         is_duplicate = False
@@ -368,6 +590,9 @@ class CSVParserService:
             notes=notes,
             tags=tags,
             ticker=ticker,
+            shares=shares,
+            price_per_share=price_per_share,
+            fees=fees,
             is_duplicate=is_duplicate,
             duplicate_reason=duplicate_reason,
             has_error=has_error,
@@ -382,8 +607,11 @@ class CSVParserService:
         
         # Remove currency symbols and whitespace
         amount_str = amount_str.strip()
-        for symbol in ['$', '€', '£', 'R$', 'C$', ',']:
+        for symbol in ['$', '€', '£', 'R$', 'C$', 'CAD', 'USD', 'BRL', ' ']:
             amount_str = amount_str.replace(symbol, '')
+        
+        # Remove thousand separators (comma in US format)
+        amount_str = amount_str.replace(',', '')
         
         # Handle parentheses as negative (accounting format)
         if amount_str.startswith('(') and amount_str.endswith(')'):
@@ -398,8 +626,14 @@ class CSVParserService:
         """Infer transaction type from type column value"""
         type_value = type_value.lower()
         
+        # Investment patterns
+        if any(word in type_value for word in ['buy', 'bought', 'purchase', 'compra']):
+            return TransactionType.BUY
+        elif any(word in type_value for word in ['sell', 'sold', 'venda']):
+            return TransactionType.SELL
+        
         # Common patterns
-        if any(word in type_value for word in ['credit', 'deposit', 'payment received', 'income', 'refund']):
+        if any(word in type_value for word in ['credit', 'deposit', 'payment received', 'income', 'refund', 'dividend']):
             return TransactionType.INCOME
         elif any(word in type_value for word in ['debit', 'withdrawal', 'payment', 'purchase', 'expense']):
             return TransactionType.EXPENSE
@@ -407,41 +641,6 @@ class CSVParserService:
             return TransactionType.TRANSFER
         
         return TransactionType.EXPENSE  # Default
-    
-    def _infer_type_from_description(
-        self, 
-        description: str, 
-        rules: Dict[str, str]
-    ) -> Optional[TransactionType]:
-        """Infer transaction type from description using rules"""
-        description_lower = description.lower()
-        
-        for keyword, type_str in rules.items():
-            if keyword.lower() in description_lower:
-                try:
-                    return TransactionType(type_str.lower())
-                except ValueError:
-                    continue
-        
-        return None
-    
-    def _extract_ticker(self, text: str) -> Optional[str]:
-        """Extract ticker symbol from text"""
-        import re
-        
-        # Common patterns for tickers in Monarch exports:
-        # "VTI - Limit buy" or "VTI - Sold asset" 
-        # Match 2-5 uppercase letters/numbers at start, optionally with .F or .TO suffix
-        match = re.match(r'^([A-Z]{2,5}(?:\.[A-Z]{1,2})?)\s*[-:]', text)
-        if match:
-            return match.group(1)
-        
-        # Try just finding uppercase ticker at start
-        match = re.match(r'^([A-Z]{2,5}(?:\.[A-Z]{1,2})?)\s', text)
-        if match:
-            return match.group(1)
-        
-        return None
     
     def _check_duplicate(
         self,
@@ -452,9 +651,7 @@ class CSVParserService:
     ) -> Tuple[bool, Optional[str]]:
         """Check if transaction is a duplicate"""
         
-        # Check against existing transactions
         for tx in existing_transactions:
-            # Match on date, amount, and description
             if (tx.date.date() == date.date() and 
                 abs(tx.amount - amount) < 0.01 and 
                 tx.description.lower() == description.lower()):
@@ -474,7 +671,6 @@ class CSVParserService:
         transactions = []
         
         for tx_preview in preview.transactions:
-            # Skip based on filters
             if skip_duplicates and tx_preview.is_duplicate:
                 continue
             if skip_errors and tx_preview.has_error:
@@ -482,7 +678,6 @@ class CSVParserService:
             if selected_rows is not None and tx_preview.row_number not in selected_rows:
                 continue
             
-            # Create transaction
             transaction = TransactionCreate(
                 description=tx_preview.description,
                 amount=tx_preview.amount,
@@ -495,9 +690,10 @@ class CSVParserService:
                 original_statement=tx_preview.original_statement,
                 notes=tx_preview.notes,
                 tags=tx_preview.tags,
-                ticker=tx_preview.ticker
+                ticker=tx_preview.ticker,
+                shares=tx_preview.shares,
+                price_per_share=tx_preview.price_per_share
             )
             transactions.append(transaction)
         
         return transactions
-

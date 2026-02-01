@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Home, DollarSign, TrendingUp, Settings, Wallet, Upload } from "lucide-react";
+import { Home, DollarSign, TrendingUp, Settings, Wallet, Upload, Target, Plug } from "lucide-react";
 import { motion } from "framer-motion";
 import DarkModeToggle from "./DarkModeToggle";
 
@@ -10,7 +10,9 @@ const navigation = [
   { name: "Transactions", href: "/transactions", icon: DollarSign },
   { name: "Import", href: "/import", icon: Upload },
   { name: "Portfolio", href: "/portfolio", icon: TrendingUp },
+  { name: "Insights", href: "/insights", icon: Target },
   { name: "Accounts", href: "/accounts", icon: Wallet },
+  { name: "Integrations", href: "/settings/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
