@@ -2,11 +2,23 @@ import '@/styles/globals.css'
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useState } from 'react'
 
 export default function App({ Component, pageProps }: AppProps) {
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000, // 1 minute
+        refetchOnWindowFocus: false,
+      },
+    },
+  }))
+
   return (
-    <ErrorBoundary>
-      <Head>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <Head>
         <link rel="icon" href="/brand/canopy-icon-32.png" sizes="32x32" type="image/png" />
         <link rel="icon" href="/brand/canopy-icon-64.png" sizes="64x64" type="image/png" />
         <link rel="icon" href="/brand/canopy-icon-192.png" sizes="192x192" type="image/png" />
@@ -31,7 +43,8 @@ export default function App({ Component, pageProps }: AppProps) {
         />
         <meta name="twitter:image" content="/brand/canopy-banner-dark-og.png" />
       </Head>
-      <Component {...pageProps} />
-    </ErrorBoundary>
+        <Component {...pageProps} />
+      </ErrorBoundary>
+    </QueryClientProvider>
   )
 }
