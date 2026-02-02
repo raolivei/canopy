@@ -121,7 +121,10 @@ interface FIRESummary {
 }
 
 // Helpers
-function formatCurrency(value: number | null, currency: string = "USD"): string {
+function formatCurrency(
+  value: number | null,
+  currency: string = "USD",
+): string {
   if (value === null) return "—";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -163,28 +166,38 @@ const CURRENCY_FLAGS: Record<string, string> = {
 };
 
 export default function Insights() {
-  const [baseCurrency, setBaseCurrency] = useState<"USD" | "CAD" | "BRL" | "EUR">("USD");
+  const [baseCurrency, setBaseCurrency] = useState<
+    "USD" | "CAD" | "BRL" | "EUR"
+  >("USD");
   const [monthlyExpenses, setMonthlyExpenses] = useState(5000);
   const [monthlySavings, setMonthlySavings] = useState(2000);
   const [expenseCurrency, setExpenseCurrency] = useState("CAD");
   const [showFIREDetails, setShowFIREDetails] = useState(false);
 
   // Fetch insights summary
-  const { data: insights, isLoading: insightsLoading } = useQuery<InsightsSummary>({
-    queryKey: ["insights-summary", baseCurrency],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/v1/insights/summary?base_currency=${baseCurrency}`);
-      if (!res.ok) throw new Error("Failed to fetch insights");
-      return res.json();
-    },
-  });
+  const { data: insights, isLoading: insightsLoading } =
+    useQuery<InsightsSummary>({
+      queryKey: ["insights-summary", baseCurrency],
+      queryFn: async () => {
+        const res = await fetch(
+          `${API_URL}/v1/insights/summary?base_currency=${baseCurrency}`,
+        );
+        if (!res.ok) throw new Error("Failed to fetch insights");
+        return res.json();
+      },
+    });
 
   // Fetch FIRE calculations
   const { data: fire, isLoading: fireLoading } = useQuery<FIRESummary>({
-    queryKey: ["fire-summary", monthlyExpenses, monthlySavings, expenseCurrency],
+    queryKey: [
+      "fire-summary",
+      monthlyExpenses,
+      monthlySavings,
+      expenseCurrency,
+    ],
     queryFn: async () => {
       const res = await fetch(
-        `${API_URL}/v1/insights/fire?monthly_expenses=${monthlyExpenses}&monthly_savings=${monthlySavings}&currency=${expenseCurrency}`
+        `${API_URL}/v1/insights/fire?monthly_expenses=${monthlyExpenses}&monthly_savings=${monthlySavings}&currency=${expenseCurrency}`,
       );
       if (!res.ok) throw new Error("Failed to fetch FIRE data");
       return res.json();
@@ -210,14 +223,19 @@ export default function Insights() {
     : [];
 
   const currencyExposure = insights?.currency_exposure.exposures
-    ? Object.entries(insights.currency_exposure.exposures).map(([name, value]) => ({
-        name,
-        value: Number(value.toFixed(1)),
-        amount: insights.currency_exposure.amounts_usd[name] || 0,
-      }))
+    ? Object.entries(insights.currency_exposure.exposures).map(
+        ([name, value]) => ({
+          name,
+          value: Number(value.toFixed(1)),
+          amount: insights.currency_exposure.amounts_usd[name] || 0,
+        }),
+      )
     : [];
 
-  const projectionData = fire?.projections.filter((_, i) => i % 5 === 0 || i === fire.projections.length - 1) || [];
+  const projectionData =
+    fire?.projections.filter(
+      (_, i) => i % 5 === 0 || i === fire.projections.length - 1,
+    ) || [];
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -229,7 +247,9 @@ export default function Insights() {
       <main className="flex-1 p-8 ml-64">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Insights</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Insights
+            </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               Financial overview, projections, and FIRE planning
             </p>
@@ -237,7 +257,9 @@ export default function Insights() {
           <div className="flex items-center gap-4">
             {/* Base Currency Selector */}
             <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 shadow-sm">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Base:</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Base:
+              </span>
               {(["USD", "CAD", "BRL", "EUR"] as const).map((curr) => (
                 <button
                   key={curr}
@@ -267,7 +289,9 @@ export default function Insights() {
               {/* Total Net Worth */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">Net Worth</span>
+                  <span className="text-gray-600 dark:text-gray-400 text-sm">
+                    Net Worth
+                  </span>
                   <DollarSign className="w-5 h-5 text-blue-500" />
                 </div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -276,7 +300,9 @@ export default function Insights() {
                 {insights.net_worth.change_1m_percent !== null && (
                   <div
                     className={`flex items-center text-sm mt-1 ${
-                      insights.net_worth.change_1m_percent >= 0 ? "text-green-600" : "text-red-600"
+                      insights.net_worth.change_1m_percent >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
                     }`}
                   >
                     {insights.net_worth.change_1m_percent >= 0 ? (
@@ -292,35 +318,53 @@ export default function Insights() {
               {/* Total Assets */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">Total Assets</span>
+                  <span className="text-gray-600 dark:text-gray-400 text-sm">
+                    Total Assets
+                  </span>
                   <TrendingUp className="w-5 h-5 text-green-500" />
                 </div>
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {formatCurrency(insights.net_worth.total_assets_usd, baseCurrency)}
+                  {formatCurrency(
+                    insights.net_worth.total_assets_usd,
+                    baseCurrency,
+                  )}
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Across {Object.keys(insights.net_worth.assets_by_currency).length} currencies
+                  Across{" "}
+                  {Object.keys(insights.net_worth.assets_by_currency).length}{" "}
+                  currencies
                 </div>
               </div>
 
               {/* Total Liabilities */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">Total Liabilities</span>
+                  <span className="text-gray-600 dark:text-gray-400 text-sm">
+                    Total Liabilities
+                  </span>
                   <TrendingDown className="w-5 h-5 text-red-500" />
                 </div>
                 <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {formatCurrency(insights.net_worth.total_liabilities_usd, baseCurrency)}
+                  {formatCurrency(
+                    insights.net_worth.total_liabilities_usd,
+                    baseCurrency,
+                  )}
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {Object.keys(insights.net_worth.liabilities_by_currency).length} accounts
+                  {
+                    Object.keys(insights.net_worth.liabilities_by_currency)
+                      .length
+                  }{" "}
+                  accounts
                 </div>
               </div>
 
               {/* YTD Change */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">YTD Change</span>
+                  <span className="text-gray-600 dark:text-gray-400 text-sm">
+                    YTD Change
+                  </span>
                   <Calendar className="w-5 h-5 text-purple-500" />
                 </div>
                 <div
@@ -361,7 +405,10 @@ export default function Insights() {
                         label={({ name, value }) => `${name}: ${value}%`}
                       >
                         {allocationByType.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
                         ))}
                       </Pie>
                       <Tooltip formatter={(value: number) => `${value}%`} />
@@ -377,11 +424,13 @@ export default function Insights() {
                   Currency Exposure
                   <span
                     className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                      insights.currency_exposure.risk_assessment === "diversified"
+                      insights.currency_exposure.risk_assessment ===
+                      "diversified"
                         ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                        : insights.currency_exposure.risk_assessment === "balanced"
-                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
-                        : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                        : insights.currency_exposure.risk_assessment ===
+                            "balanced"
+                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
+                          : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
                     }`}
                   >
                     {insights.currency_exposure.risk_assessment}
@@ -390,7 +439,9 @@ export default function Insights() {
                 <div className="space-y-3">
                   {currencyExposure.map((item, index) => (
                     <div key={item.name} className="flex items-center">
-                      <span className="w-8 text-lg">{CURRENCY_FLAGS[item.name] || "💱"}</span>
+                      <span className="w-8 text-lg">
+                        {CURRENCY_FLAGS[item.name] || "💱"}
+                      </span>
                       <span className="w-16 text-sm font-medium text-gray-700 dark:text-gray-300">
                         {item.name}
                       </span>
@@ -448,7 +499,9 @@ export default function Insights() {
                       <input
                         type="number"
                         value={monthlyExpenses}
-                        onChange={(e) => setMonthlyExpenses(Number(e.target.value))}
+                        onChange={(e) =>
+                          setMonthlyExpenses(Number(e.target.value))
+                        }
                         className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                       <select
@@ -469,14 +522,28 @@ export default function Insights() {
                     <input
                       type="number"
                       value={monthlySavings}
-                      onChange={(e) => setMonthlySavings(Number(e.target.value))}
+                      onChange={(e) =>
+                        setMonthlySavings(Number(e.target.value))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div className="flex items-end">
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <div>SWR: {((fire?.metrics.safe_withdrawal_rate || 0.04) * 100).toFixed(0)}%</div>
-                      <div>Return: {((fire?.metrics.expected_return || 0.07) * 100).toFixed(0)}%</div>
+                      <div>
+                        SWR:{" "}
+                        {(
+                          (fire?.metrics.safe_withdrawal_rate || 0.04) * 100
+                        ).toFixed(0)}
+                        %
+                      </div>
+                      <div>
+                        Return:{" "}
+                        {(
+                          (fire?.metrics.expected_return || 0.07) * 100
+                        ).toFixed(0)}
+                        %
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -486,7 +553,9 @@ export default function Insights() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                   {/* FIRE Number */}
                   <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                    <div className="text-sm text-orange-600 dark:text-orange-400 mb-1">FIRE Number</div>
+                    <div className="text-sm text-orange-600 dark:text-orange-400 mb-1">
+                      FIRE Number
+                    </div>
                     <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
                       {formatCurrency(fire.metrics.fire_number, "USD")}
                     </div>
@@ -494,21 +563,27 @@ export default function Insights() {
 
                   {/* Progress */}
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div className="text-sm text-blue-600 dark:text-blue-400 mb-1">Progress</div>
+                    <div className="text-sm text-blue-600 dark:text-blue-400 mb-1">
+                      Progress
+                    </div>
                     <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                       {fire.metrics.progress_percentage.toFixed(1)}%
                     </div>
                     <div className="w-full h-2 bg-blue-200 dark:bg-blue-800 rounded-full mt-2">
                       <div
                         className="h-full bg-blue-500 rounded-full"
-                        style={{ width: `${Math.min(fire.metrics.progress_percentage, 100)}%` }}
+                        style={{
+                          width: `${Math.min(fire.metrics.progress_percentage, 100)}%`,
+                        }}
                       />
                     </div>
                   </div>
 
                   {/* Years to FIRE */}
                   <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="text-sm text-green-600 dark:text-green-400 mb-1">Years to FIRE</div>
+                    <div className="text-sm text-green-600 dark:text-green-400 mb-1">
+                      Years to FIRE
+                    </div>
                     <div className="text-2xl font-bold text-green-700 dark:text-green-300">
                       {formatYears(fire.metrics.years_to_fire)}
                     </div>
@@ -521,9 +596,14 @@ export default function Insights() {
 
                   {/* Monthly Income at FIRE */}
                   <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <div className="text-sm text-purple-600 dark:text-purple-400 mb-1">Monthly at FIRE</div>
+                    <div className="text-sm text-purple-600 dark:text-purple-400 mb-1">
+                      Monthly at FIRE
+                    </div>
                     <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                      {formatCurrency(fire.metrics.monthly_income_at_fire, "USD")}
+                      {formatCurrency(
+                        fire.metrics.monthly_income_at_fire,
+                        "USD",
+                      )}
                     </div>
                   </div>
                 </div>
@@ -534,18 +614,26 @@ export default function Insights() {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={projectionData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-gray-200 dark:stroke-gray-700"
+                      />
                       <XAxis
                         dataKey="year"
                         tickFormatter={(year) => `${year}y`}
                         className="text-gray-600 dark:text-gray-400"
                       />
                       <YAxis
-                        tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
+                        tickFormatter={(value) =>
+                          `$${(value / 1000000).toFixed(1)}M`
+                        }
                         className="text-gray-600 dark:text-gray-400"
                       />
                       <Tooltip
-                        formatter={(value: number) => [formatCurrency(value, "USD"), ""]}
+                        formatter={(value: number) => [
+                          formatCurrency(value, "USD"),
+                          "",
+                        ]}
                         labelFormatter={(year) => `Year ${year}`}
                       />
                       <Area
@@ -590,11 +678,14 @@ export default function Insights() {
                         {scenario.difference_years !== null && (
                           <div
                             className={`text-xs ${
-                              scenario.difference_years < 0 ? "text-green-600" : "text-red-600"
+                              scenario.difference_years < 0
+                                ? "text-green-600"
+                                : "text-red-600"
                             }`}
                           >
                             {scenario.difference_years < 0 ? "" : "+"}
-                            {scenario.difference_years?.toFixed(1)} years vs baseline
+                            {scenario.difference_years?.toFixed(1)} years vs
+                            baseline
                           </div>
                         )}
                       </div>
@@ -612,7 +703,9 @@ export default function Insights() {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Avg Monthly</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Avg Monthly
+                  </div>
                   <div
                     className={`text-xl font-bold ${
                       insights.growth.average_monthly >= 0
@@ -624,7 +717,9 @@ export default function Insights() {
                   </div>
                 </div>
                 <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Annualized</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Annualized
+                  </div>
                   <div
                     className={`text-xl font-bold ${
                       insights.growth.yearly_rate >= 0
@@ -636,13 +731,17 @@ export default function Insights() {
                   </div>
                 </div>
                 <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <div className="text-sm text-green-600 dark:text-green-400 mb-1">Best Month</div>
+                  <div className="text-sm text-green-600 dark:text-green-400 mb-1">
+                    Best Month
+                  </div>
                   <div className="text-xl font-bold text-green-700 dark:text-green-300">
                     {formatPercent(insights.growth.best_month_return)}
                   </div>
                 </div>
                 <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <div className="text-sm text-red-600 dark:text-red-400 mb-1">Worst Month</div>
+                  <div className="text-sm text-red-600 dark:text-red-400 mb-1">
+                    Worst Month
+                  </div>
                   <div className="text-xl font-bold text-red-700 dark:text-red-300">
                     {formatPercent(insights.growth.worst_month_return)}
                   </div>
@@ -693,17 +792,33 @@ export default function Insights() {
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={Object.entries(insights.allocation.by_country).map(([name, value]) => ({
-                        name: name === "CA" ? "🇨🇦 Canada" : name === "US" ? "🇺🇸 USA" : name === "BR" ? "🇧🇷 Brazil" : name,
-                        value: Number(value.toFixed(1)),
-                      }))}
+                      data={Object.entries(insights.allocation.by_country).map(
+                        ([name, value]) => ({
+                          name:
+                            name === "CA"
+                              ? "🇨🇦 Canada"
+                              : name === "US"
+                                ? "🇺🇸 USA"
+                                : name === "BR"
+                                  ? "🇧🇷 Brazil"
+                                  : name,
+                          value: Number(value.toFixed(1)),
+                        }),
+                      )}
                       layout="vertical"
                     >
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-gray-200 dark:stroke-gray-700"
+                      />
                       <XAxis type="number" tickFormatter={(v) => `${v}%`} />
                       <YAxis dataKey="name" type="category" width={100} />
                       <Tooltip formatter={(value: number) => `${value}%`} />
-                      <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                      <Bar
+                        dataKey="value"
+                        fill="#3b82f6"
+                        radius={[0, 4, 4, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

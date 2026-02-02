@@ -1,7 +1,7 @@
 """Add real estate and liability models for insights.
 
 Revision ID: 002_add_insights_models
-Revises: 20260131_0001_001_initial_portfolio_schema
+Revises: 001
 Create Date: 2026-01-31
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '002_add_insights_models'
-down_revision: Union[str, None] = '20260131_0001_001_initial_portfolio_schema'
+down_revision: Union[str, None] = '001'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

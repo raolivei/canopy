@@ -1,7 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Home, DollarSign, TrendingUp, Settings, Wallet, Upload, Target, Plug } from "lucide-react";
+import {
+  Home,
+  DollarSign,
+  TrendingUp,
+  Settings,
+  Wallet,
+  Upload,
+  Target,
+  Plug,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import DarkModeToggle from "./DarkModeToggle";
 
@@ -88,7 +97,9 @@ export default function Sidebar() {
                   size={20}
                   className={`relative z-10 ${isActive ? "text-white" : ""}`}
                 />
-                <span className={`relative z-10 font-medium ${isActive ? "text-white" : ""}`}>
+                <span
+                  className={`relative z-10 font-medium ${isActive ? "text-white" : ""}`}
+                >
                   {item.name}
                 </span>
               </Link>

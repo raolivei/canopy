@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 **Current Status**: Pre-release (0.x.x versions)
 
-- **0.x.x**: Development versions - features are being built and tested  
+- **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
 ## [0.4.0] - 2026-01-31 - 🎯 **Insights & FIRE Planning**
@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 ### Major Features
 
 #### Portfolio Insights Dashboard
+
 - **Net Worth Tracking**: Multi-currency net worth calculation with USD as base currency
 - **Asset Allocation**: Breakdown by type, currency, country, and institution
 - **Currency Exposure**: Risk assessment (concentrated/balanced/diversified)
@@ -21,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - **Historical Snapshots**: Track portfolio value over time
 
 #### FIRE Calculator
+
 - **FIRE Number**: Calculate target net worth based on expenses and SWR
 - **Years to FIRE**: Projection based on current savings rate
 - **What-If Scenarios**: Compare different savings/return scenarios
@@ -28,12 +30,14 @@ All notable changes to this project will be documented in this file.
 - **Customizable Parameters**: SWR (4% default), return rate (7% default)
 
 #### Real Estate Tracking
+
 - **Property Management**: Track properties with payment schedules
 - **Partnership Support**: 50% ownership split with partners (e.g., apartment with Alex)
 - **Payment Series**: Track ATO, SINAL, MENSAIS, SEMESTRAIS payments
 - **Equity Calculation**: Track how much of the property is paid off
 
 #### Liability Management
+
 - **Credit Cards**: Track balances, limits, APR, rewards programs
 - **Loans**: Car loans, personal loans with amortization tracking
 - **Balance History**: Historical balance tracking
@@ -42,25 +46,31 @@ All notable changes to this project will be documented in this file.
 ### New Files
 
 **Backend Models:**
+
 - `backend/db/models/asset.py` - Enhanced with 20+ asset types, institution/country tracking
 - `backend/db/models/real_estate.py` - Property and payment schedule models
 - `backend/db/models/liability.py` - Liability and payment tracking models
 
 **Backend Services:**
+
 - `backend/services/insights_calculator.py` - Net worth, allocation, growth calculations
 - `backend/services/fire_calculator.py` - FIRE planning calculations
 
 **Backend API:**
-- `backend/api/insights.py` - Insights endpoints (/v1/insights/*)
+
+- `backend/api/insights.py` - Insights endpoints (/v1/insights/\*)
 
 **Frontend Pages:**
+
 - `frontend/pages/insights.tsx` - Insights dashboard with charts
 - `frontend/pages/settings/integrations.tsx` - Integrations settings page
 
 **Database Migrations:**
+
 - `backend/alembic/versions/20260131_0002_add_insights_models.py`
 
 **Scripts:**
+
 - `backend/scripts/seed_portfolio.py` - Seed script for portfolio data
 
 ### API Endpoints Added
@@ -78,6 +88,7 @@ GET  /v1/insights/projections       - Net worth projections
 ```
 
 ### UI Improvements
+
 - Added Insights page to sidebar navigation
 - Added Integrations page to sidebar navigation
 - Currency switcher (USD/CAD/BRL/EUR) on Insights page
@@ -87,6 +98,7 @@ GET  /v1/insights/projections       - Net worth projections
 - What-if scenario comparisons
 
 ### Technical Improvements
+
 - Extended Asset model with 20+ asset types
 - Added ownership_percentage for shared assets
 - Added sync_source for API integration tracking
@@ -97,11 +109,13 @@ GET  /v1/insights/projections       - Net worth projections
 ## [0.2.3-dev] - 2025-01-XX
 
 ### Changed
+
 - Updated MASTER_PROMPT.md with project documentation
 - Updated backend configuration (config.py)
 - Updated Kubernetes deployment manifests (k8s/deploy.yaml)
 
 ### Added
+
 - Claude AI settings configuration (.claude/settings.local.json)
 
 ## [0.3.0] - 2025-11-13 - 🌳 **Canopy Launch** (Pre-release)
@@ -220,7 +234,6 @@ Built by Rafael Oliveira (@raolivei) for the Pi fleet homelab.
 ### Added
 
 - **Backend API Setup** (`feature/backend-api-setup`):
-
   - FastAPI application with CORS middleware configuration
   - Transaction models (Transaction, TransactionCreate, TransactionType enum)
   - Transaction CRUD API endpoints (GET all, GET by ID, POST, DELETE)
@@ -229,7 +242,6 @@ Built by Rafael Oliveira (@raolivei) for the Pi fleet homelab.
   - In-memory transaction storage (ready for database migration)
 
 - **UI Redesign** (`feature/ui-redesign-monarch-style`):
-
   - Modern Monarch Money-inspired UI design
   - Sidebar navigation component with active state highlighting
   - Reusable StatCard component for dashboard metrics
@@ -244,7 +256,6 @@ Built by Rafael Oliveira (@raolivei) for the Pi fleet homelab.
   - Responsive grid layouts and modern card designs
 
 - **Currency Support** (`feature/currency-support`):
-
   - Multi-currency support (USD, CAD, BRL, EUR, GBP)
   - Currency API endpoints (`/v1/currency/supported`, `/v1/currency/rates`, `/v1/currency/convert`)
   - Currency conversion logic with mock exchange rates
@@ -255,7 +266,6 @@ Built by Rafael Oliveira (@raolivei) for the Pi fleet homelab.
   - Show both original and converted amounts when currencies differ
 
 - **Dark Mode** (`feature/dark-mode`):
-
   - DarkModeToggle component with localStorage persistence
   - System preference detection for automatic dark mode
   - Dark mode styles throughout all UI components
@@ -264,7 +274,6 @@ Built by Rafael Oliveira (@raolivei) for the Pi fleet homelab.
   - SSR-safe implementation to prevent hydration mismatches
 
 - **Placeholder Pages** (`feature/placeholder-pages`):
-
   - Portfolio page with stat cards for investment metrics
   - Accounts page with account cards (Checking, Credit Card, Savings)
   - Settings page with currency selector, dark mode toggle, and placeholder sections

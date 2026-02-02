@@ -32,7 +32,8 @@ const integrations: Integration[] = [
     id: "questrade",
     name: "Questrade",
     logo: "🇨🇦",
-    description: "Canadian discount brokerage. Connect your TFSA, RRSP, and trading accounts.",
+    description:
+      "Canadian discount brokerage. Connect your TFSA, RRSP, and trading accounts.",
     status: "disconnected",
     setupSteps: [
       "Go to my.questrade.com/APIAccess",
@@ -46,7 +47,8 @@ const integrations: Integration[] = [
     id: "moomoo",
     name: "Moomoo",
     logo: "🐄",
-    description: "Commission-free trading. Requires OpenD gateway running locally.",
+    description:
+      "Commission-free trading. Requires OpenD gateway running locally.",
     status: "disconnected",
     setupSteps: [
       "Download OpenD from Futu's developer portal",
@@ -60,7 +62,8 @@ const integrations: Integration[] = [
     id: "wise",
     name: "Wise",
     logo: "💱",
-    description: "Multi-currency account. Track your CAD, USD, BRL balances automatically.",
+    description:
+      "Multi-currency account. Track your CAD, USD, BRL balances automatically.",
     status: "disconnected",
     setupSteps: [
       "Log in to Wise and go to Settings",
@@ -96,9 +99,12 @@ function IntegrationCard({
   const [apiToken, setApiToken] = useState("");
 
   const statusColors = {
-    connected: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    disconnected: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400",
-    pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+    connected:
+      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    disconnected:
+      "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400",
+    pending:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   };
 
   const statusIcons = {
@@ -135,8 +141,8 @@ function IntegrationCard({
               {integration.status === "connected"
                 ? "Connected"
                 : integration.status === "pending"
-                ? "Connecting..."
-                : "Not Connected"}
+                  ? "Connecting..."
+                  : "Not Connected"}
             </span>
             <ChevronRight
               className={`w-5 h-5 text-gray-400 transition-transform ${
@@ -231,7 +237,7 @@ export default function Integrations() {
     // TODO: Implement actual connection logic when APIs are ready
     console.log(`Connecting to ${integrationId}...`);
     alert(
-      `Connection to ${integrationId} is not yet implemented.\n\nPlease ensure you have the required credentials ready, then check back later.`
+      `Connection to ${integrationId} is not yet implemented.\n\nPlease ensure you have the required credentials ready, then check back later.`,
     );
   };
 
@@ -264,9 +270,10 @@ export default function Integrations() {
               API Integrations Coming Soon
             </h3>
             <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
-              Direct API connections to your financial institutions are being developed.
-              In the meantime, you can use CSV imports to add your data.
-              Set up your API credentials now so you're ready when the features launch.
+              Direct API connections to your financial institutions are being
+              developed. In the meantime, you can use CSV imports to add your
+              data. Set up your API credentials now so you're ready when the
+              features launch.
             </p>
           </div>
         </div>
@@ -289,8 +296,8 @@ export default function Integrations() {
             CSV Import (Available Now)
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            For institutions without API access, you can import data via CSV export.
-            Supported formats:
+            For institutions without API access, you can import data via CSV
+            export. Supported formats:
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
@@ -325,9 +332,12 @@ export default function Integrations() {
           <div className="flex items-start gap-3">
             <Key className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              <strong className="text-gray-700 dark:text-gray-300">Security Note:</strong>{" "}
-              All API credentials are stored locally on your machine and never sent to external servers.
-              Canopy runs entirely on your own infrastructure.
+              <strong className="text-gray-700 dark:text-gray-300">
+                Security Note:
+              </strong>{" "}
+              All API credentials are stored locally on your machine and never
+              sent to external servers. Canopy runs entirely on your own
+              infrastructure.
             </div>
           </div>
         </div>

@@ -1,15 +1,16 @@
-# Canopy  
+# Canopy
 
 **Your financial life. Under one canopy.**
 
-Canopy is a self-hosted personal finance, investment, and budgeting dashboard inspired by Monarch Money, Ghostfolio, and Firefly III. It runs fully local on Raspberry Pi k3s clusters with a lean footprint, storing all data locally without cloud dependencies.  
+Canopy is a self-hosted personal finance, investment, and budgeting dashboard inspired by Monarch Money, Ghostfolio, and Firefly III. It runs fully local on Raspberry Pi k3s clusters with a lean footprint, storing all data locally without cloud dependencies.
 
-## Project Objectives  
-- Combine portfolio, budgeting, and net-worth views into a single dashboard.  
-- Store all data locally — no cloud dependencies.  
-- Support multi-currency (CAD, USD, BRL, EUR, GBP) assets.  
-- Allow easy CSV/OFX imports for banks and brokerages.  
-- Run lean — optimized for Raspberry Pi hardware.  
+## Project Objectives
+
+- Combine portfolio, budgeting, and net-worth views into a single dashboard.
+- Store all data locally — no cloud dependencies.
+- Support multi-currency (CAD, USD, BRL, EUR, GBP) assets.
+- Allow easy CSV/OFX imports for banks and brokerages.
+- Run lean — optimized for Raspberry Pi hardware.
 - Be modular so other developers can fork and extend.
 
 ### Design Rationale
@@ -18,6 +19,7 @@ Canopy is a self-hosted personal finance, investment, and budgeting dashboard in
 Financial health requires seeing the big picture. Combining portfolio, budgeting, and transactions in one view helps users understand their complete financial situation without switching between tools.
 
 **Why Local Storage?**
+
 - **Privacy:** Financial data never leaves your control
 - **Security:** No cloud breaches can expose your data
 - **Control:** You decide when and how to back up
@@ -30,11 +32,12 @@ Modern users often have assets across currencies. Proper currency support enable
 Most banks don't offer APIs. CSV/OFX files are universal formats that allow users to import transaction history from any financial institution, making the tool truly platform-agnostic.
 
 **Why Raspberry Pi Optimized?**
-Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.  
+Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.
 
 ## Core Features
 
 ### Transaction Management (✅ Implemented)
+
 - ✅ Transaction tracking with categories and types (income, expense, transfer, buy, sell)
 - ✅ Multi-currency FX conversions with display currency toggle
 - ✅ Modern Monarch Money-inspired UI with dark mode support
@@ -47,6 +50,7 @@ Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 
 - ✅ Rich transaction data (merchant, notes, tags, original statement)
 
 ### Portfolio & Insights (✅ Implemented)
+
 - ✅ Investment portfolio tracking (stocks, ETFs, crypto, retirement accounts)
 - ✅ Net worth dashboard with multi-currency support (USD/CAD/BRL/EUR base)
 - ✅ Asset allocation by type, currency, country, and institution
@@ -57,6 +61,7 @@ Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 
 - ✅ Liability tracking (credit cards, loans, mortgages)
 
 ### FIRE Planning (✅ Implemented)
+
 - ✅ FIRE number calculation (based on expenses and safe withdrawal rate)
 - ✅ Years-to-FIRE projection with compound growth
 - ✅ 30-year net worth projections
@@ -64,12 +69,14 @@ Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 
 - ✅ Passive income projections at FIRE
 
 ### Integrations (🔄 In Progress)
+
 - 🔄 Questrade API (OAuth 2.0) - UI ready, API pending
 - 🔄 Moomoo/Futu OpenAPI - UI ready, API pending
 - 🔄 Wise API - UI ready, API pending
 - ✅ CSV import for all major institutions
 
 ### Planned Features
+
 - 💰 Budgeting with categories and goals
 - 🧾 OFX import
 - 📤 Local backup to S3-compatible storage (MinIO/B2)
@@ -85,6 +92,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for detailed release notes.
 ## Quick Start
 
 ### Prerequisites
+
 - Docker and Docker Compose (recommended)
 - Python 3.11+ with venv (for local development fallback)
 - Node.js 18+ and npm (for local development fallback)
@@ -104,11 +112,13 @@ docker-compose up -d
 ```
 
 **Access:**
+
 - Frontend: http://localhost:3001
 - API: http://localhost:8001
 - API Docs: http://localhost:8001/docs
 
 **Benefits:**
+
 - Consistent environment (matches production)
 - Hot reload enabled via volume mounts
 - No local Python/Node version conflicts
@@ -119,6 +129,7 @@ See `../workspace-config/docs/DOCKER_COMPOSE_GUIDE.md` for complete guide.
 ### Alternative: Local Development (Fallback)
 
 #### Backend Setup
+
 ```bash
 cd backend
 python3 -m venv venv
@@ -137,6 +148,7 @@ Enables auto-reload on code changes during development, speeding up iteration. R
 Binds to all network interfaces, allowing access from other devices on your network (e.g., testing on mobile). Use `127.0.0.1` for localhost-only access.
 
 #### Frontend Setup
+
 ```bash
 cd frontend
 npm install
@@ -145,26 +157,31 @@ npm run dev
 
 **Why Separate Processes?**
 Backend and frontend are independent services. Separating them allows:
+
 - Independent scaling
 - Different deployment strategies
 - Team members to work on one without affecting the other
 - Technology choices (Python backend, Node.js frontend)
 
 ### Testing
+
 Run the test script to verify all functionality:
+
 ```bash
 ./test_app.sh
 ```
 
 ### Access
+
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
-## Repo Structure  
+## Repo Structure
+
 ```
-canopy/  
- ├── backend/  
+canopy/
+ ├── backend/
  │   ├── api/              # API endpoints
  │   │   ├── portfolio.py      # Portfolio CRUD
  │   │   ├── insights.py       # Insights & FIRE calculations
@@ -190,7 +207,7 @@ canopy/
  │   ├── models/           # Pydantic schemas
  │   ├── app/              # FastAPI application
  │   └── ingest/           # CSV import + Celery tasks
- ├── frontend/  
+ ├── frontend/
  │   ├── components/       # React components
  │   │   ├── AllocationChart.tsx
  │   │   ├── PerformanceChart.tsx
@@ -207,7 +224,7 @@ canopy/
  ├── .github/workflows/    # CI/CD
  ├── CHANGELOG.md          # Version history
  ├── ARCHITECTURE.md       # Architecture decisions
- └── README.md  
+ └── README.md
 ```
 
 ## CSV Import
@@ -215,6 +232,7 @@ canopy/
 Canopy now supports importing transactions from CSV files with smart format detection:
 
 ### Supported Formats
+
 - **Monarch Money** - Full support including merchant names, categories, tags, and investment transactions
 - **Chase Bank** - Standard CSV export format
 - **Bank of America** - Checking and credit card statements
@@ -225,6 +243,7 @@ Canopy now supports importing transactions from CSV files with smart format dete
 - **Generic CSV** - Custom field mapping for any format
 
 ### Key Features
+
 - 🎯 Automatic format detection
 - 🔍 Duplicate transaction detection
 - 💰 Multi-currency support
@@ -240,25 +259,31 @@ See **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** for detailed instructions a
 The Insights page (`/insights`) provides comprehensive financial analytics:
 
 ### Net Worth Dashboard
+
 - Total net worth with multi-currency support
 - Assets vs liabilities breakdown
 - Currency exposure analysis
 - Growth metrics (monthly, yearly, YTD)
 
 ### FIRE Calculator
+
 Calculate your path to Financial Independence:
+
 - **FIRE Number**: Target net worth based on your expenses
 - **Years to FIRE**: How long until you reach financial independence
 - **Progress**: Visual progress bar showing % complete
 - **Projections**: 30-year net worth projections
 
 Default assumptions (customizable):
+
 - Monthly expenses: $5,000 CAD (~$3,600 USD)
 - Safe Withdrawal Rate: 4%
 - Expected Return: 7%
 
 ### What-If Scenarios
+
 Compare different scenarios:
+
 - Save $500 more per month
 - Save $1000 more per month
 - Reduce expenses by 10%
@@ -279,6 +304,7 @@ python -m backend.scripts.seed_portfolio --clear
 ```
 
 The seed script includes:
+
 - 40+ accounts across Canada, USA, and Brazil
 - Historical snapshots from Sep 2024 to present
 - Real estate (apartment with 50% ownership)
@@ -297,6 +323,7 @@ The seed script includes:
 ## GitHub Issues
 
 Track ongoing development:
+
 - [#21 - Questrade API Integration](https://github.com/raolivei/canopy/issues/21)
 - [#22 - Moomoo API Integration](https://github.com/raolivei/canopy/issues/22)
 - [#23 - Wise API Integration](https://github.com/raolivei/canopy/issues/23)
