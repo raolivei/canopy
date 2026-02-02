@@ -123,7 +123,7 @@ class RealEstateProperty(Base):
     )
     payments: Mapped[list["RealEstatePayment"]] = relationship(
         "RealEstatePayment",
-        back_populates="property",
+        back_populates="real_estate_property",
         cascade="all, delete-orphan"
     )
     
@@ -265,7 +265,7 @@ class RealEstatePayment(Base):
     )
     
     # Relationships
-    property: Mapped["RealEstateProperty"] = relationship(
+    real_estate_property: Mapped["RealEstateProperty"] = relationship(
         "RealEstateProperty",
         back_populates="payments"
     )
