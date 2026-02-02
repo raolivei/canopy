@@ -106,11 +106,11 @@ class Asset(Base):
         default=Decimal("1.0")
     )
     
-    # Sync source for automatic updates
-    sync_source: Mapped[Optional[SyncSource]] = mapped_column(
-        Enum(SyncSource), 
+    # Sync source for automatic updates (stored as string to match migration)
+    sync_source: Mapped[Optional[str]] = mapped_column(
+        String(50), 
         nullable=True,
-        default=SyncSource.MANUAL
+        default="MANUAL"
     )
     
     # External account ID for linking to APIs (Questrade account ID, etc.)

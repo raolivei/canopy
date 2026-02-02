@@ -27,7 +27,6 @@ from backend.db.session import SessionLocal
 from backend.db.models import (
     Asset,
     AssetType,
-    SyncSource,
     Lot,
     PortfolioSnapshot,
     SnapshotHolding,
@@ -90,7 +89,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Wealthsimple",
         "country": "CA",
-        "sync_source": SyncSource.WEALTHSIMPLE,
+        "sync_source": "WEALTHSIMPLE",
     },
     {
         "symbol": "WS_TFSA",
@@ -99,7 +98,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Wealthsimple",
         "country": "CA",
-        "sync_source": SyncSource.WEALTHSIMPLE,
+        "sync_source": "WEALTHSIMPLE",
     },
     {
         "symbol": "WS_FHSA",
@@ -108,7 +107,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Wealthsimple",
         "country": "CA",
-        "sync_source": SyncSource.WEALTHSIMPLE,
+        "sync_source": "WEALTHSIMPLE",
     },
     {
         "symbol": "WS_CHEQUING",
@@ -117,7 +116,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Wealthsimple",
         "country": "CA",
-        "sync_source": SyncSource.WEALTHSIMPLE,
+        "sync_source": "WEALTHSIMPLE",
     },
     {
         "symbol": "WS_DIRECT_INDEX",
@@ -126,7 +125,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Wealthsimple",
         "country": "CA",
-        "sync_source": SyncSource.WEALTHSIMPLE,
+        "sync_source": "WEALTHSIMPLE",
     },
     # CanadaLife
     {
@@ -153,7 +152,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Moomoo",
         "country": "CA",
-        "sync_source": SyncSource.MOOMOO,
+        "sync_source": "MOOMOO",
     },
     {
         "symbol": "QUESTRADE",
@@ -162,7 +161,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Questrade",
         "country": "CA",
-        "sync_source": SyncSource.QUESTRADE,
+        "sync_source": "QUESTRADE",
     },
     {
         "symbol": "WISE_CAD",
@@ -171,7 +170,7 @@ CANADA_ACCOUNTS = [
         "currency": "CAD",
         "institution": "Wise",
         "country": "CA",
-        "sync_source": SyncSource.WISE,
+        "sync_source": "WISE",
     },
 ]
 
@@ -611,7 +610,7 @@ def create_assets(db: Session) -> dict[str, Asset]:
             currency=account["currency"],
             institution=account.get("institution"),
             country=account.get("country"),
-            sync_source=account.get("sync_source", SyncSource.MANUAL),
+            sync_source=account.get("sync_source", "MANUAL"),
             notes=account.get("notes"),
         )
         db.add(asset)
