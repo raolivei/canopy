@@ -82,7 +82,10 @@ class Asset(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     symbol: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255))
-    asset_type: Mapped[AssetType] = mapped_column(Enum(AssetType), default=AssetType.STOCK)
+    asset_type: Mapped[AssetType] = mapped_column(
+        Enum(AssetType, values_callable=lambda x: [e.value for e in x]), 
+        default=AssetType.STOCK
+    )
     currency: Mapped[str] = mapped_column(String(10), default="USD")  # Supports crypto tickers
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
