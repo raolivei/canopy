@@ -305,10 +305,11 @@ export default function Import() {
                       <p className="text-slate-600 dark:text-slate-400 mb-6">
                         or click to browse your files
                       </p>
-                      <label>
-                        <Button variant="primary" as="span" leftIcon={<FileText className="w-4 h-4" />}>
+                      <label className="cursor-pointer">
+                        <span className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 shadow-sm hover:shadow transition-all duration-150 active:scale-[0.98]">
+                          <FileText className="w-4 h-4" />
                           Choose CSV File
-                        </Button>
+                        </span>
                         <input
                           type="file"
                           accept=".csv"
