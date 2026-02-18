@@ -2,7 +2,7 @@ import React from "react";
 import { cn } from "@/utils/cn";
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: "default" | "primary" | "success" | "warning" | "danger" | "outline";
+  variant?: "default" | "secondary" | "primary" | "success" | "warning" | "danger" | "outline";
   size?: "sm" | "md";
   dot?: boolean;
 }
@@ -17,6 +17,7 @@ export function Badge({
 }: BadgeProps) {
   const variants = {
     default: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    secondary: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
     primary:
       "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300",
     success:
@@ -31,6 +32,7 @@ export function Badge({
 
   const dotColors = {
     default: "bg-slate-500",
+    secondary: "bg-slate-400",
     primary: "bg-primary-500",
     success: "bg-success-500",
     warning: "bg-warning-500",
