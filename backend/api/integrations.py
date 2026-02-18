@@ -1,10 +1,17 @@
 """API endpoints for third-party integrations (Wise, etc.)."""
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
+
+from backend.app.config import get_settings
+from backend.db.session import DbSession
+from backend.db.models.asset import Asset, AssetType
+from backend.db.models.transaction import Transaction as TransactionModel
 
 router = APIRouter(prefix="/v1/integrations", tags=["integrations"])
 
@@ -34,6 +41,13 @@ class WiseTransactionResponse(BaseModel):
     transaction_type: str
     reference: Optional[str] = None
     merchant: Optional[str] = None
+
+
+@router.get("/wise/status")
+async def get_wise_status():
+    """Return whether Wise is configured (token set via WISE_API_TOKEN env)."""
+    settings = get_settings()
+    return {"connected": bool(settings.wise_api_token)}
 
 
 @router.post("/wise/test-connection")
@@ -136,6 +150,366 @@ async def get_wise_transactions(request: WiseTransactionsRequest):
         raise HTTPException(status_code=400, detail=f"Failed to fetch transactions: {str(e)}")
 
 
+class WiseSyncRequest(BaseModel):
+    """Request to sync Wise data into Canopy (assets + transactions)."""
+    api_token: Optional[str] = None  # If omitted, uses WISE_API_TOKEN from env
+    sandbox: bool = False
+    days: int = 90
+
+
+class WiseSyncResponse(BaseModel):
+    """Response after syncing Wise data."""
+    assets_created: int
+    assets_updated: int
+    transactions_imported: int
+    currencies: list[str]
+
+
+@router.post("/wise/sync", response_model=WiseSyncResponse)
+async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
+    """Fetch Wise balances and transactions, then upsert Canopy assets and import transactions."""
+    from backend.services.wise_integration import WiseIntegrationService
+
+    token = request.api_token or get_settings().wise_api_token
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No Wise token. Provide api_token in the request or set WISE_API_TOKEN.",
+        )
+
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=request.days)
+    assets_created = 0
+    assets_updated = 0
+    transactions_imported = 0
+    currencies: list[str] = []
+
+    with WiseIntegrationService(token, sandbox=request.sandbox) as wise:
+        balances = wise.get_balances()
+        for b in balances:
+            currencies.append(b.currency)
+            symbol = f"WISE_{b.currency}"
+            existing = db.execute(select(Asset).where(Asset.symbol == symbol)).scalar_one_or_none()
+            if existing:
+                # Could update balance-related fields here if we stored current_balance on Asset
+                assets_updated += 1
+            else:
+                asset = Asset(
+                    symbol=symbol,
+                    name=f"Wise {b.currency}",
+                    asset_type=AssetType.BANK_ACCOUNT,
+                    currency=b.currency,
+                    institution="Wise",
+                    sync_source="WISE",
+                )
+                db.add(asset)
+                assets_created += 1
+
+        transactions = wise.get_all_transactions(start_date=start_date, end_date=end_date)
+        existing_ids = {
+            row[0]
+            for row in db.execute(
+                select(TransactionModel.import_id).where(
+                    TransactionModel.import_source == "wise"
+                )
+            ).all()
+        }
+        for tx in transactions:
+            if tx.id in existing_ids:
+                continue
+            db.add(
+                TransactionModel(
+                    description=tx.description or "Wise transaction",
+                    amount=Decimal(str(tx.amount)),
+                    currency=tx.currency,
+                    type="income" if tx.amount > 0 else "expense",
+                    date=tx.date,
+                    merchant=tx.merchant,
+                    import_id=tx.id,
+                    import_source="wise",
+                )
+            )
+            transactions_imported += 1
+
+    db.commit()
+    return WiseSyncResponse(
+        assets_created=assets_created,
+        assets_updated=assets_updated,
+        transactions_imported=transactions_imported,
+        currencies=currencies,
+    )
+
+
+# ==================== Moomoo (Futu) Integration ====================
+
+class MoomooConnectRequest(BaseModel):
+    """Request to connect to Moomoo OpenD gateway."""
+    host: str = "127.0.0.1"
+    port: int = 11111
+    rsa_path: Optional[str] = None
+
+
+class MoomooAccountResponse(BaseModel):
+    """Account response from Moomoo."""
+    acc_id: int
+    acc_type: str
+    card_num: str
+    currency: str
+    market: str
+    status: str
+
+
+class MoomooPositionResponse(BaseModel):
+    """Position response from Moomoo."""
+    code: str
+    name: str
+    quantity: float
+    cost_price: Optional[float] = None
+    current_price: Optional[float] = None
+    market_value: Optional[float] = None
+    profit_loss: Optional[float] = None
+    profit_loss_pct: Optional[float] = None
+    currency: str
+    market: str
+
+
+class MoomooBalanceResponse(BaseModel):
+    """Balance response from Moomoo."""
+    currency: str
+    cash: float
+    frozen_cash: float
+    market_value: float
+    total_assets: float
+    available_funds: float
+
+
+class MoomooQuoteResponse(BaseModel):
+    """Market quote response."""
+    code: str
+    name: str
+    last_price: float
+    open_price: Optional[float] = None
+    high_price: Optional[float] = None
+    low_price: Optional[float] = None
+    prev_close: Optional[float] = None
+    volume: int
+    turnover: float
+    change_val: Optional[float] = None
+    change_pct: Optional[float] = None
+    update_time: str
+
+
+@router.post("/moomoo/test-connection")
+async def test_moomoo_connection(request: MoomooConnectRequest):
+    """Test connection to Moomoo OpenD gateway.
+    
+    The user must have OpenD running locally.
+    Download from: https://openapi.futunn.com/
+    """
+    try:
+        from backend.services.moomoo_integration import (
+            MoomooIntegrationService,
+            MoomooConnectionError,
+        )
+        
+        service = MoomooIntegrationService(
+            host=request.host,
+            port=request.port,
+            rsa_path=request.rsa_path,
+        )
+        
+        if not service.connect():
+            raise HTTPException(status_code=400, detail="Failed to connect to OpenD")
+        
+        status = service.get_connection_status()
+        service.close()
+        
+        return {
+            "status": "connected",
+            "gateway": f"{request.host}:{request.port}",
+            "details": status,
+        }
+        
+    except MoomooConnectionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="futu-api package not installed. Contact administrator."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+
+
+@router.post("/moomoo/accounts", response_model=list[MoomooAccountResponse])
+async def get_moomoo_accounts(request: MoomooConnectRequest):
+    """Get all trading accounts from Moomoo."""
+    try:
+        from backend.services.moomoo_integration import (
+            MoomooIntegrationService,
+            MoomooConnectionError,
+        )
+        
+        with MoomooIntegrationService(
+            host=request.host,
+            port=request.port,
+            rsa_path=request.rsa_path,
+        ) as moomoo:
+            accounts = moomoo.get_accounts()
+            return [
+                MoomooAccountResponse(
+                    acc_id=acc.acc_id,
+                    acc_type=acc.acc_type,
+                    card_num=acc.card_num,
+                    currency=acc.currency,
+                    market=acc.market,
+                    status=acc.status,
+                )
+                for acc in accounts
+            ]
+            
+    except MoomooConnectionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch accounts: {str(e)}")
+
+
+class MoomooPositionsRequest(BaseModel):
+    """Request for Moomoo positions."""
+    host: str = "127.0.0.1"
+    port: int = 11111
+    rsa_path: Optional[str] = None
+    acc_id: int
+    market: str = "US"
+
+
+@router.post("/moomoo/positions", response_model=list[MoomooPositionResponse])
+async def get_moomoo_positions(request: MoomooPositionsRequest):
+    """Get positions for a Moomoo account."""
+    try:
+        from backend.services.moomoo_integration import (
+            MoomooIntegrationService,
+            MoomooConnectionError,
+        )
+        
+        with MoomooIntegrationService(
+            host=request.host,
+            port=request.port,
+            rsa_path=request.rsa_path,
+        ) as moomoo:
+            positions = moomoo.get_positions(request.acc_id, request.market)
+            return [
+                MoomooPositionResponse(
+                    code=pos.code,
+                    name=pos.name,
+                    quantity=float(pos.quantity),
+                    cost_price=float(pos.cost_price) if pos.cost_price else None,
+                    current_price=float(pos.current_price) if pos.current_price else None,
+                    market_value=float(pos.market_value) if pos.market_value else None,
+                    profit_loss=float(pos.profit_loss) if pos.profit_loss else None,
+                    profit_loss_pct=float(pos.profit_loss_pct) if pos.profit_loss_pct else None,
+                    currency=pos.currency,
+                    market=pos.market,
+                )
+                for pos in positions
+            ]
+            
+    except MoomooConnectionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch positions: {str(e)}")
+
+
+class MoomooBalancesRequest(BaseModel):
+    """Request for Moomoo balances."""
+    host: str = "127.0.0.1"
+    port: int = 11111
+    rsa_path: Optional[str] = None
+    acc_id: int
+    market: str = "US"
+
+
+@router.post("/moomoo/balances", response_model=list[MoomooBalanceResponse])
+async def get_moomoo_balances(request: MoomooBalancesRequest):
+    """Get balances for a Moomoo account."""
+    try:
+        from backend.services.moomoo_integration import (
+            MoomooIntegrationService,
+            MoomooConnectionError,
+        )
+        
+        with MoomooIntegrationService(
+            host=request.host,
+            port=request.port,
+            rsa_path=request.rsa_path,
+        ) as moomoo:
+            balances = moomoo.get_balances(request.acc_id, request.market)
+            return [
+                MoomooBalanceResponse(
+                    currency=bal.currency,
+                    cash=float(bal.cash),
+                    frozen_cash=float(bal.frozen_cash),
+                    market_value=float(bal.market_value),
+                    total_assets=float(bal.total_assets),
+                    available_funds=float(bal.available_funds),
+                )
+                for bal in balances
+            ]
+            
+    except MoomooConnectionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch balances: {str(e)}")
+
+
+class MoomooQuoteRequest(BaseModel):
+    """Request for Moomoo quotes."""
+    host: str = "127.0.0.1"
+    port: int = 11111
+    codes: list[str]
+
+
+@router.post("/moomoo/quotes", response_model=list[MoomooQuoteResponse])
+async def get_moomoo_quotes(request: MoomooQuoteRequest):
+    """Get real-time quotes for securities.
+    
+    Codes should be in format: "MARKET.SYMBOL" (e.g., "US.AAPL", "HK.00700")
+    """
+    try:
+        from backend.services.moomoo_integration import (
+            MoomooIntegrationService,
+            MoomooConnectionError,
+        )
+        
+        with MoomooIntegrationService(
+            host=request.host,
+            port=request.port,
+        ) as moomoo:
+            quotes = moomoo.get_quote(request.codes)
+            return [
+                MoomooQuoteResponse(
+                    code=q.code,
+                    name=q.name,
+                    last_price=float(q.last_price),
+                    open_price=float(q.open_price) if q.open_price else None,
+                    high_price=float(q.high_price) if q.high_price else None,
+                    low_price=float(q.low_price) if q.low_price else None,
+                    prev_close=float(q.prev_close) if q.prev_close else None,
+                    volume=q.volume,
+                    turnover=float(q.turnover),
+                    change_val=float(q.change_val) if q.change_val else None,
+                    change_pct=float(q.change_pct) if q.change_pct else None,
+                    update_time=q.update_time,
+                )
+                for q in quotes
+            ]
+            
+    except MoomooConnectionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch quotes: {str(e)}")
+
+
 # ==================== Integration Status ====================
 
 @router.get("/status")
@@ -151,6 +525,17 @@ async def get_integration_status():
                 "description": "Multi-currency account with global transfers",
                 "requires_token": True,
                 "supported_features": ["balances", "transactions"],
+            },
+            {
+                "id": "moomoo",
+                "name": "Moomoo (Futu)",
+                "type": "gateway",
+                "status": "available",
+                "description": "US/HK/CN/SG/JP stock trading via local OpenD gateway",
+                "requires_gateway": True,
+                "gateway_download": "https://openapi.futunn.com/",
+                "supported_features": ["accounts", "positions", "balances", "quotes"],
+                "supported_markets": ["US", "HK", "CN", "SG", "JP"],
             },
             {
                 "id": "csv_import",
