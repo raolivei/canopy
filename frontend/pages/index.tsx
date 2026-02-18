@@ -33,6 +33,14 @@ import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { formatCurrency, formatCurrencyCompact } from "@/utils/currency";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
+import {
+  CHART_COLORS,
+  CHART_PALETTE,
+  getTooltipStyle,
+  getGridProps,
+  getAxisProps,
+  isDarkMode as checkDarkMode,
+} from "@/utils/chartTheme";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -176,7 +184,7 @@ export default function Dashboard() {
       .map(([name, value]) => ({ name, value }));
   }, [transactions]);
 
-  const COLORS = ["#14b8a6", "#0d9488", "#10b981", "#059669", "#6366f1"];
+  const COLORS = [CHART_COLORS.primary, CHART_COLORS.primaryDark, CHART_COLORS.success, CHART_COLORS.successDark, CHART_COLORS.accent];
 
   const recentTransactions = useMemo(
     () =>
@@ -346,36 +354,25 @@ export default function Dashboard() {
                   <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor={CHART_COLORS.success} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={CHART_COLORS.success} stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                        <stop offset="5%" stopColor={CHART_COLORS.danger} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={CHART_COLORS.danger} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                    <CartesianGrid {...getGridProps(checkDarkMode())} />
                     <XAxis
                       dataKey="date"
-                      className="text-xs"
-                      tick={{ fill: "currentColor" }}
-                      tickLine={false}
-                      axisLine={false}
+                      {...getAxisProps(checkDarkMode())}
                     />
                     <YAxis
-                      className="text-xs"
-                      tick={{ fill: "currentColor" }}
-                      tickLine={false}
-                      axisLine={false}
+                      {...getAxisProps(checkDarkMode())}
                       tickFormatter={(v) => formatCurrencyCompact(v, displayCurrency)}
                     />
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--tooltip-bg, #fff)",
-                        border: "1px solid var(--tooltip-border, #e2e8f0)",
-                        borderRadius: "8px",
-                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                      }}
+                      contentStyle={getTooltipStyle(checkDarkMode())}
                       formatter={(value: number, name: string) => [
                         formatCurrency(value, displayCurrency),
                         name.charAt(0).toUpperCase() + name.slice(1),
@@ -384,14 +381,14 @@ export default function Dashboard() {
                     <Area
                       type="monotone"
                       dataKey="income"
-                      stroke="#10b981"
+                      stroke={CHART_COLORS.success}
                       strokeWidth={2}
                       fill="url(#incomeGradient)"
                     />
                     <Area
                       type="monotone"
                       dataKey="expenses"
-                      stroke="#ef4444"
+                      stroke={CHART_COLORS.danger}
                       strokeWidth={2}
                       fill="url(#expenseGradient)"
                     />

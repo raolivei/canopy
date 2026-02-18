@@ -7,6 +7,11 @@ import {
   Legend,
   Tooltip,
 } from "recharts";
+import {
+  ALLOCATION_PALETTE,
+  getTooltipStyle,
+  isDarkMode as checkDarkMode,
+} from "@/utils/chartTheme";
 
 interface AllocationItem {
   asset_type: string;
@@ -20,15 +25,6 @@ interface AllocationChartProps {
   totalValue: number;
   currency?: string;
 }
-
-const COLORS = [
-  "#3b82f6", // blue - stocks
-  "#10b981", // green - etf
-  "#f59e0b", // amber - crypto
-  "#8b5cf6", // purple - bonds
-  "#6b7280", // gray - other
-  "#ec4899", // pink
-];
 
 const TYPE_LABELS: Record<string, string> = {
   stock: "Stocks",
@@ -55,11 +51,11 @@ export default function AllocationChart({
 }: AllocationChartProps) {
   if (data.length === 0) {
     return (
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
           Asset Allocation
         </h3>
-        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+        <p className="text-slate-500 dark:text-slate-400 text-center py-8">
           No data to display
         </p>
       </div>
@@ -71,23 +67,26 @@ export default function AllocationChart({
     value: Number(item.value),
     percentage: Number(item.percentage),
     count: item.count,
-    color: COLORS[index % COLORS.length],
+    color: ALLOCATION_PALETTE[index % ALLOCATION_PALETTE.length],
   }));
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const entry = payload[0].payload;
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <p className="font-medium text-gray-900 dark:text-white">
-            {data.name}
+        <div
+          className="rounded-lg shadow-lg border p-3"
+          style={getTooltipStyle(checkDarkMode())}
+        >
+          <p className="font-medium text-slate-900 dark:text-white">
+            {entry.name}
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {formatCurrency(data.value, currency)} (
-            {Number(data.percentage).toFixed(1)}%)
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {formatCurrency(entry.value, currency)} (
+            {Number(entry.percentage).toFixed(1)}%)
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {data.count} {data.count === 1 ? "holding" : "holdings"}
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {entry.count} {entry.count === 1 ? "holding" : "holdings"}
           </p>
         </div>
       );
@@ -96,10 +95,7 @@ export default function AllocationChart({
   };
 
   return (
-    <div className="card p-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        Asset Allocation
-      </h3>
+    <div>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -119,7 +115,7 @@ export default function AllocationChart({
             <Tooltip content={<CustomTooltip />} />
             <Legend
               formatter={(value, entry: any) => (
-                <span className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="text-sm text-slate-700 dark:text-slate-300">
                   {value} ({Number(entry.payload.percentage).toFixed(1)}%)
                 </span>
               )}
@@ -128,8 +124,8 @@ export default function AllocationChart({
         </ResponsiveContainer>
       </div>
       <div className="mt-4 text-center">
-        <p className="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
-        <p className="text-2xl font-bold text-gray-900 dark:text-white">
+        <p className="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
+        <p className="text-2xl font-bold text-slate-900 dark:text-white">
           {formatCurrency(totalValue, currency)}
         </p>
       </div>

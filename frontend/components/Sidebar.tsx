@@ -33,9 +33,9 @@ export default function Sidebar() {
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className="fixed left-0 top-0 h-full w-64 bg-dark-warm-gradient text-white flex flex-col border-r border-warm-gray-800/50"
+      className="fixed left-0 top-0 h-full w-64 bg-gradient-dark text-white flex flex-col border-r border-slate-800/50"
     >
-      <div className="p-6 border-b border-warm-gray-800/50">
+      <div className="p-6 border-b border-slate-800/50">
         <div className="flex items-center justify-between mb-4">
           <div className="flex flex-col">
             <div className="relative h-10 w-40">
@@ -56,7 +56,7 @@ export default function Sidebar() {
                 className="hidden object-contain object-left dark:block"
               />
             </div>
-            <p className="text-xs text-warm-gray-400 dark:text-warm-gray-500 mt-2 tracking-wide italic">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 tracking-wide italic">
               Grow. Protect. Flourish.
             </p>
           </div>
@@ -77,18 +77,18 @@ export default function Sidebar() {
               <Link
                 href={item.href}
                 className={`
-                  relative flex items-center gap-3 px-4 py-3 rounded-button transition-all duration-300 ease-out
+                  relative flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-300 ease-out
                   ${
                     isActive
-                      ? "bg-golden-gradient text-white shadow-golden"
-                      : "text-warm-gray-300 dark:text-warm-gray-400 hover:bg-warm-gray-800/50 hover:text-white"
+                      ? "bg-primary-600 text-white shadow-glow"
+                      : "text-slate-300 dark:text-slate-400 hover:bg-slate-800/50 hover:text-white"
                   }
                 `}
               >
                 {isActive && (
                   <motion.div
                     layoutId="activeNav"
-                    className="absolute inset-0 bg-golden-gradient rounded-button"
+                    className="absolute inset-0 bg-gradient-primary rounded-md"
                     initial={false}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
@@ -107,17 +107,17 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <div className="p-4 border-t border-warm-gray-800/50">
+      <div className="p-4 border-t border-slate-800/50">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-warm-gray-800/30 dark:bg-warm-gray-900/50 rounded-card p-4 border border-warm-gray-700/50"
+          className="bg-slate-800/30 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-700/50"
         >
-          <p className="text-xs text-warm-gray-400 dark:text-warm-gray-500 font-medium">
+          <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
             Privacy First
           </p>
-          <p className="text-sm text-warm-gray-300 dark:text-warm-gray-400 mt-1">
+          <p className="text-sm text-slate-300 dark:text-slate-400 mt-1">
             All data stored locally
           </p>
         </motion.div>

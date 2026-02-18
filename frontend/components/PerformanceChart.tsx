@@ -1,5 +1,13 @@
 import React, { useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { cn } from "@/utils/cn";
+import {
+  CHART_COLORS,
+  getTooltipStyle,
+  getGridProps,
+  getAxisProps,
+  isDarkMode as checkDarkMode,
+} from "@/utils/chartTheme";
 
 interface PerformancePoint {
   date: string;
@@ -47,24 +55,27 @@ export default function PerformanceChart({ data, currency = "USD", onPeriodChang
     onPeriodChange?.(period);
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const point = payload[0].payload;
       const isPositive = point.gain_loss >= 0;
-      
+
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            {new Date(point.date).toLocaleDateString("en-US", { 
-              year: "numeric", 
-              month: "long", 
-              day: "numeric" 
+        <div
+          className="rounded-lg shadow-lg border p-3"
+          style={getTooltipStyle(checkDarkMode())}
+        >
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
+            {new Date(point.date).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
             })}
           </p>
-          <p className="font-semibold text-gray-900 dark:text-white">
+          <p className="font-semibold text-slate-900 dark:text-white">
             {formatCurrency(point.total_value, currency)}
           </p>
-          <p className={`text-sm ${isPositive ? "text-green-600" : "text-red-600"}`}>
+          <p className={cn("text-sm", isPositive ? "text-success-600 dark:text-success-400" : "text-danger-600 dark:text-danger-400")}>
             {isPositive ? "+" : ""}{formatCurrency(point.gain_loss, currency)}
             {point.return_pct !== null && ` (${point.return_pct.toFixed(2)}%)`}
           </p>
@@ -74,30 +85,35 @@ export default function PerformanceChart({ data, currency = "USD", onPeriodChang
     return null;
   };
 
+  const PeriodSelector = () => (
+    <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+      {PERIODS.map((period) => (
+        <button
+          key={period.value}
+          onClick={() => handlePeriodChange(period.value)}
+          className={cn(
+            "px-3 py-1 text-sm font-medium rounded-md transition-colors",
+            selectedPeriod === period.value
+              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+          )}
+        >
+          {period.label}
+        </button>
+      ))}
+    </div>
+  );
+
   if (data.length === 0) {
     return (
-      <div className="card p-6">
+      <div className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
             Portfolio Performance
           </h3>
-          <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            {PERIODS.map((period) => (
-              <button
-                key={period.value}
-                onClick={() => handlePeriodChange(period.value)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  selectedPeriod === period.value
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                }`}
-              >
-                {period.label}
-              </button>
-            ))}
-          </div>
+          <PeriodSelector />
         </div>
-        <p className="text-gray-500 dark:text-gray-400 text-center py-12">
+        <p className="text-slate-500 dark:text-slate-400 text-center py-12">
           Not enough data to display performance chart
         </p>
       </div>
@@ -107,67 +123,52 @@ export default function PerformanceChart({ data, currency = "USD", onPeriodChang
   const latestValue = data[data.length - 1]?.total_value || 0;
   const latestGainLoss = data[data.length - 1]?.gain_loss || 0;
   const isPositive = latestGainLoss >= 0;
+  const chartColor = isPositive ? CHART_COLORS.success : CHART_COLORS.danger;
 
   return (
-    <div className="card p-6">
+    <div className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
             Portfolio Performance
           </h3>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-bold text-gray-900 dark:text-white">
+            <span className="text-2xl font-bold text-slate-900 dark:text-white">
               {formatCurrency(latestValue, currency)}
             </span>
-            <span className={`text-sm font-medium ${isPositive ? "text-green-600" : "text-red-600"}`}>
+            <span className={cn("text-sm font-medium", isPositive ? "text-success-600 dark:text-success-400" : "text-danger-600 dark:text-danger-400")}>
               {isPositive ? "+" : ""}{formatCurrency(latestGainLoss, currency)}
             </span>
           </div>
         </div>
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-          {PERIODS.map((period) => (
-            <button
-              key={period.value}
-              onClick={() => handlePeriodChange(period.value)}
-              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                selectedPeriod === period.value
-                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              }`}
-            >
-              {period.label}
-            </button>
-          ))}
-        </div>
+        <PeriodSelector />
       </div>
-      
+
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isPositive ? "#10b981" : "#ef4444"} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={isPositive ? "#10b981" : "#ef4444"} stopOpacity={0} />
+                <stop offset="5%" stopColor={chartColor} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
-            <XAxis 
-              dataKey="date" 
+            <CartesianGrid {...getGridProps(checkDarkMode())} />
+            <XAxis
+              dataKey="date"
               tickFormatter={formatDate}
-              className="text-gray-500"
-              tick={{ fontSize: 12 }}
+              {...getAxisProps(checkDarkMode())}
             />
-            <YAxis 
+            <YAxis
               tickFormatter={(value) => formatCurrency(value, currency)}
-              className="text-gray-500"
-              tick={{ fontSize: 12 }}
+              {...getAxisProps(checkDarkMode())}
               width={80}
             />
             <Tooltip content={<CustomTooltip />} />
             <Area
               type="monotone"
               dataKey="total_value"
-              stroke={isPositive ? "#10b981" : "#ef4444"}
+              stroke={chartColor}
               strokeWidth={2}
               fill="url(#colorValue)"
             />

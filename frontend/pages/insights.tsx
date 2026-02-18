@@ -38,6 +38,14 @@ import {
 } from "recharts";
 import { motion } from "framer-motion";
 import { cn } from "@/utils/cn";
+import {
+  CHART_PALETTE,
+  CHART_COLORS,
+  getTooltipStyle,
+  getGridProps,
+  getAxisProps,
+  isDarkMode as checkDarkMode,
+} from "@/utils/chartTheme";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -147,16 +155,7 @@ function formatYears(years: number | null): string {
   return `${years.toFixed(1)} years`;
 }
 
-const COLORS = [
-  "rgb(20, 184, 166)", // teal (primary)
-  "rgb(99, 102, 241)", // indigo (accent)
-  "rgb(16, 185, 129)", // emerald (success)
-  "rgb(245, 158, 11)", // amber (warning)
-  "rgb(239, 68, 68)", // red (danger)
-  "rgb(168, 85, 247)", // purple
-  "rgb(236, 72, 153)", // pink
-  "rgb(6, 182, 212)", // cyan
-];
+const COLORS = [...CHART_PALETTE];
 
 const CURRENCY_FLAGS: Record<string, string> = {
   CAD: "🇨🇦",
@@ -400,7 +399,6 @@ export default function Insights() {
                           cy="50%"
                           innerRadius={60}
                           outerRadius={100}
-                          fill="#8884d8"
                           paddingAngle={2}
                           dataKey="value"
                           label={({ name, value }) => `${name}: ${value}%`}
@@ -409,7 +407,10 @@ export default function Insights() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => `${value}%`} />
+                        <Tooltip
+                          contentStyle={getTooltipStyle(checkDarkMode())}
+                          formatter={(value: number) => `${value}%`}
+                        />
                       </RechartsPieChart>
                     </ResponsiveContainer>
                   </div>
@@ -525,14 +526,14 @@ export default function Insights() {
                         }))}
                         layout="vertical"
                       >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          className="stroke-slate-200 dark:stroke-slate-700"
+                        <CartesianGrid {...getGridProps(checkDarkMode())} />
+                        <XAxis type="number" tickFormatter={(v) => `${v}%`} {...getAxisProps(checkDarkMode())} />
+                        <YAxis dataKey="name" type="category" width={100} {...getAxisProps(checkDarkMode())} />
+                        <Tooltip
+                          contentStyle={getTooltipStyle(checkDarkMode())}
+                          formatter={(value: number) => `${value}%`}
                         />
-                        <XAxis type="number" tickFormatter={(v) => `${v}%`} />
-                        <YAxis dataKey="name" type="category" width={100} />
-                        <Tooltip formatter={(value: number) => `${value}%`} />
-                        <Bar dataKey="value" fill="rgb(20, 184, 166)" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="value" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -660,36 +661,34 @@ export default function Insights() {
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={projectionData}>
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              className="stroke-slate-200 dark:stroke-slate-700"
-                            />
+                            <CartesianGrid {...getGridProps(checkDarkMode())} />
                             <XAxis
                               dataKey="year"
                               tickFormatter={(year) => `${year}y`}
-                              className="text-slate-600 dark:text-slate-400"
+                              {...getAxisProps(checkDarkMode())}
                             />
                             <YAxis
                               tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
-                              className="text-slate-600 dark:text-slate-400"
+                              {...getAxisProps(checkDarkMode())}
                             />
                             <Tooltip
+                              contentStyle={getTooltipStyle(checkDarkMode())}
                               formatter={(value: number) => [formatCurrency(value, "USD"), ""]}
                               labelFormatter={(year) => `Year ${year}`}
                             />
                             <Area
                               type="monotone"
                               dataKey="net_worth"
-                              stroke="rgb(20, 184, 166)"
-                              fill="rgb(20, 184, 166)"
+                              stroke={CHART_COLORS.primary}
+                              fill={CHART_COLORS.primary}
                               fillOpacity={0.2}
                               name="Net Worth"
                             />
                             <Area
                               type="monotone"
                               dataKey="contributions"
-                              stroke="rgb(16, 185, 129)"
-                              fill="rgb(16, 185, 129)"
+                              stroke={CHART_COLORS.success}
+                              fill={CHART_COLORS.success}
                               fillOpacity={0.1}
                               name="Contributions"
                             />

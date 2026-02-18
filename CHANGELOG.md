@@ -9,7 +9,20 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
-## [Unreleased] - Wise integration
+## [0.6.0] - 2026-02-18 - Modern UI Redesign
+
+### Changed
+
+- **Design system overhaul**: Migrated from gray/warm-gray palette to slate-based design tokens with teal/emerald primary, indigo accent, and semantic success/warning/danger colors
+- **Chart theming**: Centralized chart colors, tooltips, grids, and axes via `utils/chartTheme.ts` for consistent data visualization across Dashboard, Insights, Portfolio
+- **Component library**: New `Toast` (notification system) and `Table` (sortable, paginated) UI components; barrel exports in `components/ui/index.ts`
+- **Sidebar navigation**: Replaced orphaned warm-gray/golden gradients with gradient-primary and slate tokens
+- **All components updated**: CurrencySelector, ErrorBoundary, DarkModeToggle, StatCard, SkeletonLoader, AddAssetModal (refactored to use Modal/Button/Input/Select UI), PortfolioHoldingsTable (CurrencyBadge), PerformanceChart, AllocationChart, DividendHistory
+- **Global ToastProvider** integrated in `_app.tsx`
+
+---
+
+## [0.5.0] - Wise integration
 
 ### Added
 
