@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_
 
 from backend.db.session import DbSession
 from backend.db.models.transaction import Transaction as TransactionModel
@@ -38,18 +38,32 @@ def _db_to_response(tx: TransactionModel) -> Transaction:
 async def get_transactions(
     db: DbSession,
     currency: Optional[str] = Query(None, description="Convert all amounts to this currency"),
+    search: Optional[str] = Query(None, description="Search description, merchant, notes"),
     category: Optional[str] = Query(None, description="Filter by category"),
     account: Optional[str] = Query(None, description="Filter by account"),
     type: Optional[str] = Query(None, description="Filter by type (income, expense, transfer)"),
     start_date: Optional[datetime] = Query(None, description="Filter by start date"),
     end_date: Optional[datetime] = Query(None, description="Filter by end date"),
+    min_amount: Optional[float] = Query(None, description="Minimum amount (absolute)"),
+    max_amount: Optional[float] = Query(None, description="Maximum amount (absolute)"),
+    import_source: Optional[str] = Query(None, description="Filter by import source"),
     limit: int = Query(500, ge=1, le=5000, description="Maximum number of transactions"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
     """Get all transactions with optional filters and currency conversion."""
     query = select(TransactionModel)
     
-    # Apply filters
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            or_(
+                TransactionModel.description.ilike(term),
+                TransactionModel.merchant.ilike(term),
+                TransactionModel.notes.ilike(term),
+                TransactionModel.category.ilike(term),
+                TransactionModel.original_statement.ilike(term),
+            )
+        )
     if category:
         query = query.where(TransactionModel.category == category)
     if account:
@@ -60,8 +74,13 @@ async def get_transactions(
         query = query.where(TransactionModel.date >= start_date)
     if end_date:
         query = query.where(TransactionModel.date <= end_date)
+    if min_amount is not None:
+        query = query.where(func.abs(TransactionModel.amount) >= Decimal(str(min_amount)))
+    if max_amount is not None:
+        query = query.where(func.abs(TransactionModel.amount) <= Decimal(str(max_amount)))
+    if import_source:
+        query = query.where(TransactionModel.import_source == import_source)
     
-    # Order by date descending (most recent first)
     query = query.order_by(desc(TransactionModel.date)).offset(offset).limit(limit)
     
     transactions = db.execute(query).scalars().all()

@@ -27,6 +27,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const INTEGRATIONS_BASE = API_BASE ? `${API_BASE}/v1/integrations` : "/v1/integrations";
 const WISE_TOKEN_KEY = "canopy_wise_token";
 const WISE_SANDBOX_KEY = "canopy_wise_sandbox";
+const QUESTRADE_TOKEN_KEY = "canopy_questrade_token";
 
 interface Integration {
   id: string;
@@ -596,6 +597,190 @@ function WiseCard({ integration }: { integration: Integration }) {
   );
 }
 
+function QuestradeCard({ integration }: { integration: Integration }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [refreshToken, setRefreshToken] = useState("");
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [accounts, setAccounts] = useState<{ number: string; type: string; status: string }[]>([]);
+  const [syncResult, setSyncResult] = useState<{ accounts_synced: number; assets_created: number; assets_updated: number; positions_synced: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem(QUESTRADE_TOKEN_KEY);
+    if (token) {
+      setConnected(true);
+      setRefreshToken(token);
+    }
+  }, []);
+
+  const handleConnect = async () => {
+    if (!refreshToken.trim()) return;
+    setIsConnecting(true);
+    setError(null);
+    try {
+      const res = await fetch(`${INTEGRATIONS_BASE}/questrade/test-connection`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken.trim() }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || "Connection failed");
+      }
+      const data = await res.json();
+      if (data.new_refresh_token) {
+        localStorage.setItem(QUESTRADE_TOKEN_KEY, data.new_refresh_token);
+        setRefreshToken(data.new_refresh_token);
+      } else {
+        localStorage.setItem(QUESTRADE_TOKEN_KEY, refreshToken.trim());
+      }
+      setConnected(true);
+      setAccounts(data.accounts || []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Connection failed");
+      setConnected(false);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    localStorage.removeItem(QUESTRADE_TOKEN_KEY);
+    setConnected(false);
+    setAccounts([]);
+    setSyncResult(null);
+    setRefreshToken("");
+  };
+
+  const handleSync = async () => {
+    const token = localStorage.getItem(QUESTRADE_TOKEN_KEY) || refreshToken;
+    if (!token) { setError("No token. Connect first."); return; }
+    setIsSyncing(true);
+    setError(null);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`${INTEGRATIONS_BASE}/questrade/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: token }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || "Sync failed");
+      }
+      const data = await res.json();
+      setSyncResult(data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div
+        className="p-6 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-3xl">{integration.logo}</span>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{integration.name}</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{integration.description}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <StatusBadge status={connected ? "connected" : "disconnected"} />
+            <ChevronRight className={cn("w-5 h-5 text-slate-400 transition-transform", isExpanded && "rotate-90")} />
+          </div>
+        </div>
+        {connected && accounts.length > 0 && (
+          <div className="mt-3 flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+            <span>{accounts.length} account(s)</span>
+            <span>{accounts.map((a) => a.type).join(", ")}</span>
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-6 pb-6 border-t border-slate-100 dark:border-slate-800">
+              <div className="pt-4 space-y-4">
+                <SetupInstructions steps={integration.setupSteps} docsUrl={integration.docsUrl} />
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Refresh Token
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      value={refreshToken}
+                      onChange={(e) => setRefreshToken(e.target.value)}
+                      placeholder="Paste your Questrade refresh token..."
+                      className="flex-1"
+                    />
+                    {connected ? (
+                      <Button variant="danger" onClick={(e) => { e.stopPropagation(); handleDisconnect(); }}>
+                        Disconnect
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        onClick={(e) => { e.stopPropagation(); handleConnect(); }}
+                        disabled={!refreshToken.trim() || isConnecting}
+                      >
+                        {isConnecting ? "Connecting..." : "Connect"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {connected && (
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="secondary"
+                      leftIcon={<RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />}
+                      onClick={(e) => { e.stopPropagation(); handleSync(); }}
+                      disabled={isSyncing}
+                    >
+                      {isSyncing ? "Syncing..." : "Sync Now"}
+                    </Button>
+                  </div>
+                )}
+
+                {syncResult && (
+                  <div className="p-3 bg-success-50 dark:bg-success-900/20 rounded-lg text-sm text-success-700 dark:text-success-300">
+                    Synced {syncResult.accounts_synced} account(s): {syncResult.assets_created} assets created, {syncResult.assets_updated} updated, {syncResult.positions_synced} positions synced
+                  </div>
+                )}
+
+                {error && (
+                  <div className="p-3 bg-danger-50 dark:bg-danger-900/20 rounded-lg text-sm text-danger-700 dark:text-danger-300">
+                    {error}
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
+
 function IntegrationCard({
   integration,
   onConnect,
@@ -802,6 +987,8 @@ export default function Integrations() {
             <WiseCard key={integration.id} integration={integration} />
           ) : integration.id === "moomoo" ? (
             <MoomooCard key={integration.id} integration={integration} />
+          ) : integration.id === "questrade" ? (
+            <QuestradeCard key={integration.id} integration={integration} />
           ) : (
             <IntegrationCard
               key={integration.id}

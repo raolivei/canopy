@@ -516,6 +516,170 @@ async def get_moomoo_quotes(request: MoomooQuoteRequest):
         raise HTTPException(status_code=400, detail=f"Failed to fetch quotes: {str(e)}")
 
 
+# ==================== Questrade Integration ====================
+
+class QuestradeConnectRequest(BaseModel):
+    """Request to connect Questrade account."""
+    refresh_token: str
+
+
+class QuestradeAccountResponse(BaseModel):
+    number: str
+    type: str
+    status: str
+
+
+class QuestradePositionResponse(BaseModel):
+    symbol: str
+    quantity: float
+    market_value: Optional[float] = None
+    current_price: Optional[float] = None
+    avg_entry_price: Optional[float] = None
+    open_pnl: Optional[float] = None
+
+
+class QuestradeBalanceResponse(BaseModel):
+    currency: str
+    cash: float
+    market_value: float
+    total_equity: float
+
+
+class QuestradeSyncResponse(BaseModel):
+    accounts_synced: int
+    assets_created: int
+    assets_updated: int
+    positions_synced: int
+
+
+QUESTRADE_TOKEN_KEY = "questrade_refresh_token"
+
+
+@router.post("/questrade/test-connection")
+async def test_questrade_connection(request: QuestradeConnectRequest):
+    """Test Questrade API connection with provided refresh token."""
+    try:
+        from backend.services.questrade_integration import QuestradeIntegrationService
+
+        with QuestradeIntegrationService(request.refresh_token) as qt:
+            accounts = qt.get_accounts()
+            if not accounts:
+                raise HTTPException(status_code=400, detail="No accounts found")
+            return {
+                "status": "connected",
+                "accounts": [
+                    QuestradeAccountResponse(
+                        number=a.number, type=a.type, status=a.status
+                    )
+                    for a in accounts
+                ],
+                "new_refresh_token": qt.refresh_token,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        msg = str(e)
+        if "401" in msg or "Unauthorized" in msg or "invalid_grant" in msg:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired refresh token. Generate a new one at my.questrade.com/APIAccess.",
+            )
+        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}")
+
+
+@router.post("/questrade/accounts", response_model=list[QuestradeAccountResponse])
+async def get_questrade_accounts(request: QuestradeConnectRequest):
+    """Fetch Questrade accounts."""
+    try:
+        from backend.services.questrade_integration import QuestradeIntegrationService
+
+        with QuestradeIntegrationService(request.refresh_token) as qt:
+            accounts = qt.get_accounts()
+            return [
+                QuestradeAccountResponse(
+                    number=a.number, type=a.type, status=a.status
+                )
+                for a in accounts
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/questrade/positions", response_model=list[QuestradePositionResponse])
+async def get_questrade_positions(
+    request: QuestradeConnectRequest,
+    account_number: str = Query(..., description="Questrade account number"),
+):
+    """Fetch positions for a Questrade account."""
+    try:
+        from backend.services.questrade_integration import QuestradeIntegrationService
+
+        with QuestradeIntegrationService(request.refresh_token) as qt:
+            positions = qt.get_positions(account_number)
+            return [
+                QuestradePositionResponse(
+                    symbol=p.symbol,
+                    quantity=float(p.open_quantity),
+                    market_value=float(p.current_market_value) if p.current_market_value else None,
+                    current_price=float(p.current_price) if p.current_price else None,
+                    avg_entry_price=float(p.average_entry_price) if p.average_entry_price else None,
+                    open_pnl=float(p.open_pnl) if p.open_pnl else None,
+                )
+                for p in positions
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/questrade/sync", response_model=QuestradeSyncResponse)
+async def sync_questrade(request: QuestradeConnectRequest, db: DbSession):
+    """Sync Questrade accounts and positions into Canopy portfolio."""
+    from backend.services.questrade_integration import QuestradeIntegrationService
+    from backend.db.models.lot import Lot
+
+    assets_created = 0
+    assets_updated = 0
+    positions_synced = 0
+
+    with QuestradeIntegrationService(request.refresh_token) as qt:
+        accounts = qt.get_accounts()
+
+        for account in accounts:
+            positions = qt.get_positions(account.number)
+            for pos in positions:
+                symbol = pos.symbol
+                existing = db.execute(
+                    select(Asset).where(Asset.symbol == symbol, Asset.sync_source == "QUESTRADE")
+                ).scalar_one_or_none()
+
+                if existing:
+                    assets_updated += 1
+                else:
+                    asset = Asset(
+                        symbol=symbol,
+                        name=symbol,
+                        asset_type=AssetType.STOCK,
+                        currency="CAD",
+                        institution="Questrade",
+                        sync_source="QUESTRADE",
+                    )
+                    db.add(asset)
+                    db.flush()
+                    existing = asset
+                    assets_created += 1
+
+                positions_synced += 1
+
+        db.commit()
+
+    return QuestradeSyncResponse(
+        accounts_synced=len(accounts),
+        assets_created=assets_created,
+        assets_updated=assets_updated,
+        positions_synced=positions_synced,
+    )
+
+
 # ==================== Integration Status ====================
 
 @router.get("/status")
@@ -542,6 +706,15 @@ async def get_integration_status():
                 "gateway_download": "https://openapi.futunn.com/",
                 "supported_features": ["accounts", "positions", "balances", "quotes"],
                 "supported_markets": ["US", "HK", "CN", "SG", "JP"],
+            },
+            {
+                "id": "questrade",
+                "name": "Questrade",
+                "type": "api",
+                "status": "available",
+                "description": "Canadian discount brokerage (TFSA, RRSP, trading)",
+                "requires_token": True,
+                "supported_features": ["accounts", "positions", "balances"],
             },
             {
                 "id": "csv_import",

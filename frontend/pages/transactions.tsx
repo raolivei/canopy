@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/router";
 import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -37,6 +37,11 @@ interface Transaction {
   category?: string;
   date: string;
   account?: string;
+  merchant?: string;
+  original_statement?: string;
+  notes?: string;
+  tags?: string[];
+  import_source?: string;
 }
 
 const CATEGORIES = [
@@ -65,8 +70,12 @@ export default function Transactions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
-
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [accountFilter, setAccountFilter] = useState<string>("all");
   const [formData, setFormData] = useState({
     description: "",
     amount: "",
@@ -77,9 +86,34 @@ export default function Transactions() {
     date: format(new Date(), "yyyy-MM-dd"),
   });
 
+  const fetchTransactions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("search", searchQuery);
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      if (categoryFilter.length === 1) params.set("category", categoryFilter[0]);
+      if (startDate) params.set("start_date", new Date(startDate).toISOString());
+      if (endDate) params.set("end_date", new Date(endDate + "T23:59:59").toISOString());
+      if (minAmount) params.set("min_amount", minAmount);
+      if (maxAmount) params.set("max_amount", maxAmount);
+      if (accountFilter !== "all") params.set("account", accountFilter);
+      if (displayCurrency) params.set("currency", displayCurrency);
+      params.set("limit", "2000");
+
+      const res = await fetch(`/v1/transactions/?${params.toString()}`);
+      const data = await res.json();
+      setTransactions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, typeFilter, categoryFilter, startDate, endDate, minAmount, maxAmount, accountFilter, displayCurrency]);
+
   useEffect(() => {
     fetchTransactions();
-  }, []);
+  }, [fetchTransactions]);
 
   useEffect(() => {
     if (router.query.action === "add") {
@@ -88,21 +122,9 @@ export default function Transactions() {
     }
     if (router.query.category && typeof router.query.category === "string") {
       setCategoryFilter([router.query.category]);
-      setShowFilters(true);
+      setShowAdvanced(true);
     }
   }, [router.query]);
-
-  const fetchTransactions = async () => {
-    try {
-      const res = await fetch("/v1/transactions/");
-      const data = await res.json();
-      setTransactions(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to fetch transactions:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,35 +172,18 @@ export default function Transactions() {
   };
 
   const { totalIncome, totalExpenses, net } = useMemo(() => {
-    const filtered = transactions.filter((t) => {
-      if (typeFilter !== "all" && t.type !== typeFilter) return false;
-      if (categoryFilter.length > 0 && !categoryFilter.includes(t.category || "")) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        return t.description.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q);
-      }
-      return true;
-    });
-
-    const income = filtered.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
-    const expenses = filtered.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
-
+    const income = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+    const expenses = transactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
     return { totalIncome: income, totalExpenses: expenses, net: income - expenses };
-  }, [transactions, typeFilter, categoryFilter, searchQuery]);
+  }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    return transactions
-      .filter((t) => {
-        if (typeFilter !== "all" && t.type !== typeFilter) return false;
-        if (categoryFilter.length > 0 && !categoryFilter.includes(t.category || "")) return false;
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          return t.description.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q);
-        }
-        return true;
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, typeFilter, categoryFilter, searchQuery]);
+    let result = [...transactions];
+    if (categoryFilter.length > 1) {
+      result = result.filter((t) => categoryFilter.includes(t.category || ""));
+    }
+    return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, categoryFilter]);
 
   const groupedTransactions = useMemo(() => {
     const groups: Record<string, Transaction[]> = {};
@@ -211,6 +216,11 @@ export default function Transactions() {
     return Array.from(cats).sort();
   }, [transactions]);
 
+  const uniqueAccounts = useMemo(() => {
+    const accs = new Set(transactions.map((t) => t.account).filter(Boolean));
+    return Array.from(accs).sort();
+  }, [transactions]);
+
   const typeOptions = [
     { value: "all", label: "All Types" },
     { value: "income", label: "Income" },
@@ -220,6 +230,11 @@ export default function Transactions() {
 
   const categoryOptions = uniqueCategories.map((c) => ({ value: c as string, label: c as string }));
 
+  const accountOptions = [
+    { value: "all", label: "All Accounts" },
+    ...uniqueAccounts.map((a) => ({ value: a as string, label: a as string })),
+  ];
+
   const currencyOptions = [
     { value: "CAD", label: "CAD" },
     { value: "USD", label: "USD" },
@@ -228,7 +243,20 @@ export default function Transactions() {
     { value: "GBP", label: "GBP" },
   ];
 
-  const hasActiveFilters = typeFilter !== "all" || categoryFilter.length > 0 || searchQuery;
+  const hasActiveFilters = typeFilter !== "all" || categoryFilter.length > 0 || searchQuery || startDate || endDate || minAmount || maxAmount || accountFilter !== "all";
+
+  const advancedFilterCount = [startDate, endDate, minAmount, maxAmount, accountFilter !== "all" ? accountFilter : ""].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    setTypeFilter("all");
+    setCategoryFilter([]);
+    setSearchQuery("");
+    setStartDate("");
+    setEndDate("");
+    setMinAmount("");
+    setMaxAmount("");
+    setAccountFilter("all");
+  };
 
   return (
     <PageLayout title="Transactions" description="Manage your income and expenses">
@@ -308,11 +336,12 @@ export default function Transactions() {
         className="mb-6"
       >
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col lg:flex-row gap-4">
+          <CardContent className="p-4 space-y-3">
+            {/* Primary filter row */}
+            <div className="flex flex-col lg:flex-row gap-3">
               <div className="flex-1">
                 <Input
-                  placeholder="Search transactions..."
+                  placeholder="Search description, merchant, notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   leftIcon={<Search className="w-4 h-4" />}
@@ -325,7 +354,7 @@ export default function Transactions() {
                   }
                 />
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 items-center">
                 <Select options={typeOptions} value={typeFilter} onChange={setTypeFilter} className="w-32" />
                 <MultiSelect
                   options={categoryOptions}
@@ -335,21 +364,97 @@ export default function Transactions() {
                   className="w-40"
                 />
                 <Select options={currencyOptions} value={displayCurrency} onChange={setDisplayCurrency} className="w-24" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Filter className="w-4 h-4" />}
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className={cn(advancedFilterCount > 0 && "text-primary-600 dark:text-primary-400")}
+                >
+                  More{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
+                </Button>
                 {hasActiveFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setTypeFilter("all");
-                      setCategoryFilter([]);
-                      setSearchQuery("");
-                    }}
-                  >
-                    Clear filters
+                  <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+                    Clear all
                   </Button>
                 )}
               </div>
             </div>
+
+            {/* Advanced filters */}
+            <AnimatePresence>
+              {showAdvanced && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                          <Calendar className="w-3 h-3 inline mr-1" />From
+                        </label>
+                        <Input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                          <Calendar className="w-3 h-3 inline mr-1" />To
+                        </label>
+                        <Input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                          Min Amount
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={minAmount}
+                          onChange={(e) => setMinAmount(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                          Max Amount
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="∞"
+                          value={maxAmount}
+                          onChange={(e) => setMaxAmount(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                          <Wallet className="w-3 h-3 inline mr-1" />Account
+                        </label>
+                        <Select options={accountOptions} value={accountFilter} onChange={setAccountFilter} />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Active filter count */}
+            {hasActiveFilters && (
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Showing {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? "s" : ""}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -522,8 +627,11 @@ function TransactionRow({ transaction: tx, onDelete, displayCurrency }: Transact
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-slate-900 dark:text-white truncate">{tx.description}</p>
-          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
             <span>{format(parseISO(tx.date), "MMM d, yyyy")}</span>
+            {tx.merchant && tx.merchant !== tx.description && (
+              <span className="truncate max-w-[150px]" title={tx.merchant}>{tx.merchant}</span>
+            )}
             {tx.category && (
               <Badge variant="default" size="sm">
                 {tx.category}
