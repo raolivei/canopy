@@ -1,5 +1,12 @@
 import React from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
 
 interface AllocationItem {
   asset_type: string;
@@ -41,7 +48,11 @@ function formatCurrency(value: number, currency: string = "USD"): string {
   }).format(value);
 }
 
-export default function AllocationChart({ data, totalValue, currency = "USD" }: AllocationChartProps) {
+export default function AllocationChart({
+  data,
+  totalValue,
+  currency = "USD",
+}: AllocationChartProps) {
   if (data.length === 0) {
     return (
       <div className="card p-6">
@@ -68,9 +79,12 @@ export default function AllocationChart({ data, totalValue, currency = "USD" }: 
       const data = payload[0].payload;
       return (
         <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <p className="font-medium text-gray-900 dark:text-white">{data.name}</p>
+          <p className="font-medium text-gray-900 dark:text-white">
+            {data.name}
+          </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {formatCurrency(data.value, currency)} ({data.percentage.toFixed(1)}%)
+            {formatCurrency(data.value, currency)} (
+            {Number(data.percentage).toFixed(1)}%)
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {data.count} {data.count === 1 ? "holding" : "holdings"}
@@ -106,7 +120,7 @@ export default function AllocationChart({ data, totalValue, currency = "USD" }: 
             <Legend
               formatter={(value, entry: any) => (
                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {value} ({entry.payload.percentage.toFixed(1)}%)
+                  {value} ({Number(entry.payload.percentage).toFixed(1)}%)
                 </span>
               )}
             />

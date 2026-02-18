@@ -19,6 +19,7 @@ from backend.db.models.liability import (
     LiabilityBalanceHistory,
     LiabilityPayment,
 )
+from backend.db.models.transaction import Transaction, TransactionType
 
 __all__ = [
     # Core assets
@@ -43,4 +44,7 @@ __all__ = [
     "LiabilityStatus",
     "LiabilityBalanceHistory",
     "LiabilityPayment",
+    # Transactions
+    "Transaction",
+    "TransactionType",
 ]

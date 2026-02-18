@@ -1,29 +1,35 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from typing import List, Optional
+"""CSV Import API endpoints for importing transactions from bank exports."""
+
 import uuid
 import time
 from datetime import datetime
+from decimal import Decimal
+from typing import Optional
+
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query
+from sqlalchemy import select, func
+
+from backend.db.session import get_db_session
+from backend.db.models.transaction import Transaction as TransactionModel
 from backend.models.csv_import import (
     CSVImportConfig, CSVImportPreview, CSVImportRequest, 
     ImportResult, ImportHistory, ImportHistoryList,
     BankFormat, FieldMapping, ImportStatus
 )
-from backend.models.transaction import Transaction, TransactionCreate
 from backend.services.csv_parser import CSVParserService
-from backend.api.transactions import transactions_db, next_id
 
 router = APIRouter(prefix="/v1/csv-import", tags=["csv-import"])
 
 # Service instance
 csv_service = CSVParserService()
 
-# Storage for import previews and history
-import_previews: dict[str, CSVImportPreview] = {}
-import_history: List[ImportHistory] = []
+# Storage for import previews (temporary, cleared after import)
+import_previews: dict[str, dict] = {}
 
-@router.get("/formats", response_model=List[dict])
+
+@router.get("/formats", response_model=list[dict])
 async def get_supported_formats():
-    """Get list of supported bank formats"""
+    """Get list of supported bank formats."""
     formats = []
     for bank_format in BankFormat:
         format_info = {
@@ -34,9 +40,10 @@ async def get_supported_formats():
         formats.append(format_info)
     return formats
 
+
 @router.get("/format/{bank_format}", response_model=dict)
 async def get_format_config(bank_format: BankFormat):
-    """Get field mapping configuration for a specific bank format"""
+    """Get field mapping configuration for a specific bank format."""
     if bank_format in csv_service.BANK_FORMATS:
         mapping = csv_service.BANK_FORMATS[bank_format]
         return {
@@ -45,11 +52,12 @@ async def get_format_config(bank_format: BankFormat):
         }
     raise HTTPException(status_code=404, detail=f"No preset configuration for {bank_format.value}")
 
+
 @router.post("/preview", response_model=dict)
 async def preview_csv_import(
     file: UploadFile = File(...),
     bank_format: str = Form(BankFormat.GENERIC.value),
-    default_currency: str = Form("USD"),
+    default_currency: str = Form("CAD"),
     default_account: Optional[str] = Form(None),
     skip_rows: int = Form(0),
     skip_duplicates: bool = Form(True)
@@ -104,12 +112,12 @@ async def preview_csv_import(
         skip_duplicates=skip_duplicates
     )
     
-    # Parse and preview
+    # Parse and preview (no existing transactions to check against initially)
     try:
         preview = csv_service.parse_csv_file(
             file_content=file_content,
             config=config,
-            existing_transactions=transactions_db
+            existing_transactions=[]
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
@@ -118,7 +126,12 @@ async def preview_csv_import(
     import_id = str(uuid.uuid4())
     
     # Store preview for later import
-    import_previews[import_id] = preview
+    import_previews[import_id] = {
+        "preview": preview,
+        "config": config,
+        "filename": file.filename,
+        "bank_format": bank_format_enum,
+    }
     
     return {
         "import_id": import_id,
@@ -130,20 +143,29 @@ async def preview_csv_import(
         "config": config.model_dump()
     }
 
+
 @router.post("/import", response_model=ImportResult)
 async def import_transactions(request: CSVImportRequest):
     """
     Import transactions from a previously previewed CSV file.
+    Persists transactions to the database.
     """
     
     # Get preview
-    preview = import_previews.get(request.import_id)
-    if not preview:
-        raise HTTPException(status_code=404, detail="Import preview not found. Please upload and preview the file first.")
+    preview_data = import_previews.get(request.import_id)
+    if not preview_data:
+        raise HTTPException(
+            status_code=404, 
+            detail="Import preview not found. Please upload and preview the file first."
+        )
+    
+    preview = preview_data["preview"]
+    filename = preview_data["filename"]
+    bank_format = preview_data["bank_format"]
     
     start_time = time.time()
     
-    # Convert preview to transactions
+    # Convert preview to transaction create objects
     transactions_to_create = csv_service.create_transactions_from_preview(
         preview=preview,
         skip_duplicates=request.skip_duplicates,
@@ -151,36 +173,41 @@ async def import_transactions(request: CSVImportRequest):
         selected_rows=request.selected_rows
     )
     
-    # Import transactions
+    # Import transactions to database
     imported_ids = []
     errors = []
     
-    global next_id
-    for tx_create in transactions_to_create:
-        try:
-            new_transaction = Transaction(
-                id=next_id,
-                description=tx_create.description,
-                amount=tx_create.amount,
-                currency=tx_create.currency,
-                type=tx_create.type,
-                category=tx_create.category,
-                date=tx_create.date or datetime.now(),
-                account=tx_create.account,
-                merchant=tx_create.merchant,
-                original_statement=tx_create.original_statement,
-                notes=tx_create.notes,
-                tags=tx_create.tags,
-                ticker=tx_create.ticker,
-            )
-            next_id += 1
-            transactions_db.append(new_transaction)
-            imported_ids.append(new_transaction.id)
-        except Exception as e:
-            errors.append({
-                "description": tx_create.description,
-                "error": str(e)
-            })
+    with get_db_session() as db:
+        for tx_create in transactions_to_create:
+            try:
+                new_tx = TransactionModel(
+                    description=tx_create.description,
+                    amount=Decimal(str(tx_create.amount)),
+                    currency=tx_create.currency,
+                    type=tx_create.type.value,
+                    date=tx_create.date or datetime.now(),
+                    category=tx_create.category,
+                    account=tx_create.account,
+                    merchant=tx_create.merchant,
+                    original_statement=tx_create.original_statement,
+                    notes=tx_create.notes,
+                    tags=tx_create.tags,
+                    ticker=tx_create.ticker,
+                    shares=Decimal(str(tx_create.shares)) if tx_create.shares else None,
+                    price_per_share=Decimal(str(tx_create.price_per_share)) if tx_create.price_per_share else None,
+                    import_id=request.import_id,
+                    import_source=bank_format.value,
+                )
+                db.add(new_tx)
+                db.flush()  # Get the ID
+                imported_ids.append(new_tx.id)
+            except Exception as e:
+                errors.append({
+                    "description": tx_create.description,
+                    "error": str(e)
+                })
+        
+        db.commit()
     
     duration = time.time() - start_time
     
@@ -202,59 +229,69 @@ async def import_transactions(request: CSVImportRequest):
         duration_seconds=duration
     )
     
-    # Add to history
-    # Note: We don't have filename here, would need to pass it in request or store in preview
-    history_entry = ImportHistory(
-        import_id=request.import_id,
-        filename="imported_file.csv",  # TODO: Store filename in preview
-        bank_format=BankFormat.GENERIC,  # TODO: Store format in preview
-        status=status,
-        total_rows=result.total_rows,
-        imported_count=result.imported_count,
-        skipped_count=result.skipped_count,
-        error_count=result.error_count,
-        created_at=result.created_at,
-        completed_at=datetime.now()
-    )
-    import_history.append(history_entry)
-    
     # Clean up preview after import
     if request.import_id in import_previews:
         del import_previews[request.import_id]
     
     return result
 
-@router.get("/history", response_model=ImportHistoryList)
-async def get_import_history(limit: int = 50, offset: int = 0):
-    """Get import history"""
-    
-    # Sort by created_at descending
-    sorted_history = sorted(
-        import_history, 
-        key=lambda x: x.created_at, 
-        reverse=True
-    )
-    
-    paginated = sorted_history[offset:offset + limit]
-    
-    return ImportHistoryList(
-        imports=paginated,
-        total=len(import_history)
-    )
 
-@router.get("/history/{import_id}", response_model=ImportHistory)
-async def get_import_details(import_id: str):
-    """Get details of a specific import"""
-    
-    for entry in import_history:
-        if entry.import_id == import_id:
-            return entry
-    
-    raise HTTPException(status_code=404, detail="Import not found")
+@router.get("/history", response_model=dict)
+async def get_import_history(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """Get import history based on transactions with import_id."""
+    with get_db_session() as db:
+        # Get unique import_ids with counts
+        query = (
+            select(
+                TransactionModel.import_id,
+                TransactionModel.import_source,
+                func.count(TransactionModel.id).label('count'),
+                func.min(TransactionModel.date).label('earliest_date'),
+                func.max(TransactionModel.date).label('latest_date'),
+                func.min(TransactionModel.created_at).label('imported_at'),
+            )
+            .where(TransactionModel.import_id.isnot(None))
+            .group_by(TransactionModel.import_id, TransactionModel.import_source)
+            .order_by(func.min(TransactionModel.created_at).desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        
+        results = db.execute(query).all()
+        
+        imports = [
+            {
+                "import_id": r.import_id,
+                "source": r.import_source,
+                "transaction_count": r.count,
+                "date_range": {
+                    "start": r.earliest_date.isoformat() if r.earliest_date else None,
+                    "end": r.latest_date.isoformat() if r.latest_date else None,
+                },
+                "imported_at": r.imported_at.isoformat() if r.imported_at else None,
+            }
+            for r in results
+        ]
+        
+        # Get total count
+        total_query = (
+            select(func.count(func.distinct(TransactionModel.import_id)))
+            .where(TransactionModel.import_id.isnot(None))
+        )
+        total = db.execute(total_query).scalar() or 0
+        
+        return {
+            "imports": imports,
+            "total": total,
+        }
+
 
 @router.delete("/preview/{import_id}")
 async def delete_preview(import_id: str):
-    """Delete a preview that hasn't been imported yet"""
+    """Delete a preview that hasn't been imported yet."""
     
     if import_id in import_previews:
         del import_previews[import_id]
@@ -262,89 +299,37 @@ async def delete_preview(import_id: str):
     
     raise HTTPException(status_code=404, detail="Preview not found")
 
-@router.post("/custom-mapping", response_model=dict)
-async def create_custom_mapping(
-    file: UploadFile = File(...),
-    date_column: str = Form(...),
-    description_column: str = Form(...),
-    amount_column: Optional[str] = Form(None),
-    debit_column: Optional[str] = Form(None),
-    credit_column: Optional[str] = Form(None),
-    type_column: Optional[str] = Form(None),
-    category_column: Optional[str] = Form(None),
-    account_column: Optional[str] = Form(None),
-    currency_column: Optional[str] = Form(None),
-    date_format: str = Form("%Y-%m-%d"),
-    default_currency: str = Form("USD"),
-    default_account: Optional[str] = Form(None),
-    skip_rows: int = Form(0)
-):
-    """
-    Upload CSV with custom field mapping.
-    Must specify either amount_column OR both debit_column and credit_column.
-    """
-    
-    # Validate that we have amount info
-    if not amount_column and not (debit_column and credit_column):
-        raise HTTPException(
-            status_code=400, 
-            detail="Must provide either 'amount_column' or both 'debit_column' and 'credit_column'"
-        )
-    
-    # Read file
-    try:
-        content = await file.read()
-        file_content = content.decode('utf-8')
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
-    
-    # Create custom field mapping
-    field_mapping = FieldMapping(
-        date_column=date_column,
-        description_column=description_column,
-        amount_column=amount_column or "",
-        type_column=type_column,
-        category_column=category_column,
-        account_column=account_column,
-        currency_column=currency_column,
-        debit_column=debit_column,
-        credit_column=credit_column,
-        date_format=date_format
-    )
-    
-    # Create config
-    config = CSVImportConfig(
-        bank_format=BankFormat.CUSTOM,
-        field_mapping=field_mapping,
-        default_currency=default_currency,
-        default_account=default_account,
-        skip_rows=skip_rows,
-        skip_duplicates=True
-    )
-    
-    # Parse and preview
-    try:
-        preview = csv_service.parse_csv_file(
-            file_content=file_content,
-            config=config,
-            existing_transactions=transactions_db
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
-    
-    # Generate import ID
-    import_id = str(uuid.uuid4())
-    import_previews[import_id] = preview
-    
-    return {
-        "import_id": import_id,
-        "filename": file.filename,
-        "preview": preview.model_dump(),
-        "config": config.model_dump()
-    }
 
-def _infer_field_mapping(headers: List[str]) -> FieldMapping:
-    """Infer field mapping from headers for generic format"""
+@router.delete("/import/{import_id}")
+async def delete_import(import_id: str):
+    """Delete all transactions from a specific import."""
+    with get_db_session() as db:
+        # Count transactions to delete
+        count_query = (
+            select(func.count(TransactionModel.id))
+            .where(TransactionModel.import_id == import_id)
+        )
+        count = db.execute(count_query).scalar() or 0
+        
+        if count == 0:
+            raise HTTPException(status_code=404, detail="No transactions found for this import")
+        
+        # Delete transactions
+        delete_query = (
+            select(TransactionModel)
+            .where(TransactionModel.import_id == import_id)
+        )
+        transactions = db.execute(delete_query).scalars().all()
+        for tx in transactions:
+            db.delete(tx)
+        
+        db.commit()
+        
+        return {"message": f"Deleted {count} transactions from import {import_id}"}
+
+
+def _infer_field_mapping(headers: list[str]) -> FieldMapping:
+    """Infer field mapping from headers for generic format."""
     headers_lower = [h.lower().strip() for h in headers]
     
     # Try to find date column
@@ -395,4 +380,3 @@ def _infer_field_mapping(headers: List[str]) -> FieldMapping:
         credit_column=credit_column,
         date_format="%Y-%m-%d"  # Default
     )
-

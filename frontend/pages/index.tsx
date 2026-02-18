@@ -55,6 +55,8 @@ import {
   formatCurrencyCompact,
 } from "@/utils/currency";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
 interface Transaction {
   id: number;
   description: string;
@@ -80,7 +82,8 @@ export default function Home() {
   const [spendingRange, setSpendingRange] = useState<TimeRange>("30d");
 
   useEffect(() => {
-    fetchTransactions();
+    // Fetch with default currency (server-side conversion)
+    fetchTransactions(showConverted ? displayCurrency : undefined);
     // Check dark mode status
     const checkDarkMode = () => {
       if (typeof window !== "undefined") {
@@ -105,9 +108,13 @@ export default function Home() {
     }
   }, [transactions, displayCurrency, showConverted]);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (currency?: string) => {
     try {
-      const res = await fetch("http://localhost:8000/v1/transactions/");
+      // Use server-side currency conversion for efficiency
+      const url = currency
+        ? `${API_URL}/v1/transactions/?currency=${currency}`
+        : `${API_URL}/v1/transactions/`;
+      const res = await fetch(url);
       const data = await res.json();
       setTransactions(data);
       setLoading(false);
@@ -117,22 +124,19 @@ export default function Home() {
     }
   };
 
+  // Re-fetch transactions when currency changes
+  useEffect(() => {
+    if (showConverted) {
+      fetchTransactions(displayCurrency);
+    }
+  }, [displayCurrency, showConverted]);
+
   const convertAllAmounts = async () => {
+    // Server-side conversion is now used, so just map transaction amounts
     const converted: Record<number, number> = {};
-    await Promise.all(
-      transactions.map(async (tx) => {
-        if (tx.currency === displayCurrency) {
-          converted[tx.id] = tx.amount;
-        } else {
-          const convertedAmount = await convertCurrency(
-            tx.amount,
-            tx.currency,
-            displayCurrency
-          );
-          converted[tx.id] = convertedAmount;
-        }
-      })
-    );
+    transactions.forEach((tx) => {
+      converted[tx.id] = tx.amount;
+    });
     setConvertedAmounts(converted);
   };
 
@@ -141,7 +145,7 @@ export default function Home() {
       if (!showConverted || tx.currency === displayCurrency) return null;
       return convertedAmounts[tx.id] || null;
     },
-    [showConverted, displayCurrency, convertedAmounts]
+    [showConverted, displayCurrency, convertedAmounts],
   );
 
   // Calculate totals - convert all to display currency for summary (memoized)
@@ -320,10 +324,10 @@ export default function Home() {
       case "all":
         if (transactions.length === 0) return 30;
         const oldestTx = Math.min(
-          ...transactions.map((t) => new Date(t.date).getTime())
+          ...transactions.map((t) => new Date(t.date).getTime()),
         );
         const daysDiff = Math.ceil(
-          (now.getTime() - oldestTx) / (1000 * 60 * 60 * 24)
+          (now.getTime() - oldestTx) / (1000 * 60 * 60 * 24),
         );
         return Math.min(365, daysDiff);
       default:
@@ -377,46 +381,52 @@ export default function Home() {
         };
       }).filter((d) => d.fullDate <= now);
     },
-    [transactions, displayCurrency, convertedAmounts, now]
+    [transactions, displayCurrency, convertedAmounts, now],
   );
 
   const cashFlowData = useMemo(
     () => getChartData(cashFlowRange),
-    [getChartData, cashFlowRange]
+    [getChartData, cashFlowRange],
   );
 
   // Category breakdown (using converted amounts) - memoized
   const { categoryData, totalExpensesForChart, pieData } = useMemo(() => {
     const catData = transactions
       .filter((t) => t.type === "expense" && t.category)
-      .reduce((acc, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        acc[t.category!] = (acc[t.category!] || 0) + amount;
-        return acc;
-      }, {} as Record<string, number>);
+      .reduce(
+        (acc, t) => {
+          const amount =
+            t.currency === displayCurrency
+              ? t.amount
+              : convertedAmounts[t.id] || 0;
+          acc[t.category!] = (acc[t.category!] || 0) + amount;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
     const total = Object.values(catData).reduce((sum, val) => sum + val, 0);
     const threshold = total * 0.05; // 5% threshold
 
     const pie = Object.entries(catData)
       .sort(([, a], [, b]) => b - a) // Sort by value descending
-      .reduce((acc, [name, value]) => {
-        if (value >= threshold) {
-          acc.push({ name, value });
-        } else {
-          // Add to "Others" category
-          const othersIndex = acc.findIndex((item) => item.name === "Others");
-          if (othersIndex >= 0) {
-            acc[othersIndex].value += value;
+      .reduce(
+        (acc, [name, value]) => {
+          if (value >= threshold) {
+            acc.push({ name, value });
           } else {
-            acc.push({ name: "Others", value });
+            // Add to "Others" category
+            const othersIndex = acc.findIndex((item) => item.name === "Others");
+            if (othersIndex >= 0) {
+              acc[othersIndex].value += value;
+            } else {
+              acc.push({ name: "Others", value });
+            }
           }
-        }
-        return acc;
-      }, [] as Array<{ name: string; value: number }>);
+          return acc;
+        },
+        [] as Array<{ name: string; value: number }>,
+      );
 
     return {
       categoryData: catData,
@@ -447,19 +457,22 @@ export default function Home() {
 
   // Get recurring-like transactions (same merchant, similar amount, regular intervals) - memoized
   const recurringTransactions = useMemo(() => {
-    const merchantGroups = transactions.reduce((acc, tx) => {
-      if (!tx.category) return acc;
-      const key = `${tx.description.toLowerCase().substring(0, 20)}`;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(tx);
-      return acc;
-    }, {} as Record<string, Transaction[]>);
+    const merchantGroups = transactions.reduce(
+      (acc, tx) => {
+        if (!tx.category) return acc;
+        const key = `${tx.description.toLowerCase().substring(0, 20)}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(tx);
+        return acc;
+      },
+      {} as Record<string, Transaction[]>,
+    );
 
     return Object.entries(merchantGroups)
       .filter(([_, txs]) => txs.length >= 2)
       .map(([_, txs]) => {
         const sorted = txs.sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
         );
         return sorted[0];
       })
@@ -549,7 +562,7 @@ export default function Home() {
                     netChangeMoM !== 0
                       ? `${netChangeMoM >= 0 ? "+" : ""}${formatCurrency(
                           netChangeMoM,
-                          displayCurrency
+                          displayCurrency,
                         )} (${
                           netWorthChangePercent >= 0 ? "+" : ""
                         }${netWorthChangePercent.toFixed(1)}%)`
@@ -625,7 +638,7 @@ export default function Home() {
                               >
                                 {formatCurrency(
                                   category.spent,
-                                  displayCurrency
+                                  displayCurrency,
                                 )}
                               </span>
                               <span className="text-warm-gray-400 dark:text-warm-gray-500">
@@ -634,7 +647,7 @@ export default function Home() {
                               <span className="text-warm-gray-600 dark:text-warm-gray-400">
                                 {formatCurrency(
                                   category.budget,
-                                  displayCurrency
+                                  displayCurrency,
                                 )}
                               </span>
                             </div>
@@ -645,8 +658,8 @@ export default function Home() {
                                 isOverBudget
                                   ? "bg-red-500"
                                   : percentage > 80
-                                  ? "bg-yellow-500"
-                                  : "bg-green-500"
+                                    ? "bg-yellow-500"
+                                    : "bg-green-500"
                               }`}
                               style={{ width: `${Math.min(percentage, 100)}%` }}
                             />
@@ -657,11 +670,11 @@ export default function Home() {
                               {isOverBudget
                                 ? `${formatCurrency(
                                     category.spent - category.budget,
-                                    displayCurrency
+                                    displayCurrency,
                                   )} over budget`
                                 : `${formatCurrency(
                                     category.budget - category.spent,
-                                    displayCurrency
+                                    displayCurrency,
                                   )} remaining`}
                             </span>
                           </div>
@@ -694,7 +707,7 @@ export default function Home() {
                         <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
                           {formatCurrency(
                             currentMonthIncome - currentMonthExpenses,
-                            displayCurrency
+                            displayCurrency,
                           )}{" "}
                           this month
                         </p>
@@ -714,12 +727,12 @@ export default function Home() {
                               {range === "7d"
                                 ? "7D"
                                 : range === "30d"
-                                ? "30D"
-                                : range === "90d"
-                                ? "90D"
-                                : "1Y"}
+                                  ? "30D"
+                                  : range === "90d"
+                                    ? "90D"
+                                    : "1Y"}
                             </button>
-                          )
+                          ),
                         )}
                       </div>
                     </div>
@@ -815,8 +828,8 @@ export default function Home() {
                             name === "income"
                               ? "Income"
                               : name === "expenses"
-                              ? "Expenses"
-                              : "Net",
+                                ? "Expenses"
+                                : "Net",
                           ]}
                         />
                         <Legend
@@ -826,8 +839,8 @@ export default function Home() {
                             value === "income"
                               ? "Income"
                               : value === "expenses"
-                              ? "Expenses"
-                              : "Net"
+                                ? "Expenses"
+                                : "Net"
                           }
                         />
                         <Area
@@ -872,7 +885,7 @@ export default function Home() {
                         <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
                           {formatCurrency(
                             currentMonthExpenses,
-                            displayCurrency
+                            displayCurrency,
                           )}{" "}
                           this month
                         </p>
@@ -963,7 +976,7 @@ export default function Home() {
                                     <div className="text-sm font-semibold text-warm-gray-900 dark:text-warm-gray-50">
                                       {formatCurrency(
                                         entry.value,
-                                        displayCurrency
+                                        displayCurrency,
                                       )}
                                     </div>
                                     <div className="text-xs text-warm-gray-500 dark:text-warm-gray-400">
@@ -1122,7 +1135,7 @@ export default function Home() {
                                   {tx.type === "expense" ? "-" : "+"}
                                   {formatCurrency(
                                     Math.abs(tx.amount),
-                                    tx.currency
+                                    tx.currency,
                                   )}
                                 </p>
                                 {showConverted &&
@@ -1132,7 +1145,7 @@ export default function Home() {
                                       ≈{" "}
                                       {formatCurrency(
                                         Math.abs(convertedAmount),
-                                        displayCurrency
+                                        displayCurrency,
                                       )}
                                     </p>
                                   )}
@@ -1196,7 +1209,7 @@ export default function Home() {
                       .sort(
                         (a, b) =>
                           new Date(b.date).getTime() -
-                          new Date(a.date).getTime()
+                          new Date(a.date).getTime(),
                       )
                       .slice(0, 5)
                       .map((tx) => {
@@ -1213,8 +1226,8 @@ export default function Home() {
                                     tx.type === "income"
                                       ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                                       : tx.type === "expense"
-                                      ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                                      : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                                        ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                        : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                                   }`}
                                 >
                                   {tx.type === "income" ? (
@@ -1247,7 +1260,7 @@ export default function Home() {
                                     {tx.type === "expense" ? "-" : "+"}
                                     {formatCurrency(
                                       Math.abs(tx.amount),
-                                      tx.currency
+                                      tx.currency,
                                     )}
                                   </p>
                                   {showConverted &&
@@ -1266,7 +1279,7 @@ export default function Home() {
                                         >
                                           {formatCurrency(
                                             Math.abs(convertedAmount),
-                                            displayCurrency
+                                            displayCurrency,
                                           )}
                                         </p>
                                       </>

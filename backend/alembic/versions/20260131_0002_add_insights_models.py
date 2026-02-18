@@ -19,22 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add new columns to assets table
-    op.add_column('assets', sa.Column('institution', sa.String(100), nullable=True))
-    op.add_column('assets', sa.Column('country', sa.String(2), nullable=True))
-    op.add_column('assets', sa.Column('is_liability', sa.Boolean(), nullable=False, server_default='false'))
-    op.add_column('assets', sa.Column('ownership_percentage', sa.Numeric(precision=5, scale=4), nullable=False, server_default='1.0'))
-    op.add_column('assets', sa.Column('sync_source', sa.String(50), nullable=True))
-    op.add_column('assets', sa.Column('external_account_id', sa.String(100), nullable=True))
-    op.add_column('assets', sa.Column('interest_rate', sa.Numeric(precision=6, scale=4), nullable=True))
-    op.add_column('assets', sa.Column('credit_limit', sa.Numeric(precision=18, scale=2), nullable=True))
-    op.add_column('assets', sa.Column('notes', sa.String(1000), nullable=True))
-    
-    # Alter symbol column to allow longer symbols
-    op.alter_column('assets', 'symbol', type_=sa.String(50))
-    
-    # Alter currency column to allow crypto tickers
-    op.alter_column('assets', 'currency', type_=sa.String(10))
+    # NOTE: Columns for assets table (institution, country, is_liability, etc.)
+    # are now in the initial migration (001). This migration only adds
+    # real estate and liability tables.
     
     # Create real_estate_properties table
     op.create_table(
@@ -188,17 +175,4 @@ def downgrade() -> None:
     op.drop_table('real_estate_payment_series')
     op.drop_table('real_estate_properties')
     
-    # Remove columns from assets
-    op.drop_column('assets', 'notes')
-    op.drop_column('assets', 'credit_limit')
-    op.drop_column('assets', 'interest_rate')
-    op.drop_column('assets', 'external_account_id')
-    op.drop_column('assets', 'sync_source')
-    op.drop_column('assets', 'ownership_percentage')
-    op.drop_column('assets', 'is_liability')
-    op.drop_column('assets', 'country')
-    op.drop_column('assets', 'institution')
-    
-    # Revert column type changes
-    op.alter_column('assets', 'currency', type_=sa.String(3))
-    op.alter_column('assets', 'symbol', type_=sa.String(20))
+    # NOTE: Asset columns are now dropped in the initial migration (001)

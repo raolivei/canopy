@@ -1,16 +1,34 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Head from "next/head";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import DarkModeToggle from "../components/DarkModeToggle";
+import CurrencySelector from "../components/CurrencySelector";
 import PortfolioHoldingsTable from "../components/PortfolioHoldingsTable";
 import AddAssetModal from "../components/AddAssetModal";
 import AllocationChart from "../components/AllocationChart";
 import DividendHistory from "../components/DividendHistory";
 import PerformanceChart from "../components/PerformanceChart";
-import { TrendingUp, TrendingDown, DollarSign, PieChart, Plus, RefreshCw, Loader2 } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  PieChart,
+  Plus,
+  RefreshCw,
+  Loader2,
+  Filter,
+} from "lucide-react";
+import { convertCurrency } from "../utils/currency";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+// Exchange rates (approximate - should come from API in production)
+const EXCHANGE_RATES: Record<string, Record<string, number>> = {
+  USD: { USD: 1, CAD: 1.35, BRL: 5.0, BTC: 0.000016, ETH: 0.00035 },
+  CAD: { USD: 0.74, CAD: 1, BRL: 3.7, BTC: 0.000012, ETH: 0.00026 },
+  BRL: { USD: 0.2, CAD: 0.27, BRL: 1, BTC: 0.0000032, ETH: 0.00007 },
+};
 
 interface PortfolioSummary {
   total_value: number | null;
@@ -36,8 +54,19 @@ interface Performance {
   period_return_pct: number | null;
 }
 
-function formatCurrency(value: number | null, currency: string = "USD"): string {
+function formatCurrencyValue(
+  value: number | null,
+  currency: string = "USD",
+): string {
   if (value === null) return "—";
+  // Handle non-standard currencies
+  if (currency === "BTC" || currency === "ETH") {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(value);
+  }
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -47,23 +76,53 @@ function formatCurrency(value: number | null, currency: string = "USD"): string 
 
 function formatPercent(value: number | null): string {
   if (value === null) return "—";
-  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+  const num = Number(value);
+  return `${num >= 0 ? "+" : ""}${num.toFixed(2)}%`;
 }
 
 export default function Portfolio() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [performancePeriod, setPerformancePeriod] = useState("30d");
+  const [displayCurrency, setDisplayCurrency] = useState("CAD");
+  const [currencyFilter, setCurrencyFilter] = useState<string | null>(null);
+  const [showCurrencyFilter, setShowCurrencyFilter] = useState(false);
   const queryClient = useQueryClient();
 
+  // Convert value from one currency to display currency
+  const convertToDisplay = (
+    value: number | string | null,
+    fromCurrency: string,
+  ): number => {
+    if (value === null) return 0;
+    const numValue = Number(value);
+    if (fromCurrency === displayCurrency) return numValue;
+
+    // Handle crypto
+    if (fromCurrency === "BTC") {
+      // BTC to USD then to display
+      const btcToUsd = numValue * 62000; // Approximate BTC price
+      return convertToDisplay(btcToUsd, "USD");
+    }
+    if (fromCurrency === "ETH") {
+      const ethToUsd = numValue * 2400; // Approximate ETH price
+      return convertToDisplay(ethToUsd, "USD");
+    }
+
+    const rates = EXCHANGE_RATES[fromCurrency];
+    if (!rates) return numValue;
+    return numValue * (rates[displayCurrency] || 1);
+  };
+
   // Fetch portfolio summary
-  const { data: summary, isLoading: summaryLoading } = useQuery<PortfolioSummary>({
-    queryKey: ["portfolio-summary"],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/v1/portfolio/summary`);
-      if (!res.ok) throw new Error("Failed to fetch portfolio summary");
-      return res.json();
-    },
-  });
+  const { data: summary, isLoading: summaryLoading } =
+    useQuery<PortfolioSummary>({
+      queryKey: ["portfolio-summary"],
+      queryFn: async () => {
+        const res = await fetch(`${API_URL}/v1/portfolio/summary`);
+        if (!res.ok) throw new Error("Failed to fetch portfolio summary");
+        return res.json();
+      },
+    });
 
   // Fetch allocation
   const { data: allocation } = useQuery<Allocation>({
@@ -89,7 +148,9 @@ export default function Portfolio() {
   const { data: performance } = useQuery<Performance>({
     queryKey: ["portfolio-performance", performancePeriod],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/v1/portfolio/performance?period=${performancePeriod}`);
+      const res = await fetch(
+        `${API_URL}/v1/portfolio/performance?period=${performancePeriod}`,
+      );
       if (!res.ok) throw new Error("Failed to fetch performance");
       return res.json();
     },
@@ -98,7 +159,9 @@ export default function Portfolio() {
   // Refresh prices mutation
   const refreshPrices = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${API_URL}/v1/portfolio/prices/refresh`, { method: "POST" });
+      const res = await fetch(`${API_URL}/v1/portfolio/prices/refresh`, {
+        method: "POST",
+      });
       if (!res.ok) throw new Error("Failed to refresh prices");
       return res.json();
     },
@@ -112,7 +175,9 @@ export default function Portfolio() {
   // Create snapshot mutation
   const createSnapshot = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${API_URL}/v1/portfolio/snapshots/create`, { method: "POST" });
+      const res = await fetch(`${API_URL}/v1/portfolio/snapshots/create`, {
+        method: "POST",
+      });
       if (!res.ok) throw new Error("Failed to create snapshot");
       return res.json();
     },
@@ -135,14 +200,14 @@ export default function Portfolio() {
           currency: data.currency,
         }),
       });
-      
+
       if (!assetRes.ok) {
         const err = await assetRes.json();
         throw new Error(err.detail || "Failed to create asset");
       }
-      
+
       const asset = await assetRes.json();
-      
+
       // Then create the lot
       const lotRes = await fetch(`${API_URL}/v1/portfolio/lots`, {
         method: "POST",
@@ -156,9 +221,9 @@ export default function Portfolio() {
           account: data.account,
         }),
       });
-      
+
       if (!lotRes.ok) throw new Error("Failed to create lot");
-      
+
       return asset;
     },
     onSuccess: () => {
@@ -168,8 +233,42 @@ export default function Portfolio() {
     },
   });
 
-  const isPositive = summary?.total_gain_loss !== null && (summary?.total_gain_loss ?? 0) > 0;
-  const isNegative = summary?.total_gain_loss !== null && (summary?.total_gain_loss ?? 0) < 0;
+  // Filter and convert holdings
+  const processedHoldings = useMemo(() => {
+    if (!summary?.holdings) return [];
+
+    let holdings = summary.holdings;
+
+    // Apply currency filter
+    if (currencyFilter) {
+      holdings = holdings.filter((h: any) => h.currency === currencyFilter);
+    }
+
+    // Convert values to display currency
+    return holdings.map((h: any) => ({
+      ...h,
+      market_value_converted: convertToDisplay(h.market_value, h.currency),
+      cost_basis_converted: convertToDisplay(h.cost_basis, h.currency),
+    }));
+  }, [summary?.holdings, currencyFilter, displayCurrency]);
+
+  // Calculate totals in display currency
+  const totalValue = useMemo(() => {
+    return processedHoldings.reduce(
+      (sum: number, h: any) => sum + (h.market_value_converted || 0),
+      0,
+    );
+  }, [processedHoldings]);
+
+  // Get unique currencies from holdings
+  const availableCurrencies = useMemo(() => {
+    if (!summary?.holdings) return [];
+    const currencies = new Set(summary.holdings.map((h: any) => h.currency));
+    return Array.from(currencies).sort();
+  }, [summary?.holdings]);
+
+  const isPositive = totalValue > 0;
+  const isNegative = totalValue < 0;
 
   return (
     <>
@@ -191,6 +290,67 @@ export default function Portfolio() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
+                {/* Currency Filter */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowCurrencyFilter(!showCurrencyFilter)}
+                    className={`flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                      currencyFilter
+                        ? "border-primary-500"
+                        : "border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    <Filter className="w-4 h-4" />
+                    {currencyFilter || "All"}
+                  </button>
+                  {showCurrencyFilter && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowCurrencyFilter(false)}
+                      />
+                      <div className="absolute right-0 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 min-w-[120px]">
+                        <button
+                          onClick={() => {
+                            setCurrencyFilter(null);
+                            setShowCurrencyFilter(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-xl ${
+                            !currencyFilter
+                              ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
+                              : ""
+                          }`}
+                        >
+                          All Currencies
+                        </button>
+                        {availableCurrencies.map((currency) => (
+                          <button
+                            key={currency}
+                            onClick={() => {
+                              setCurrencyFilter(currency);
+                              setShowCurrencyFilter(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 last:rounded-b-xl ${
+                              currencyFilter === currency
+                                ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
+                                : ""
+                            }`}
+                          >
+                            {currency}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Display Currency */}
+                <CurrencySelector
+                  selectedCurrency={displayCurrency}
+                  onCurrencyChange={setDisplayCurrency}
+                  showLabel={false}
+                />
+
                 <button
                   onClick={() => createSnapshot.mutate()}
                   disabled={createSnapshot.isPending}
@@ -214,14 +374,14 @@ export default function Portfolio() {
                   ) : (
                     <RefreshCw className="w-4 h-4" />
                   )}
-                  Refresh Prices
+                  Refresh
                 </button>
                 <button
                   onClick={() => setIsAddModalOpen(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Asset
+                  Add
                 </button>
                 <DarkModeToggle />
               </div>
@@ -234,9 +394,16 @@ export default function Portfolio() {
                   <div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Total Portfolio Value
+                      {currencyFilter && (
+                        <span className="ml-1 text-primary-500">
+                          ({currencyFilter})
+                        </span>
+                      )}
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                      {summaryLoading ? "..." : formatCurrency(summary?.total_value ?? null)}
+                      {summaryLoading
+                        ? "..."
+                        : formatCurrencyValue(totalValue, displayCurrency)}
                     </p>
                   </div>
                   <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl">
@@ -251,33 +418,13 @@ export default function Portfolio() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Total Gain/Loss
                     </p>
-                    <p className={`text-2xl font-bold mt-2 ${
-                      isPositive ? "text-green-600 dark:text-green-400" :
-                      isNegative ? "text-red-600 dark:text-red-400" :
-                      "text-gray-900 dark:text-white"
-                    }`}>
-                      {summaryLoading ? "..." : formatCurrency(summary?.total_gain_loss ?? null)}
+                    <p className="text-2xl font-bold mt-2 text-gray-500">
+                      {summaryLoading ? "..." : "—"}
                     </p>
-                    <p className={`text-sm ${
-                      isPositive ? "text-green-600 dark:text-green-400" :
-                      isNegative ? "text-red-600 dark:text-red-400" :
-                      "text-gray-500"
-                    }`}>
-                      {formatPercent(summary?.total_return_pct ?? null)}
-                    </p>
+                    <p className="text-sm text-gray-500">(no cost basis)</p>
                   </div>
-                  <div className={`p-3 rounded-xl ${
-                    isPositive ? "bg-green-100 dark:bg-green-900/30" :
-                    isNegative ? "bg-red-100 dark:bg-red-900/30" :
-                    "bg-gray-100 dark:bg-gray-800"
-                  }`}>
-                    {isPositive ? (
-                      <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
-                    ) : isNegative ? (
-                      <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
-                    ) : (
-                      <TrendingUp className="w-6 h-6 text-gray-400" />
-                    )}
+                  <div className="p-3 rounded-xl bg-gray-100 dark:bg-gray-800">
+                    <TrendingUp className="w-6 h-6 text-gray-400" />
                   </div>
                 </div>
               </div>
@@ -289,7 +436,12 @@ export default function Portfolio() {
                       Total Dividends
                     </p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">
-                      {summaryLoading ? "..." : formatCurrency(summary?.total_dividends ?? 0)}
+                      {summaryLoading
+                        ? "..."
+                        : formatCurrencyValue(
+                            Number(summary?.total_dividends ?? 0),
+                            displayCurrency,
+                          )}
                     </p>
                   </div>
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
@@ -305,10 +457,12 @@ export default function Portfolio() {
                       Holdings
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                      {summaryLoading ? "..." : summary?.holdings_count ?? 0}
+                      {summaryLoading ? "..." : processedHoldings.length}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      assets tracked
+                      {currencyFilter
+                        ? `${currencyFilter} assets`
+                        : "assets tracked"}
                     </p>
                   </div>
                   <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
@@ -325,11 +479,18 @@ export default function Portfolio() {
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                     Holdings
+                    {currencyFilter && (
+                      <span className="ml-2 text-sm font-normal text-primary-500">
+                        ({currencyFilter} only)
+                      </span>
+                    )}
                   </h2>
                 </div>
                 <PortfolioHoldingsTable
-                  holdings={summary?.holdings || []}
+                  holdings={processedHoldings}
                   onSelect={(holding) => console.log("Selected:", holding)}
+                  currency={displayCurrency}
+                  convertToDisplay={convertToDisplay}
                 />
               </div>
 
@@ -337,7 +498,8 @@ export default function Portfolio() {
               <div>
                 <AllocationChart
                   data={allocation?.by_asset_type || []}
-                  totalValue={allocation?.total_value || 0}
+                  totalValue={totalValue}
+                  currency={displayCurrency}
                 />
               </div>
             </div>

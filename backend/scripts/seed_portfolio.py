@@ -33,11 +33,7 @@ from backend.db.models import (
     RealEstateProperty,
     RealEstatePaymentSeries,
     RealEstatePayment,
-    PaymentStatus,
-    PaymentFrequency,
     Liability,
-    LiabilityType,
-    LiabilityStatus,
     LiabilityBalanceHistory,
 )
 
@@ -315,7 +311,7 @@ LIABILITIES = [
     {
         "name": "RBC Car Loan",
         "institution": "RBC",
-        "liability_type": LiabilityType.CAR_LOAN,
+        "liability_type": "car_loan",
         "currency": "CAD",
         "country": "CA",
         "current_balance": Decimal("28521.00"),
@@ -327,7 +323,7 @@ LIABILITIES = [
         "name": "RBC VISA 7192",
         "institution": "RBC",
         "account_number_last4": "7192",
-        "liability_type": LiabilityType.CREDIT_CARD,
+        "liability_type": "credit_card",
         "currency": "CAD",
         "country": "CA",
         "current_balance": Decimal("27016.00"),
@@ -337,7 +333,7 @@ LIABILITIES = [
     {
         "name": "Amazon.ca MBNA Mastercard",
         "institution": "MBNA",
-        "liability_type": LiabilityType.CREDIT_CARD,
+        "liability_type": "credit_card",
         "currency": "CAD",
         "country": "CA",
         "current_balance": Decimal("6868.00"),
@@ -346,7 +342,7 @@ LIABILITIES = [
     {
         "name": "RBC WestJet Mastercard",
         "institution": "RBC",
-        "liability_type": LiabilityType.CREDIT_CARD,
+        "liability_type": "credit_card",
         "currency": "CAD",
         "country": "CA",
         "current_balance": Decimal("908.00"),
@@ -357,7 +353,7 @@ LIABILITIES = [
     {
         "name": "Wealthsimple Credit Card",
         "institution": "Wealthsimple",
-        "liability_type": LiabilityType.CREDIT_CARD,
+        "liability_type": "credit_card",
         "currency": "CAD",
         "country": "CA",
         "current_balance": Decimal("951.00"),
@@ -366,7 +362,7 @@ LIABILITIES = [
     {
         "name": "Scotiabank Momentum VISA Infinite",
         "institution": "Scotiabank",
-        "liability_type": LiabilityType.CREDIT_CARD,
+        "liability_type": "credit_card",
         "currency": "CAD",
         "country": "CA",
         "current_balance": Decimal("0.00"),  # Has positive balance (rewards)
@@ -376,7 +372,7 @@ LIABILITIES = [
     {
         "name": "AMEX Cobalt",
         "institution": "American Express",
-        "liability_type": LiabilityType.CREDIT_CARD,
+        "liability_type": "credit_card",
         "currency": "CAD",
         "country": "CA",
         "current_balance": Decimal("0.00"),  # Has positive balance (rewards)
@@ -519,67 +515,67 @@ APARTMENT_DATA = {
     "payment_series": [
         {
             "name": "ATO",
-            "frequency": PaymentFrequency.ONE_TIME,
+            "frequency": "one_time",
             "total_installments": 1,
             "nominal_amount": Decimal("40000.00"),
             "start_date": date(2024, 2, 20),
-            "status": PaymentStatus.PAID,
+            "status": "paid",
         },
         {
             "name": "SINAL",
-            "frequency": PaymentFrequency.ONE_TIME,
+            "frequency": "one_time",
             "total_installments": 2,
             "nominal_amount": Decimal("20000.00"),
             "start_date": date(2024, 3, 20),
-            "status": PaymentStatus.PAID,
+            "status": "paid",
         },
         {
             "name": "MENSAIS 2024",
-            "frequency": PaymentFrequency.MONTHLY,
+            "frequency": "monthly",
             "total_installments": 7,
             "nominal_amount": Decimal("14000.00"),
             "start_date": date(2024, 6, 20),
-            "status": PaymentStatus.PAID,
+            "status": "paid",
         },
         {
             "name": "MENSAIS 2025",
-            "frequency": PaymentFrequency.MONTHLY,
+            "frequency": "monthly",
             "total_installments": 12,
             "nominal_amount": Decimal("24000.00"),
             "start_date": date(2025, 1, 20),
-            "status": PaymentStatus.ONGOING,
+            "status": "ongoing",
         },
         {
             "name": "MENSAIS 2026",
-            "frequency": PaymentFrequency.MONTHLY,
+            "frequency": "monthly",
             "total_installments": 10,
             "nominal_amount": Decimal("20000.00"),
             "start_date": date(2026, 1, 20),
-            "status": PaymentStatus.NOT_STARTED,
+            "status": "not_started",
         },
         {
             "name": "SEMESTRAIS",
-            "frequency": PaymentFrequency.SEMI_ANNUAL,
+            "frequency": "semi_annual",
             "total_installments": 4,
             "nominal_amount": Decimal("50000.00"),
             "start_date": date(2024, 7, 20),
-            "status": PaymentStatus.ONGOING,
+            "status": "ongoing",
         },
         {
             "name": "UNICA SET/2026",
-            "frequency": PaymentFrequency.ONE_TIME,
+            "frequency": "one_time",
             "total_installments": 1,
             "nominal_amount": Decimal("42000.00"),
             "start_date": date(2026, 9, 20),
-            "status": PaymentStatus.NOT_STARTED,
+            "status": "not_started",
         },
         {
             "name": "UNICA ABR/2027",
-            "frequency": PaymentFrequency.ONE_TIME,
+            "frequency": "one_time",
             "total_installments": 1,
             "nominal_amount": Decimal("417.00"),
             "start_date": date(2027, 4, 20),
-            "status": PaymentStatus.NOT_STARTED,
+            "status": "not_started",
         },
     ],
 }
@@ -690,7 +686,7 @@ def create_real_estate(db: Session) -> RealEstateProperty:
             status=series_data["status"],
         )
         db.add(series)
-        print(f"    {series_data['name']}: {series_data['total_installments']}x BRL {series_data['nominal_amount']:,.2f} ({series_data['status'].value})")
+        print(f"    {series_data['name']}: {series_data['total_installments']}x BRL {series_data['nominal_amount']:,.2f} ({series_data['status']})")
     
     db.flush()
     print()
@@ -723,6 +719,7 @@ def create_historical_snapshots(db: Session, assets: dict[str, Asset]) -> list[P
                     quantity=Decimal("1"),  # Simplified - actual quantity would vary
                     market_value=balance,
                     cost_basis=Decimal("0"),
+                    price_at_snapshot=balance,  # Price equals balance for quantity=1
                 )
                 db.add(holding)
                 

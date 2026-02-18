@@ -22,7 +22,11 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"  # Overridden by SECRET_KEY env var from Vault in production
     environment: str = "development"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  # Ignore extra env vars
+    )
 
 
 @lru_cache

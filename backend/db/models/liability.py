@@ -64,14 +64,14 @@ class Liability(Base):
         String(4), nullable=True
     )  # Last 4 digits for identification
     
-    # Type and status
-    liability_type: Mapped[LiabilityType] = mapped_column(
-        Enum(LiabilityType),
-        default=LiabilityType.CREDIT_CARD
+    # Type and status (stored as string to match migration)
+    liability_type: Mapped[str] = mapped_column(
+        String(50),
+        default="credit_card"
     )
-    status: Mapped[LiabilityStatus] = mapped_column(
-        Enum(LiabilityStatus),
-        default=LiabilityStatus.ACTIVE
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="active"
     )
     
     # Currency and country

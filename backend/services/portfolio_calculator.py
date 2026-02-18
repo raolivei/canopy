@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.db.models.asset import Asset
+from backend.db.models.asset import Asset, AssetType
 from backend.db.models.lot import Lot
 from backend.db.models.dividend import Dividend
 from backend.models.portfolio_schemas import (
@@ -15,6 +15,22 @@ from backend.models.portfolio_schemas import (
     PortfolioAllocation,
 )
 
+# Asset types where current_price represents the total balance (not a per-unit price)
+BALANCE_BASED_ASSET_TYPES = {
+    AssetType.BANK_ACCOUNT,
+    AssetType.BANK_CHECKING,
+    AssetType.BANK_SAVINGS,
+    AssetType.RETIREMENT_RRSP,
+    AssetType.RETIREMENT_TFSA,
+    AssetType.RETIREMENT_FHSA,
+    AssetType.RETIREMENT_DPSP,
+    AssetType.RETIREMENT_401K,
+    AssetType.RETIREMENT_IRA,
+    AssetType.RETIREMENT_ROTH_IRA,
+    AssetType.CROWDFUNDING,
+    AssetType.CASH,
+}
+
 
 class PortfolioCalculator:
     """Calculates portfolio metrics and summaries."""
@@ -23,7 +39,35 @@ class PortfolioCalculator:
         self.db = db
     
     def get_holding_summary(self, asset: Asset) -> HoldingSummary:
-        """Calculate summary metrics for a single holding."""
+        """Calculate summary metrics for a single holding.
+        
+        For balance-based assets (bank accounts, retirement accounts, etc.),
+        the current_price IS the total balance - no lots needed.
+        
+        For tradeable assets (stocks, ETFs), we calculate from lots.
+        """
+        # Check if this is a balance-based asset
+        is_balance_asset = asset.asset_type in BALANCE_BASED_ASSET_TYPES
+        
+        if is_balance_asset:
+            # For balance-based assets, current_price IS the total value
+            market_value = asset.current_price if asset.current_price else Decimal("0")
+            return HoldingSummary(
+                asset_id=asset.id,
+                symbol=asset.symbol,
+                name=asset.name,
+                asset_type=asset.asset_type,
+                total_shares=Decimal("1"),  # Treat as 1 unit
+                average_cost=Decimal("0"),  # No cost basis tracking for accounts
+                current_price=market_value,
+                cost_basis=Decimal("0"),
+                market_value=market_value,
+                unrealized_gain_loss=Decimal("0"),  # No gain/loss for bank accounts
+                return_pct=None,
+                allocation_pct=None,
+            )
+        
+        # For tradeable assets, calculate from lots
         lots = self.db.execute(
             select(Lot)
             .where(Lot.asset_id == asset.id)
@@ -32,6 +76,25 @@ class PortfolioCalculator:
         ).scalars().all()
         
         if not lots:
+            # No lots - check if we should use current_price as balance anyway
+            # (for assets like stocks where current_price might be set manually as total value)
+            if asset.current_price and asset.current_price > 0:
+                # Treat current_price as the total market value
+                return HoldingSummary(
+                    asset_id=asset.id,
+                    symbol=asset.symbol,
+                    name=asset.name,
+                    asset_type=asset.asset_type,
+                    total_shares=Decimal("1"),
+                    average_cost=Decimal("0"),
+                    current_price=asset.current_price,
+                    cost_basis=Decimal("0"),
+                    market_value=asset.current_price,
+                    unrealized_gain_loss=Decimal("0"),
+                    return_pct=None,
+                    allocation_pct=None,
+                )
+            
             return HoldingSummary(
                 asset_id=asset.id,
                 symbol=asset.symbol,
@@ -86,8 +149,13 @@ class PortfolioCalculator:
         has_prices = False
         
         for asset in assets:
+            # Skip liability assets in portfolio summary
+            if asset.is_liability:
+                continue
+                
             summary = self.get_holding_summary(asset)
-            if summary.total_shares > 0:
+            # Include if has shares OR has market value (for balance-based assets)
+            if summary.total_shares > 0 or (summary.market_value and summary.market_value > 0):
                 holdings.append(summary)
                 total_cost_basis += summary.cost_basis
                 if summary.market_value is not None:

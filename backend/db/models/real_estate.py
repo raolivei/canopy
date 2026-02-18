@@ -136,7 +136,7 @@ class RealEstateProperty(Base):
         return sum(
             (p.amount_paid or Decimal("0")) * self.ownership_percentage
             for p in self.payments
-            if p.status == PaymentStatus.PAID
+            if p.status == "paid"
         )
     
     @property
@@ -178,9 +178,9 @@ class RealEstatePaymentSeries(Base):
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
     # Payment details
-    frequency: Mapped[PaymentFrequency] = mapped_column(
-        Enum(PaymentFrequency),
-        default=PaymentFrequency.MONTHLY
+    frequency: Mapped[str] = mapped_column(
+        String(50),
+        default="monthly"
     )
     total_installments: Mapped[int] = mapped_column(default=1)
     nominal_amount_per_installment: Mapped[Decimal] = mapped_column(
@@ -192,9 +192,9 @@ class RealEstatePaymentSeries(Base):
     end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     
     # Status
-    status: Mapped[PaymentStatus] = mapped_column(
-        Enum(PaymentStatus),
-        default=PaymentStatus.NOT_STARTED
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="not_started"
     )
     
     # Timestamps
@@ -246,9 +246,9 @@ class RealEstatePayment(Base):
     
     # Payment info
     payment_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    status: Mapped[PaymentStatus] = mapped_column(
-        Enum(PaymentStatus),
-        default=PaymentStatus.NOT_STARTED
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="not_started"
     )
     
     # Split tracking (for 50/50 ownership)
