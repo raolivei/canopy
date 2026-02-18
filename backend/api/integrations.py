@@ -75,7 +75,13 @@ async def test_wise_connection(request: WiseConnectRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+        msg = str(e)
+        if "401" in msg or "Unauthorized" in msg:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired API token. Generate a new Personal Token in Wise Settings → API tokens.",
+            )
+        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}")
 
 
 @router.post("/wise/balances", response_model=list[WiseBalanceResponse])

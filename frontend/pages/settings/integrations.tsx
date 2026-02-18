@@ -399,6 +399,16 @@ function WiseCard({ integration }: { integration: Integration }) {
     if (token) {
       setConnected(true);
       setApiToken(token);
+      fetch(`${INTEGRATIONS_BASE}/wise/balances`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_token: token, sandbox: useSandbox }),
+      })
+        .then((r) => r.ok ? r.json() : [])
+        .then((balances) => {
+          if (Array.isArray(balances)) setAccountsLinked(balances.length);
+        })
+        .catch(() => {});
     }
     fetch(`${INTEGRATIONS_BASE}/wise/status`)
       .then((r) => r.json())

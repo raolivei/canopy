@@ -13,8 +13,7 @@ export const CURRENCIES: Currency[] = [
 ];
 
 export function formatCurrency(amount: number, currencyCode: string): string {
-  const currency =
-    CURRENCIES.find((c) => c.code === currencyCode) || CURRENCIES[0];
+  if (!Number.isFinite(amount)) amount = 0;
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -28,8 +27,7 @@ export function formatCurrencyCompact(
   amount: number,
   currencyCode: string,
 ): string {
-  const currency =
-    CURRENCIES.find((c) => c.code === currencyCode) || CURRENCIES[0];
+  if (!Number.isFinite(amount)) amount = 0;
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",

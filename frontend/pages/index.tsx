@@ -33,6 +33,8 @@ import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { formatCurrency, formatCurrencyCompact } from "@/utils/currency";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
+import { useRouter } from "next/router";
+import CurrencySelector from "@/components/CurrencySelector";
 import {
   CHART_COLORS,
   CHART_PALETTE,
@@ -65,38 +67,40 @@ interface PortfolioSummary {
 type TimeRange = "7d" | "30d" | "90d";
 
 export default function Dashboard() {
+  const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayCurrency, setDisplayCurrency] = useState("CAD");
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
 
-  useEffect(() => {
-    Promise.all([fetchTransactions(), fetchPortfolio()]).finally(() =>
-      setLoading(false)
-    );
-  }, []);
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async (currency: string) => {
     try {
-      const res = await fetch(`${API_URL}/v1/transactions/?currency=${displayCurrency}`);
+      const res = await fetch(`${API_URL}/v1/transactions/?currency=${currency}`);
       const data = await res.json();
       setTransactions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
       setTransactions([]);
     }
-  };
+  }, []);
 
-  const fetchPortfolio = async () => {
+  const fetchPortfolio = useCallback(async (currency: string) => {
     try {
-      const res = await fetch(`${API_URL}/v1/portfolio/summary?currency=${displayCurrency}`);
+      const res = await fetch(`${API_URL}/v1/portfolio/summary?currency=${currency}`);
       const data = await res.json();
       setPortfolio(data);
     } catch (err) {
       console.error("Failed to fetch portfolio:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchTransactions(displayCurrency), fetchPortfolio(displayCurrency)]).finally(() =>
+      setLoading(false)
+    );
+  }, [displayCurrency, fetchTransactions, fetchPortfolio]);
 
   const now = useMemo(() => new Date(), []);
   const currentMonthStart = useMemo(() => startOfMonth(now), [now]);
@@ -248,26 +252,33 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="flex gap-3">
-              <Button
-                variant="primary"
-                leftIcon={<Plus className="w-4 h-4" />}
-                onClick={() => window.location.href = "/transactions?action=add"}
-              >
-                Add Transaction
-              </Button>
-              <Button
-                variant="secondary"
-                leftIcon={<RefreshCw className="w-4 h-4" />}
-                onClick={() => {
-                  setLoading(true);
-                  Promise.all([fetchTransactions(), fetchPortfolio()]).finally(() =>
-                    setLoading(false)
-                  );
-                }}
-              >
-                Refresh
-              </Button>
+            <div className="flex flex-col items-end gap-3">
+              <CurrencySelector
+                selectedCurrency={displayCurrency}
+                onCurrencyChange={setDisplayCurrency}
+                showLabel={false}
+              />
+              <div className="flex gap-3">
+                <Button
+                  variant="primary"
+                  leftIcon={<Plus className="w-4 h-4" />}
+                  onClick={() => router.push("/transactions?action=add")}
+                >
+                  Add Transaction
+                </Button>
+                <Button
+                  variant="secondary"
+                  leftIcon={<RefreshCw className="w-4 h-4" />}
+                  onClick={() => {
+                    setLoading(true);
+                    Promise.all([fetchTransactions(displayCurrency), fetchPortfolio(displayCurrency)]).finally(() =>
+                      setLoading(false)
+                    );
+                  }}
+                >
+                  Refresh
+                </Button>
+              </div>
             </div>
           </div>
         </Card>
@@ -419,7 +430,11 @@ export default function Dashboard() {
                     const total = categoryData.reduce((s, c) => s + c.value, 0);
                     const pct = (cat.value / total) * 100;
                     return (
-                      <div key={cat.name} className="space-y-1">
+                      <button
+                        key={cat.name}
+                        className="w-full text-left space-y-1 rounded-lg px-2 py-1.5 -mx-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/transactions?category=${encodeURIComponent(cat.name)}`)}
+                      >
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2">
                             <div
@@ -440,7 +455,7 @@ export default function Dashboard() {
                             style={{ width: `${pct}%`, backgroundColor: COLORS[i] }}
                           />
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>

@@ -4,6 +4,7 @@ import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge, CurrencyBadge } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
 import { Select } from "@/components/ui/Select";
 import { SkeletonMetricCard, SkeletonTable } from "@/components/ui/Skeleton";
@@ -61,6 +62,7 @@ interface Performance {
 }
 
 export default function Portfolio() {
+  const { addToast } = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("holdings");
   const [performancePeriod, setPerformancePeriod] = useState("30d");
@@ -142,8 +144,17 @@ export default function Portfolio() {
       if (!res.ok) throw new Error("Failed to create snapshot");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["portfolio-performance"] });
+      addToast({
+        variant: data.status === "exists" ? "info" : "success",
+        title: data.status === "exists"
+          ? `Snapshot already exists for ${data.date}`
+          : `Portfolio snapshot created for ${data.date}`,
+      });
+    },
+    onError: (err: Error) => {
+      addToast({ variant: "danger", title: err.message || "Failed to create snapshot" });
     },
   });
 

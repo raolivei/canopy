@@ -173,13 +173,17 @@ export default function Insights() {
   const [showFIREDetails, setShowFIREDetails] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
-  const { data: insights, isLoading: insightsLoading } = useQuery<InsightsSummary>({
+  const { data: insights, isLoading: insightsLoading, error: insightsError } = useQuery<InsightsSummary>({
     queryKey: ["insights-summary", baseCurrency],
     queryFn: async () => {
       const res = await fetch(`${API_URL}/v1/insights/summary?base_currency=${baseCurrency}`);
-      if (!res.ok) throw new Error("Failed to fetch insights");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.detail || `Failed to fetch insights (${res.status})`);
+      }
       return res.json();
     },
+    retry: 1,
   });
 
   const { data: fire, isLoading: fireLoading } = useQuery<FIRESummary>({
@@ -241,9 +245,20 @@ export default function Insights() {
         <PageHeader title="Insights" description="Financial overview, projections, and FIRE planning" />
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-slate-500 dark:text-slate-400">
-              No data available. Please add some transactions or portfolio holdings first.
-            </p>
+            {insightsError ? (
+              <>
+                <p className="text-danger-600 dark:text-danger-400 font-medium mb-2">
+                  Failed to load insights
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {(insightsError as Error).message}
+                </p>
+              </>
+            ) : (
+              <p className="text-slate-500 dark:text-slate-400">
+                No data available. Please add some transactions or portfolio holdings first.
+              </p>
+            )}
           </CardContent>
         </Card>
       </PageLayout>

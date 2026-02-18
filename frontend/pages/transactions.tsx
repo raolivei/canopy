@@ -86,6 +86,10 @@ export default function Transactions() {
       setIsAddModalOpen(true);
       router.replace("/transactions", undefined, { shallow: true });
     }
+    if (router.query.category && typeof router.query.category === "string") {
+      setCategoryFilter([router.query.category]);
+      setShowFilters(true);
+    }
   }, [router.query]);
 
   const fetchTransactions = async () => {
