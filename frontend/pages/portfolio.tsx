@@ -1,14 +1,17 @@
 import React, { useState, useMemo } from "react";
-import Head from "next/head";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Sidebar from "../components/Sidebar";
-import DarkModeToggle from "../components/DarkModeToggle";
-import CurrencySelector from "../components/CurrencySelector";
-import PortfolioHoldingsTable from "../components/PortfolioHoldingsTable";
-import AddAssetModal from "../components/AddAssetModal";
-import AllocationChart from "../components/AllocationChart";
-import DividendHistory from "../components/DividendHistory";
-import PerformanceChart from "../components/PerformanceChart";
+import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge, CurrencyBadge } from "@/components/ui/Badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
+import { Select } from "@/components/ui/Select";
+import { SkeletonMetricCard, SkeletonTable } from "@/components/ui/Skeleton";
+import PortfolioHoldingsTable from "@/components/PortfolioHoldingsTable";
+import AddAssetModal from "@/components/AddAssetModal";
+import AllocationChart from "@/components/AllocationChart";
+import DividendHistory from "@/components/DividendHistory";
+import PerformanceChart from "@/components/PerformanceChart";
 import {
   TrendingUp,
   TrendingDown,
@@ -17,13 +20,16 @@ import {
   Plus,
   RefreshCw,
   Loader2,
-  Filter,
+  BarChart3,
+  Briefcase,
+  Calendar,
 } from "lucide-react";
-import { convertCurrency } from "../utils/currency";
+import { formatCurrency } from "@/utils/currency";
+import { cn } from "@/utils/cn";
+import { motion } from "framer-motion";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-// Exchange rates (approximate - should come from API in production)
 const EXCHANGE_RATES: Record<string, Record<string, number>> = {
   USD: { USD: 1, CAD: 1.35, BRL: 5.0, BTC: 0.000016, ETH: 0.00035 },
   CAD: { USD: 0.74, CAD: 1, BRL: 3.7, BTC: 0.000012, ETH: 0.00026 },
@@ -54,57 +60,25 @@ interface Performance {
   period_return_pct: number | null;
 }
 
-function formatCurrencyValue(
-  value: number | null,
-  currency: string = "USD",
-): string {
-  if (value === null) return "—";
-  // Handle non-standard currencies
-  if (currency === "BTC" || currency === "ETH") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-    }).format(value);
-  }
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatPercent(value: number | null): string {
-  if (value === null) return "—";
-  const num = Number(value);
-  return `${num >= 0 ? "+" : ""}${num.toFixed(2)}%`;
-}
-
 export default function Portfolio() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("holdings");
   const [performancePeriod, setPerformancePeriod] = useState("30d");
   const [displayCurrency, setDisplayCurrency] = useState("CAD");
-  const [currencyFilter, setCurrencyFilter] = useState<string | null>(null);
-  const [showCurrencyFilter, setShowCurrencyFilter] = useState(false);
+  const [currencyFilter, setCurrencyFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
-  // Convert value from one currency to display currency
-  const convertToDisplay = (
-    value: number | string | null,
-    fromCurrency: string,
-  ): number => {
+  const convertToDisplay = (value: number | string | null, fromCurrency: string): number => {
     if (value === null) return 0;
     const numValue = Number(value);
     if (fromCurrency === displayCurrency) return numValue;
 
-    // Handle crypto
     if (fromCurrency === "BTC") {
-      // BTC to USD then to display
-      const btcToUsd = numValue * 62000; // Approximate BTC price
+      const btcToUsd = numValue * 62000;
       return convertToDisplay(btcToUsd, "USD");
     }
     if (fromCurrency === "ETH") {
-      const ethToUsd = numValue * 2400; // Approximate ETH price
+      const ethToUsd = numValue * 2400;
       return convertToDisplay(ethToUsd, "USD");
     }
 
@@ -113,18 +87,15 @@ export default function Portfolio() {
     return numValue * (rates[displayCurrency] || 1);
   };
 
-  // Fetch portfolio summary
-  const { data: summary, isLoading: summaryLoading } =
-    useQuery<PortfolioSummary>({
-      queryKey: ["portfolio-summary"],
-      queryFn: async () => {
-        const res = await fetch(`${API_URL}/v1/portfolio/summary`);
-        if (!res.ok) throw new Error("Failed to fetch portfolio summary");
-        return res.json();
-      },
-    });
+  const { data: summary, isLoading: summaryLoading } = useQuery<PortfolioSummary>({
+    queryKey: ["portfolio-summary"],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/v1/portfolio/summary`);
+      if (!res.ok) throw new Error("Failed to fetch portfolio summary");
+      return res.json();
+    },
+  });
 
-  // Fetch allocation
   const { data: allocation } = useQuery<Allocation>({
     queryKey: ["portfolio-allocation"],
     queryFn: async () => {
@@ -134,7 +105,6 @@ export default function Portfolio() {
     },
   });
 
-  // Fetch dividends
   const { data: dividends } = useQuery<any[]>({
     queryKey: ["portfolio-dividends"],
     queryFn: async () => {
@@ -144,24 +114,18 @@ export default function Portfolio() {
     },
   });
 
-  // Fetch performance data
   const { data: performance } = useQuery<Performance>({
     queryKey: ["portfolio-performance", performancePeriod],
     queryFn: async () => {
-      const res = await fetch(
-        `${API_URL}/v1/portfolio/performance?period=${performancePeriod}`,
-      );
+      const res = await fetch(`${API_URL}/v1/portfolio/performance?period=${performancePeriod}`);
       if (!res.ok) throw new Error("Failed to fetch performance");
       return res.json();
     },
   });
 
-  // Refresh prices mutation
   const refreshPrices = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${API_URL}/v1/portfolio/prices/refresh`, {
-        method: "POST",
-      });
+      const res = await fetch(`${API_URL}/v1/portfolio/prices/refresh`, { method: "POST" });
       if (!res.ok) throw new Error("Failed to refresh prices");
       return res.json();
     },
@@ -172,12 +136,9 @@ export default function Portfolio() {
     },
   });
 
-  // Create snapshot mutation
   const createSnapshot = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${API_URL}/v1/portfolio/snapshots/create`, {
-        method: "POST",
-      });
+      const res = await fetch(`${API_URL}/v1/portfolio/snapshots/create`, { method: "POST" });
       if (!res.ok) throw new Error("Failed to create snapshot");
       return res.json();
     },
@@ -186,10 +147,8 @@ export default function Portfolio() {
     },
   });
 
-  // Add asset mutation
   const addAsset = useMutation({
     mutationFn: async (data: any) => {
-      // First create the asset
       const assetRes = await fetch(`${API_URL}/v1/portfolio/assets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -208,7 +167,6 @@ export default function Portfolio() {
 
       const asset = await assetRes.json();
 
-      // Then create the lot
       const lotRes = await fetch(`${API_URL}/v1/portfolio/lots`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -223,7 +181,6 @@ export default function Portfolio() {
       });
 
       if (!lotRes.ok) throw new Error("Failed to create lot");
-
       return asset;
     },
     onSuccess: () => {
@@ -233,18 +190,14 @@ export default function Portfolio() {
     },
   });
 
-  // Filter and convert holdings
   const processedHoldings = useMemo(() => {
     if (!summary?.holdings) return [];
 
     let holdings = summary.holdings;
-
-    // Apply currency filter
-    if (currencyFilter) {
+    if (currencyFilter && currencyFilter !== "all") {
       holdings = holdings.filter((h: any) => h.currency === currencyFilter);
     }
 
-    // Convert values to display currency
     return holdings.map((h: any) => ({
       ...h,
       market_value_converted: convertToDisplay(h.market_value, h.currency),
@@ -252,277 +205,296 @@ export default function Portfolio() {
     }));
   }, [summary?.holdings, currencyFilter, displayCurrency]);
 
-  // Calculate totals in display currency
   const totalValue = useMemo(() => {
-    return processedHoldings.reduce(
-      (sum: number, h: any) => sum + (h.market_value_converted || 0),
-      0,
-    );
+    return processedHoldings.reduce((sum: number, h: any) => sum + (h.market_value_converted || 0), 0);
   }, [processedHoldings]);
 
-  // Get unique currencies from holdings
   const availableCurrencies = useMemo(() => {
     if (!summary?.holdings) return [];
     const currencies = new Set(summary.holdings.map((h: any) => h.currency));
     return Array.from(currencies).sort();
   }, [summary?.holdings]);
 
-  const isPositive = totalValue > 0;
-  const isNegative = totalValue < 0;
+  const currencyOptions = [
+    { value: "all", label: "All Currencies" },
+    ...availableCurrencies.map((c) => ({ value: c, label: c })),
+  ];
+
+  const displayCurrencyOptions = [
+    { value: "CAD", label: "CAD" },
+    { value: "USD", label: "USD" },
+    { value: "BRL", label: "BRL" },
+  ];
+
+  if (summaryLoading) {
+    return (
+      <PageLayout title="Portfolio">
+        <PageHeader title="Portfolio" description="Track your investments and assets" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonMetricCard key={i} />
+          ))}
+        </div>
+        <SkeletonTable rows={8} columns={5} />
+      </PageLayout>
+    );
+  }
 
   return (
-    <>
-      <Head>
-        <title>Portfolio - Canopy</title>
-      </Head>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-        <Sidebar />
-        <div className="ml-64 flex-1 p-8">
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Portfolio
-                </h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">
-                  Track your investments and assets
-                </p>
-              </div>
+    <PageLayout title="Portfolio" description="Track your investments and assets">
+      {/* Portfolio Value Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="mb-8"
+      >
+        <Card variant="highlight" className="p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <p className="text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">
+                Total Portfolio Value
+                {currencyFilter !== "all" && (
+                  <CurrencyBadge currency={currencyFilter} className="ml-2" />
+                )}
+              </p>
+              <h1 className="text-4xl lg:text-5xl font-semibold tracking-tight text-slate-900 dark:text-white mb-2">
+                {formatCurrency(totalValue, displayCurrency)}
+              </h1>
               <div className="flex items-center gap-3">
-                {/* Currency Filter */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowCurrencyFilter(!showCurrencyFilter)}
-                    className={`flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                      currencyFilter
-                        ? "border-primary-500"
-                        : "border-gray-200 dark:border-gray-700"
-                    }`}
-                  >
-                    <Filter className="w-4 h-4" />
-                    {currencyFilter || "All"}
-                  </button>
-                  {showCurrencyFilter && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowCurrencyFilter(false)}
-                      />
-                      <div className="absolute right-0 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 min-w-[120px]">
-                        <button
-                          onClick={() => {
-                            setCurrencyFilter(null);
-                            setShowCurrencyFilter(false);
-                          }}
-                          className={`w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-xl ${
-                            !currencyFilter
-                              ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
-                              : ""
-                          }`}
-                        >
-                          All Currencies
-                        </button>
-                        {availableCurrencies.map((currency) => (
-                          <button
-                            key={currency}
-                            onClick={() => {
-                              setCurrencyFilter(currency);
-                              setShowCurrencyFilter(false);
-                            }}
-                            className={`w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 last:rounded-b-xl ${
-                              currencyFilter === currency
-                                ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
-                                : ""
-                            }`}
-                          >
-                            {currency}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Display Currency */}
-                <CurrencySelector
-                  selectedCurrency={displayCurrency}
-                  onCurrencyChange={setDisplayCurrency}
-                  showLabel={false}
-                />
-
-                <button
-                  onClick={() => createSnapshot.mutate()}
-                  disabled={createSnapshot.isPending}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                  title="Create a snapshot of current portfolio value"
-                >
-                  {createSnapshot.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                <Badge variant={summary?.total_return_pct && summary.total_return_pct >= 0 ? "success" : "danger"}>
+                  {summary?.total_return_pct && summary.total_return_pct >= 0 ? (
+                    <TrendingUp className="w-3 h-3 mr-1" />
                   ) : (
-                    <PieChart className="w-4 h-4" />
+                    <TrendingDown className="w-3 h-3 mr-1" />
                   )}
-                  Snapshot
-                </button>
-                <button
-                  onClick={() => refreshPrices.mutate()}
-                  disabled={refreshPrices.isPending}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  {refreshPrices.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4" />
-                  )}
-                  Refresh
-                </button>
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add
-                </button>
-                <DarkModeToggle />
+                  {summary?.total_return_pct?.toFixed(2) || 0}% all time
+                </Badge>
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  {processedHoldings.length} holdings
+                </span>
               </div>
             </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Total Portfolio Value
-                      {currencyFilter && (
-                        <span className="ml-1 text-primary-500">
-                          ({currencyFilter})
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                      {summaryLoading
-                        ? "..."
-                        : formatCurrencyValue(totalValue, displayCurrency)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl">
-                    <TrendingUp className="w-6 h-6 text-primary-600 dark:text-primary-400" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Total Gain/Loss
-                    </p>
-                    <p className="text-2xl font-bold mt-2 text-gray-500">
-                      {summaryLoading ? "..." : "—"}
-                    </p>
-                    <p className="text-sm text-gray-500">(no cost basis)</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-gray-100 dark:bg-gray-800">
-                    <TrendingUp className="w-6 h-6 text-gray-400" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Total Dividends
-                    </p>
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">
-                      {summaryLoading
-                        ? "..."
-                        : formatCurrencyValue(
-                            Number(summary?.total_dividends ?? 0),
-                            displayCurrency,
-                          )}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                    <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Holdings
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                      {summaryLoading ? "..." : processedHoldings.length}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {currencyFilter
-                        ? `${currencyFilter} assets`
-                        : "assets tracked"}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
-                    <PieChart className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-3">
+              <Select
+                options={currencyOptions}
+                value={currencyFilter}
+                onChange={setCurrencyFilter}
+                className="w-36"
+              />
+              <Select
+                options={displayCurrencyOptions}
+                value={displayCurrency}
+                onChange={setDisplayCurrency}
+                className="w-24"
+              />
+              <Button
+                variant="secondary"
+                leftIcon={createSnapshot.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <PieChart className="w-4 h-4" />}
+                onClick={() => createSnapshot.mutate()}
+                disabled={createSnapshot.isPending}
+              >
+                Snapshot
+              </Button>
+              <Button
+                variant="secondary"
+                leftIcon={refreshPrices.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                onClick={() => refreshPrices.mutate()}
+                disabled={refreshPrices.isPending}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="primary"
+                leftIcon={<Plus className="w-4 h-4" />}
+                onClick={() => setIsAddModalOpen(true)}
+              >
+                Add Asset
+              </Button>
             </div>
+          </div>
+        </Card>
+      </motion.div>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              {/* Holdings Table - spans 2 columns */}
-              <div className="lg:col-span-2">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    Holdings
-                    {currencyFilter && (
-                      <span className="ml-2 text-sm font-normal text-primary-500">
-                        ({currencyFilter} only)
-                      </span>
-                    )}
-                  </h2>
-                </div>
+      {/* Stats Row */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+      >
+        <MetricCard
+          title="Total Value"
+          value={formatCurrency(totalValue, displayCurrency)}
+          icon={<Briefcase className="w-5 h-5" />}
+          iconBg="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400"
+        />
+        <MetricCard
+          title="Total Gain/Loss"
+          value={summary?.total_gain_loss !== null ? formatCurrency(summary?.total_gain_loss || 0, displayCurrency) : "—"}
+          subtitle={summary?.total_gain_loss !== null ? undefined : "No cost basis data"}
+          icon={<TrendingUp className="w-5 h-5" />}
+          iconBg={cn(
+            summary?.total_gain_loss && summary.total_gain_loss >= 0
+              ? "bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400"
+              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+          )}
+        />
+        <MetricCard
+          title="Total Dividends"
+          value={formatCurrency(Number(summary?.total_dividends ?? 0), displayCurrency)}
+          icon={<DollarSign className="w-5 h-5" />}
+          iconBg="bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400"
+        />
+        <MetricCard
+          title="Holdings"
+          value={String(processedHoldings.length)}
+          subtitle={currencyFilter !== "all" ? `${currencyFilter} assets` : "assets tracked"}
+          icon={<BarChart3 className="w-5 h-5" />}
+          iconBg="bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400"
+        />
+      </motion.div>
+
+      {/* Tabbed Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
+        <Tabs defaultValue="holdings" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            <TabsTrigger value="allocation">Allocation</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="dividends">Dividends</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="holdings">
+            <Card>
+              <CardContent noPadding>
                 <PortfolioHoldingsTable
                   holdings={processedHoldings}
                   onSelect={(holding) => console.log("Selected:", holding)}
                   currency={displayCurrency}
                   convertToDisplay={convertToDisplay}
                 />
-              </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              {/* Allocation Chart */}
-              <div>
-                <AllocationChart
-                  data={allocation?.by_asset_type || []}
-                  totalValue={totalValue}
-                  currency={displayCurrency}
-                />
-              </div>
-            </div>
-
-            {/* Performance and Dividends */}
+          <TabsContent value="allocation">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PerformanceChart
-                data={performance?.data_points || []}
-                onPeriodChange={(period) => setPerformancePeriod(period)}
-              />
-              <DividendHistory dividends={dividends || []} />
-            </div>
-          </div>
-        </div>
-      </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Asset Allocation</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AllocationChart
+                    data={allocation?.by_asset_type || []}
+                    totalValue={totalValue}
+                    currency={displayCurrency}
+                  />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Allocation by Currency</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {availableCurrencies.map((currency) => {
+                      const currencyHoldings = summary?.holdings?.filter((h: any) => h.currency === currency) || [];
+                      const currencyTotal = currencyHoldings.reduce(
+                        (sum: number, h: any) => sum + convertToDisplay(h.market_value, h.currency),
+                        0
+                      );
+                      const percentage = totalValue > 0 ? (currencyTotal / totalValue) * 100 : 0;
 
-      {/* Add Asset Modal */}
+                      return (
+                        <div key={currency} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <CurrencyBadge currency={currency} />
+                              <span className="text-slate-600 dark:text-slate-400">
+                                {currencyHoldings.length} holdings
+                              </span>
+                            </div>
+                            <span className="font-medium text-slate-900 dark:text-white">
+                              {formatCurrency(currencyTotal, displayCurrency)}
+                            </span>
+                          </div>
+                          <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary-500 rounded-full transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {percentage.toFixed(1)}% of portfolio
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="performance">
+            <Card>
+              <CardContent className="p-0">
+                <PerformanceChart
+                  data={performance?.data_points || []}
+                  onPeriodChange={(period) => setPerformancePeriod(period)}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="dividends">
+            <Card>
+              <CardContent className="p-0">
+                <DividendHistory dividends={dividends || []} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </motion.div>
+
       <AddAssetModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAdd={(data) => addAsset.mutate(data)}
         apiUrl={API_URL}
       />
-    </>
+    </PageLayout>
+  );
+}
+
+interface MetricCardProps {
+  title: string;
+  value: string;
+  subtitle?: string;
+  icon: React.ReactNode;
+  iconBg: string;
+}
+
+function MetricCard({ title, value, subtitle, icon, iconBg }: MetricCardProps) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className={cn("p-2 rounded-lg", iconBg)}>{icon}</div>
+        </div>
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{title}</p>
+        <p className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          {value}
+        </p>
+        {subtitle && (
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subtitle}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

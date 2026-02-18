@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
-import Head from "next/head";
-import Sidebar from "@/components/Sidebar";
-import CurrencySelector from "@/components/CurrencySelector";
-import DarkModeToggle from "@/components/DarkModeToggle";
+import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/router";
+import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Textarea } from "@/components/ui/Input";
+import { Select, MultiSelect } from "@/components/ui/Select";
+import { Badge, CurrencyBadge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import {
   Plus,
   Trash2,
@@ -12,9 +17,16 @@ import {
   Calendar,
   Tag,
   Wallet,
+  Search,
+  Filter,
+  ArrowUpRight,
+  ArrowDownRight,
+  X,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, isThisWeek, isThisMonth, parseISO } from "date-fns";
 import { formatCurrency, convertCurrency } from "@/utils/currency";
+import { cn } from "@/utils/cn";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Transaction {
   id: number;
@@ -27,19 +39,38 @@ interface Transaction {
   account?: string;
 }
 
+const CATEGORIES = [
+  "Food & Dining",
+  "Shopping",
+  "Transportation",
+  "Entertainment",
+  "Bills & Utilities",
+  "Healthcare",
+  "Travel",
+  "Education",
+  "Income",
+  "Investment",
+  "Transfer",
+  "Other",
+];
+
+const ACCOUNTS = ["Checking", "Savings", "Credit Card", "Investment", "Cash"];
+
 export default function Transactions() {
+  const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [displayCurrency, setDisplayCurrency] = useState("USD");
-  const [showConverted, setShowConverted] = useState(true);
-  const [convertedAmounts, setConvertedAmounts] = useState<
-    Record<number, number>
-  >({});
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [displayCurrency, setDisplayCurrency] = useState("CAD");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+
   const [formData, setFormData] = useState({
     description: "",
     amount: "",
-    currency: "USD",
+    currency: "CAD",
     type: "expense" as "income" | "expense" | "transfer",
     category: "",
     account: "",
@@ -51,40 +82,17 @@ export default function Transactions() {
   }, []);
 
   useEffect(() => {
-    if (transactions.length > 0 && showConverted) {
-      convertAllAmounts();
+    if (router.query.action === "add") {
+      setIsAddModalOpen(true);
+      router.replace("/transactions", undefined, { shallow: true });
     }
-  }, [transactions, displayCurrency, showConverted]);
-
-  const convertAllAmounts = async () => {
-    const converted: Record<number, number> = {};
-    await Promise.all(
-      transactions.map(async (tx) => {
-        if (tx.currency === displayCurrency) {
-          converted[tx.id] = tx.amount;
-        } else {
-          const convertedAmount = await convertCurrency(
-            tx.amount,
-            tx.currency,
-            displayCurrency,
-          );
-          converted[tx.id] = convertedAmount;
-        }
-      }),
-    );
-    setConvertedAmounts(converted);
-  };
-
-  const getConvertedAmount = (tx: Transaction): number | null => {
-    if (!showConverted || tx.currency === displayCurrency) return null;
-    return convertedAmounts[tx.id] || null;
-  };
+  }, [router.query]);
 
   const fetchTransactions = async () => {
     try {
       const res = await fetch("/v1/transactions/");
       const data = await res.json();
-      setTransactions(data);
+      setTransactions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
     } finally {
@@ -106,16 +114,8 @@ export default function Transactions() {
       });
       if (res.ok) {
         await fetchTransactions();
-        setShowForm(false);
-        setFormData({
-          description: "",
-          amount: "",
-          currency: "USD",
-          type: "expense",
-          category: "",
-          account: "",
-          date: format(new Date(), "yyyy-MM-dd"),
-        });
+        setIsAddModalOpen(false);
+        resetForm();
       }
     } catch (err) {
       console.error("Failed to create transaction:", err);
@@ -123,11 +123,8 @@ export default function Transactions() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this transaction?")) return;
     try {
-      const res = await fetch(`/v1/transactions/${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/v1/transactions/${id}`, { method: "DELETE" });
       if (res.ok) {
         await fetchTransactions();
       }
@@ -136,429 +133,466 @@ export default function Transactions() {
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "income":
-        return <TrendingUp size={20} />;
-      case "expense":
-        return <TrendingDown size={20} />;
-      case "transfer":
-        return <ArrowLeftRight size={20} />;
-    }
+  const resetForm = () => {
+    setFormData({
+      description: "",
+      amount: "",
+      currency: "CAD",
+      type: "expense",
+      category: "",
+      account: "",
+      date: format(new Date(), "yyyy-MM-dd"),
+    });
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "income":
-        return "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400";
-      case "expense":
-        return "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400";
-      case "transfer":
-        return "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400";
-    }
-  };
+  const { totalIncome, totalExpenses, net } = useMemo(() => {
+    const filtered = transactions.filter((t) => {
+      if (typeFilter !== "all" && t.type !== typeFilter) return false;
+      if (categoryFilter.length > 0 && !categoryFilter.includes(t.category || "")) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return t.description.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q);
+      }
+      return true;
+    });
 
-  // Calculate totals - convert all to display currency for summary
-  const totalIncome = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
-  const totalExpenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => {
-      const amount =
-        t.currency === displayCurrency ? t.amount : convertedAmounts[t.id] || 0;
-      return sum + amount;
-    }, 0);
-  const net = totalIncome - totalExpenses;
+    const income = filtered.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+    const expenses = filtered.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+
+    return { totalIncome: income, totalExpenses: expenses, net: income - expenses };
+  }, [transactions, typeFilter, categoryFilter, searchQuery]);
+
+  const filteredTransactions = useMemo(() => {
+    return transactions
+      .filter((t) => {
+        if (typeFilter !== "all" && t.type !== typeFilter) return false;
+        if (categoryFilter.length > 0 && !categoryFilter.includes(t.category || "")) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          return t.description.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q);
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, typeFilter, categoryFilter, searchQuery]);
+
+  const groupedTransactions = useMemo(() => {
+    const groups: Record<string, Transaction[]> = {};
+
+    filteredTransactions.forEach((tx) => {
+      const date = parseISO(tx.date);
+      let label: string;
+
+      if (isToday(date)) {
+        label = "Today";
+      } else if (isYesterday(date)) {
+        label = "Yesterday";
+      } else if (isThisWeek(date)) {
+        label = "This Week";
+      } else if (isThisMonth(date)) {
+        label = "This Month";
+      } else {
+        label = format(date, "MMMM yyyy");
+      }
+
+      if (!groups[label]) groups[label] = [];
+      groups[label].push(tx);
+    });
+
+    return groups;
+  }, [filteredTransactions]);
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set(transactions.map((t) => t.category).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [transactions]);
+
+  const typeOptions = [
+    { value: "all", label: "All Types" },
+    { value: "income", label: "Income" },
+    { value: "expense", label: "Expense" },
+    { value: "transfer", label: "Transfer" },
+  ];
+
+  const categoryOptions = uniqueCategories.map((c) => ({ value: c as string, label: c as string }));
+
+  const currencyOptions = [
+    { value: "CAD", label: "CAD" },
+    { value: "USD", label: "USD" },
+    { value: "BRL", label: "BRL" },
+    { value: "EUR", label: "EUR" },
+    { value: "GBP", label: "GBP" },
+  ];
+
+  const hasActiveFilters = typeFilter !== "all" || categoryFilter.length > 0 || searchQuery;
 
   return (
-    <>
-      <Head>
-        <title>Transactions - Canopy</title>
-      </Head>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-        <Sidebar />
-        <main className="flex-1 ml-64 p-8">
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+    <PageLayout title="Transactions" description="Manage your income and expenses">
+      <PageHeader
+        title="Transactions"
+        description="Track and manage your financial activity"
+        actions={
+          <Button variant="primary" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsAddModalOpen(true)}>
+            Add Transaction
+          </Button>
+        }
+      />
+
+      {/* Stats Row */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6"
+      >
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                  Transactions
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Manage your income and expenses
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Income</p>
+                <p className="text-2xl font-semibold text-success-600 dark:text-success-400 mt-1">
+                  {formatCurrency(totalIncome, displayCurrency)}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
-                <DarkModeToggle />
-                <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2">
-                  <input
-                    type="checkbox"
-                    id="showConverted"
-                    checked={showConverted}
-                    onChange={(e) => setShowConverted(e.target.checked)}
-                    className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
-                  />
-                  <label
-                    htmlFor="showConverted"
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
-                  >
-                    Show converted
-                  </label>
-                </div>
-                {showConverted && (
-                  <CurrencySelector
-                    selectedCurrency={displayCurrency}
-                    onCurrencyChange={setDisplayCurrency}
-                    showLabel={false}
-                  />
+              <div className="p-2 bg-success-100 dark:bg-success-900/30 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-success-600 dark:text-success-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Expenses</p>
+                <p className="text-2xl font-semibold text-danger-600 dark:text-danger-400 mt-1">
+                  {formatCurrency(totalExpenses, displayCurrency)}
+                </p>
+              </div>
+              <div className="p-2 bg-danger-100 dark:bg-danger-900/30 rounded-lg">
+                <TrendingDown className="w-5 h-5 text-danger-600 dark:text-danger-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Net</p>
+                <p className={cn("text-2xl font-semibold mt-1", net >= 0 ? "text-success-600 dark:text-success-400" : "text-danger-600 dark:text-danger-400")}>
+                  {formatCurrency(net, displayCurrency)}
+                </p>
+              </div>
+              <div className={cn("p-2 rounded-lg", net >= 0 ? "bg-success-100 dark:bg-success-900/30" : "bg-danger-100 dark:bg-danger-900/30")}>
+                {net >= 0 ? (
+                  <TrendingUp className="w-5 h-5 text-success-600 dark:text-success-400" />
+                ) : (
+                  <TrendingDown className="w-5 h-5 text-danger-600 dark:text-danger-400" />
                 )}
-                <button
-                  onClick={() => setShowForm(!showForm)}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <Plus size={20} />
-                  Add Transaction
-                </button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                      Total Income
-                    </p>
-                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                      {formatCurrency(totalIncome, displayCurrency)}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                    <TrendingUp className="w-8 h-8 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="mb-6"
+      >
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search transactions..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  leftIcon={<Search className="w-4 h-4" />}
+                  rightIcon={
+                    searchQuery ? (
+                      <button onClick={() => setSearchQuery("")}>
+                        <X className="w-4 h-4" />
+                      </button>
+                    ) : undefined
+                  }
+                />
               </div>
-              <div className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                      Total Expenses
-                    </p>
-                    <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-                      {formatCurrency(totalExpenses, displayCurrency)}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-xl">
-                    <TrendingDown className="w-8 h-8 text-red-600 dark:text-red-400" />
-                  </div>
-                </div>
-              </div>
-              <div className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                      Net
-                    </p>
-                    <p
-                      className={`text-3xl font-bold ${net >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                    >
-                      {formatCurrency(net, displayCurrency)}
-                    </p>
-                  </div>
-                  <div
-                    className={`p-4 rounded-xl ${net >= 0 ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"}`}
+              <div className="flex flex-wrap gap-3">
+                <Select options={typeOptions} value={typeFilter} onChange={setTypeFilter} className="w-32" />
+                <MultiSelect
+                  options={categoryOptions}
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                  placeholder="Categories"
+                  className="w-40"
+                />
+                <Select options={currencyOptions} value={displayCurrency} onChange={setDisplayCurrency} className="w-24" />
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setTypeFilter("all");
+                      setCategoryFilter([]);
+                      setSearchQuery("");
+                    }}
                   >
-                    {net >= 0 ? (
-                      <TrendingUp
-                        className={`w-8 h-8 ${net >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                      />
-                    ) : (
-                      <TrendingDown className="w-8 h-8 text-red-600 dark:text-red-400" />
-                    )}
-                  </div>
-                </div>
+                    Clear filters
+                  </Button>
+                )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-            {/* Add Transaction Form */}
-            {showForm && (
-              <div className="card p-6 mb-8">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+      {/* Transactions List */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
+        {loading ? (
+          <SkeletonList items={8} />
+        ) : filteredTransactions.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ArrowLeftRight className="w-6 h-6 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">
+                {hasActiveFilters ? "No matching transactions" : "No transactions yet"}
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                {hasActiveFilters ? "Try adjusting your filters" : "Add your first transaction to get started"}
+              </p>
+              {!hasActiveFilters && (
+                <Button variant="primary" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsAddModalOpen(true)}>
                   Add Transaction
-                </h2>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Description *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.description}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            description: e.target.value,
-                          })
-                        }
-                        className="input-modern"
-                        placeholder="e.g., Grocery shopping"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Amount *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        value={formData.amount}
-                        onChange={(e) =>
-                          setFormData({ ...formData, amount: e.target.value })
-                        }
-                        className="input-modern"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Type *
-                      </label>
-                      <select
-                        value={formData.type}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            type: e.target.value as any,
-                          })
-                        }
-                        className="input-modern"
-                      >
-                        <option value="expense">Expense</option>
-                        <option value="income">Income</option>
-                        <option value="transfer">Transfer</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Currency *
-                      </label>
-                      <select
-                        value={formData.currency}
-                        onChange={(e) =>
-                          setFormData({ ...formData, currency: e.target.value })
-                        }
-                        className="input-modern"
-                      >
-                        <option value="USD">USD - US Dollar ($)</option>
-                        <option value="CAD">CAD - Canadian Dollar (C$)</option>
-                        <option value="BRL">BRL - Brazilian Real (R$)</option>
-                        <option value="EUR">EUR - Euro (€)</option>
-                        <option value="GBP">GBP - British Pound (£)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Date *
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={formData.date}
-                        onChange={(e) =>
-                          setFormData({ ...formData, date: e.target.value })
-                        }
-                        className="input-modern"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Category
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.category}
-                        onChange={(e) =>
-                          setFormData({ ...formData, category: e.target.value })
-                        }
-                        className="input-modern"
-                        placeholder="e.g., Food, Shopping"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Account
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.account}
-                        onChange={(e) =>
-                          setFormData({ ...formData, account: e.target.value })
-                        }
-                        className="input-modern"
-                        placeholder="e.g., Checking, Savings"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <button type="submit" className="btn-primary">
-                      Add Transaction
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowForm(false)}
-                      className="btn-secondary"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Transactions List */}
-            <div className="card">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  All Transactions
-                </h2>
-              </div>
-              {loading ? (
-                <div className="p-12 text-center text-gray-400 dark:text-gray-500">
-                  Loading...
-                </div>
-              ) : transactions.length === 0 ? (
-                <div className="p-12 text-center">
-                  <p className="text-gray-400 dark:text-gray-500 mb-4">
-                    No transactions yet
-                  </p>
-                  <button
-                    onClick={() => setShowForm(true)}
-                    className="btn-primary"
-                  >
-                    Add Your First Transaction
-                  </button>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {transactions
-                    .sort(
-                      (a, b) =>
-                        new Date(b.date).getTime() - new Date(a.date).getTime(),
-                    )
-                    .map((tx) => {
-                      const convertedAmount = getConvertedAmount(tx);
-                      return (
-                        <div
-                          key={tx.id}
-                          className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4 flex-1">
-                              <div
-                                className={`p-3 rounded-xl ${getTypeColor(tx.type)}`}
-                              >
-                                {getTypeIcon(tx.type)}
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-1">
-                                  {tx.description}
-                                </h3>
-                                <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                                  <span className="flex items-center gap-1">
-                                    <Calendar size={14} />
-                                    {format(new Date(tx.date), "MMM dd, yyyy")}
-                                  </span>
-                                  {tx.category && (
-                                    <span className="flex items-center gap-1">
-                                      <Tag size={14} />
-                                      {tx.category}
-                                    </span>
-                                  )}
-                                  {tx.account && (
-                                    <span className="flex items-center gap-1">
-                                      <Wallet size={14} />
-                                      {tx.account}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-6">
-                              <div className="text-right">
-                                <div className="flex items-baseline gap-2">
-                                  <p
-                                    className={`text-xl font-bold ${
-                                      tx.type === "income"
-                                        ? "text-green-600 dark:text-green-400"
-                                        : "text-red-600 dark:text-red-400"
-                                    }`}
-                                  >
-                                    {tx.type === "expense" ? "-" : "+"}
-                                    {formatCurrency(
-                                      Math.abs(tx.amount),
-                                      tx.currency,
-                                    )}
-                                  </p>
-                                  {showConverted &&
-                                    convertedAmount &&
-                                    tx.currency !== displayCurrency && (
-                                      <>
-                                        <span className="text-gray-400 dark:text-gray-500">
-                                          ≈
-                                        </span>
-                                        <p
-                                          className={`text-lg font-semibold text-gray-600 dark:text-gray-300 ${
-                                            tx.type === "income"
-                                              ? "text-green-600 dark:text-green-400"
-                                              : "text-red-600 dark:text-red-400"
-                                          }`}
-                                        >
-                                          {formatCurrency(
-                                            Math.abs(convertedAmount),
-                                            displayCurrency,
-                                          )}
-                                        </p>
-                                      </>
-                                    )}
-                                </div>
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                  {tx.currency}
-                                  {showConverted &&
-                                    convertedAmount &&
-                                    tx.currency !== displayCurrency && (
-                                      <span className="ml-1">
-                                        → {displayCurrency}
-                                      </span>
-                                    )}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => handleDelete(tx.id)}
-                                className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
+                </Button>
               )}
-            </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(groupedTransactions).map(([dateLabel, txs]) => (
+              <div key={dateLabel}>
+                <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3 sticky top-0 bg-slate-50 dark:bg-slate-950 py-2 z-10">
+                  {dateLabel}
+                </h3>
+                <Card>
+                  <CardContent noPadding>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {txs.map((tx) => (
+                        <TransactionRow key={tx.id} transaction={tx} onDelete={handleDelete} displayCurrency={displayCurrency} />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ))}
           </div>
-        </main>
+        )}
+      </motion.div>
+
+      {/* Add Transaction Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          resetForm();
+        }}
+        title="Add Transaction"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSubmit}>
+              Add Transaction
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Description"
+            required
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="e.g., Grocery shopping"
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Amount"
+              type="number"
+              step="0.01"
+              required
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              placeholder="0.00"
+            />
+            <Select
+              label="Currency"
+              options={currencyOptions}
+              value={formData.currency}
+              onChange={(v) => setFormData({ ...formData, currency: v })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Type"
+              options={[
+                { value: "expense", label: "Expense" },
+                { value: "income", label: "Income" },
+                { value: "transfer", label: "Transfer" },
+              ]}
+              value={formData.type}
+              onChange={(v) => setFormData({ ...formData, type: v as any })}
+            />
+            <Input
+              label="Date"
+              type="date"
+              required
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Category"
+              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              value={formData.category}
+              onChange={(v) => setFormData({ ...formData, category: v })}
+              searchable
+              placeholder="Select category"
+            />
+            <Select
+              label="Account"
+              options={ACCOUNTS.map((a) => ({ value: a, label: a }))}
+              value={formData.account}
+              onChange={(v) => setFormData({ ...formData, account: v })}
+              placeholder="Select account"
+            />
+          </div>
+        </form>
+      </Modal>
+    </PageLayout>
+  );
+}
+
+interface TransactionRowProps {
+  transaction: Transaction;
+  onDelete: (id: number) => void;
+  displayCurrency: string;
+}
+
+function TransactionRow({ transaction: tx, onDelete, displayCurrency }: TransactionRowProps) {
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
+  return (
+    <div className="flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+      <div className="flex items-center gap-4 flex-1 min-w-0">
+        <div
+          className={cn(
+            "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+            tx.type === "income"
+              ? "bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400"
+              : tx.type === "expense"
+              ? "bg-danger-100 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400"
+              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+          )}
+        >
+          {tx.type === "income" ? (
+            <ArrowUpRight className="w-5 h-5" />
+          ) : tx.type === "expense" ? (
+            <ArrowDownRight className="w-5 h-5" />
+          ) : (
+            <ArrowLeftRight className="w-5 h-5" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-slate-900 dark:text-white truncate">{tx.description}</p>
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <span>{format(parseISO(tx.date), "MMM d, yyyy")}</span>
+            {tx.category && (
+              <Badge variant="default" size="sm">
+                {tx.category}
+              </Badge>
+            )}
+            {tx.account && <span className="hidden sm:inline">{tx.account}</span>}
+          </div>
+        </div>
       </div>
-    </>
+      <div className="flex items-center gap-4">
+        <div className="text-right">
+          <p
+            className={cn(
+              "font-semibold",
+              tx.type === "income"
+                ? "text-success-600 dark:text-success-400"
+                : tx.type === "expense"
+                ? "text-danger-600 dark:text-danger-400"
+                : "text-slate-700 dark:text-slate-300"
+            )}
+          >
+            {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
+            {formatCurrency(Math.abs(tx.amount), tx.currency)}
+          </p>
+          <CurrencyBadge currency={tx.currency} className="mt-0.5" />
+        </div>
+        <button
+          onClick={() => setShowConfirmDelete(true)}
+          className="p-2 text-slate-400 hover:text-danger-600 dark:hover:text-danger-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-md hover:bg-danger-50 dark:hover:bg-danger-900/30"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showConfirmDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setShowConfirmDelete(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-sm w-full shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Delete Transaction</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Are you sure you want to delete this transaction? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <Button variant="secondary" size="sm" onClick={() => setShowConfirmDelete(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    onDelete(tx.id);
+                    setShowConfirmDelete(false);
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
