@@ -9,6 +9,24 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [Unreleased] - Wise integration
+
+### Added
+
+- **Wise API integration** (Settings → Integrations):
+  - **Connect**: Enter Wise API token (from wise.com → Settings → API tokens); test connection and persist token in browser (localStorage). Optional sandbox mode for testing.
+  - **Sync Now**: Fetches Wise balances and transactions, creates/updates Canopy assets per currency (e.g. WISE_CAD, WISE_USD), and imports transactions with `import_source=wise`. Duplicates skipped by `import_id`.
+  - **Disconnect**: Clears stored token and connection state.
+- Backend: `GET /v1/integrations/wise/status` — returns `{ connected: true }` when `WISE_API_TOKEN` env is set.
+- Backend: `POST /v1/integrations/wise/sync` — accepts optional `api_token` (or uses `WISE_API_TOKEN`), `sandbox`, `days`; upserts Wise assets and imports transactions.
+- Backend: Optional `wise_api_token` in Settings (from `WISE_API_TOKEN` env / Vault) for server-side token.
+
+### Changed
+
+- Integrations page: Wise card uses dedicated Connect/Sync flow and success/error feedback.
+
+---
+
 ## [0.4.0] - 2026-01-31 - 🎯 **Insights & FIRE Planning**
 
 ### Major Features

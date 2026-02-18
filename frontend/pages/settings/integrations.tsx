@@ -424,6 +424,225 @@ function MoomooCard({ integration }: { integration: Integration }) {
   );
 }
 
+function WiseCard({ integration }: { integration: Integration }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [apiToken, setApiToken] = useState("");
+  const [sandbox, setSandbox] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const [accountsLinked, setAccountsLinked] = useState<number>(0);
+  const [syncResult, setSyncResult] = useState<{ assets_created: number; assets_updated: number; transactions_imported: number; currencies: string[] } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem(WISE_TOKEN_KEY);
+    const useSandbox = localStorage.getItem(WISE_SANDBOX_KEY) === "true";
+    setSandbox(useSandbox);
+    if (token) {
+      setConnected(true);
+      setApiToken(token);
+    }
+    fetch(`${INTEGRATIONS_BASE}/wise/status`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.connected && !token) setConnected(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleConnect = async () => {
+    if (!apiToken.trim()) return;
+    setIsConnecting(true);
+    setError(null);
+    try {
+      const res = await fetch(`${INTEGRATIONS_BASE}/wise/test-connection`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_token: apiToken.trim(), sandbox }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || "Connection failed");
+      }
+      const data = await res.json();
+      localStorage.setItem(WISE_TOKEN_KEY, apiToken.trim());
+      localStorage.setItem(WISE_SANDBOX_KEY, String(sandbox));
+      setConnected(true);
+      setAccountsLinked(1);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message || "Connection failed");
+      setConnected(false);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    localStorage.removeItem(WISE_TOKEN_KEY);
+    localStorage.removeItem(WISE_SANDBOX_KEY);
+    setConnected(false);
+    setLastSync(null);
+    setAccountsLinked(0);
+    setSyncResult(null);
+    setApiToken("");
+  };
+
+  const handleSync = async () => {
+    const token = localStorage.getItem(WISE_TOKEN_KEY) || apiToken;
+    if (!token) {
+      setError("No token. Connect first.");
+      return;
+    }
+    setIsSyncing(true);
+    setError(null);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`${INTEGRATIONS_BASE}/wise/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_token: token, sandbox, days: 90 }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || "Sync failed");
+      }
+      const data = await res.json();
+      setSyncResult(data);
+      setLastSync(new Date().toLocaleString());
+      setAccountsLinked(data.currencies?.length ?? 0);
+    } catch (e: any) {
+      setError(e.message || "Sync failed");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const statusColors = {
+    connected: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    disconnected: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400",
+    pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  };
+  const statusIcons = {
+    connected: <Check className="w-4 h-4" />,
+    disconnected: <X className="w-4 h-4" />,
+    pending: <Loader2 className="w-4 h-4 animate-spin" />,
+  };
+  const status = connected ? "connected" : isConnecting ? "pending" : "disconnected";
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <div
+        className="p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-3xl">{integration.logo}</span>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{integration.name}</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{integration.description}</p>
+            </div>
+          </div>
+          <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusColors[status]}`}>
+            {statusIcons[status]}
+            {status === "connected" ? "Connected" : status === "pending" ? "Connecting..." : "Not Connected"}
+          </span>
+          <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+        </div>
+        {connected && (
+          <div className="mt-3 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+            <span>{accountsLinked} currency balance(s)</span>
+            {lastSync && <span>Last sync: {lastSync}</span>}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleSync(); }}
+              disabled={isSyncing}
+              className="flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 disabled:opacity-50"
+            >
+              <RefreshCw className={isSyncing ? "w-4 h-4 animate-spin" : "w-4 h-4"} />
+              Sync Now
+            </button>
+          </div>
+        )}
+      </div>
+      {isExpanded && (
+        <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
+          <div className="pt-4">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Setup Instructions</h4>
+            <ol className="space-y-2">
+              {integration.setupSteps.map((step, index) => (
+                <li key={index} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="flex-shrink-0 w-5 h-5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xs font-medium">
+                    {index + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+            {integration.docsUrl && (
+              <a href={integration.docsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-3 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                View Documentation
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
+            <div className="mt-4 space-y-3">
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" checked={sandbox} onChange={(e) => setSandbox(e.target.checked)} disabled={connected} />
+                Use sandbox (testing)
+              </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Token</label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={apiToken}
+                    onChange={(e) => setApiToken(e.target.value)}
+                    placeholder="Wise API token (Settings → API tokens)"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
+                  />
+                  {connected ? (
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleConnect}
+                      disabled={!apiToken.trim() || isConnecting}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                      {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Connect
+                    </button>
+                  )}
+                </div>
+              </div>
+              {error && (
+                <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+              {syncResult && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-800 dark:text-green-300">
+                  Synced: {syncResult.assets_created} assets created, {syncResult.assets_updated} updated, {syncResult.transactions_imported} transactions imported ({syncResult.currencies?.join(", ") || ""}).
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function IntegrationCard({
   integration,
   onConnect,
@@ -598,19 +817,21 @@ export default function Integrations() {
           <Check className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
           <div>
             <h3 className="font-medium text-green-900 dark:text-green-300">
-              Moomoo Integration Available
+              Wise &amp; Moomoo integrations available
             </h3>
             <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-              Connect to your Moomoo/Futu trading accounts via the local OpenD gateway.
-              View your positions, balances, and market data in real-time.
+              <strong>Wise:</strong> Connect with an API token (wise.com → Settings → API tokens), then Sync to pull balances and transactions into Canopy.{" "}
+              <strong className="ml-1">Moomoo:</strong> Connect via the local OpenD gateway to view positions and market data.
             </p>
           </div>
         </div>
 
         {/* Integration Cards */}
         <div className="space-y-4">
-          {integrations.map((integration) => (
-            integration.id === "moomoo" ? (
+          {integrations.map((integration) =>
+            integration.id === "wise" ? (
+              <WiseCard key={integration.id} integration={integration} />
+            ) : integration.id === "moomoo" ? (
               <MoomooCard key={integration.id} integration={integration} />
             ) : (
               <IntegrationCard
@@ -619,7 +840,7 @@ export default function Integrations() {
                 onConnect={handleConnect}
               />
             )
-          ))}
+          )}
         </div>
 
         {/* CSV Import Section */}
