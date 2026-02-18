@@ -1,7 +1,7 @@
 """Application configuration and settings management."""
 
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"  # Overridden by REDIS_URL env var in production
     secret_key: str = "change-me"  # Overridden by SECRET_KEY env var from Vault in production
     environment: str = "development"
+    questrade_refresh_token: Optional[str] = None  # For Celery background sync; use Vault in production
 
     model_config = SettingsConfigDict(
         env_file=".env",

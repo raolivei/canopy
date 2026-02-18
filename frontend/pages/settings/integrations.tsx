@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Head from "next/head";
 import Sidebar from "../../components/Sidebar";
 import DarkModeToggle from "../../components/DarkModeToggle";
@@ -14,6 +14,8 @@ import {
   Globe,
   Loader2,
 } from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface Integration {
   id: string;
@@ -90,13 +92,25 @@ const integrations: Integration[] = [
 
 function IntegrationCard({
   integration,
+  connectionOverride,
   onConnect,
+  onSyncNow,
+  isSyncing,
 }: {
   integration: Integration;
-  onConnect: (id: string) => void;
+  connectionOverride?: { status: "connected"; accountsLinked?: number; lastSync?: string } | null;
+  onConnect: (id: string, credential: string) => void;
+  onSyncNow?: (id: string) => void;
+  isSyncing?: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [apiToken, setApiToken] = useState("");
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  const status = connectionOverride?.status ?? integration.status;
+  const accountsLinked = connectionOverride?.accountsLinked ?? integration.accountsLinked;
+  const lastSync = connectionOverride?.lastSync ?? integration.lastSync;
 
   const statusColors = {
     connected:
@@ -134,15 +148,11 @@ function IntegrationCard({
           <div className="flex items-center gap-3">
             <span
               className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                statusColors[integration.status]
+                statusColors[status]
               }`}
             >
-              {statusIcons[integration.status]}
-              {integration.status === "connected"
-                ? "Connected"
-                : integration.status === "pending"
-                  ? "Connecting..."
-                  : "Not Connected"}
+              {status === "connected" ? statusIcons.connected : isConnecting ? statusIcons.pending : statusIcons.disconnected}
+              {status === "connected" ? "Connected" : isConnecting ? "Connecting..." : "Not Connected"}
             </span>
             <ChevronRight
               className={`w-5 h-5 text-gray-400 transition-transform ${
@@ -152,14 +162,20 @@ function IntegrationCard({
           </div>
         </div>
 
-        {integration.status === "connected" && (
+        {status === "connected" && (
           <div className="mt-3 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-            <span>{integration.accountsLinked} accounts linked</span>
-            <span>Last sync: {integration.lastSync}</span>
-            <button className="flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400">
-              <RefreshCw className="w-4 h-4" />
-              Sync Now
-            </button>
+            {accountsLinked != null && <span>{accountsLinked} accounts linked</span>}
+            {lastSync && <span>Last sync: {lastSync}</span>}
+            {onSyncNow && integration.id === "questrade" && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onSyncNow(integration.id); }}
+                disabled={isSyncing}
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 disabled:opacity-50"
+              >
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Sync Now
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -198,28 +214,42 @@ function IntegrationCard({
 
             {integration.id !== "wealthsimple" && (
               <div className="mt-4 space-y-3">
+                {connectError && <p className="text-sm text-red-600 dark:text-red-400">{connectError}</p>}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {integration.id === "moomoo" ? "OpenD Host" : "API Token"}
+                    {integration.id === "questrade" ? "Refresh token" : integration.id === "moomoo" ? "OpenD Host" : "API Token"}
                   </label>
                   <div className="flex gap-2">
                     <input
-                      type={integration.id === "moomoo" ? "text" : "password"}
+                      type={integration.id === "questrade" || integration.id === "moomoo" ? "text" : "password"}
                       value={apiToken}
-                      onChange={(e) => setApiToken(e.target.value)}
+                      onChange={(e) => { setApiToken(e.target.value); setConnectError(null); }}
                       placeholder={
-                        integration.id === "moomoo"
-                          ? "localhost:11111"
-                          : "Enter your API token..."
+                        integration.id === "questrade"
+                          ? "Paste refresh token from my.questrade.com/APIAccess"
+                          : integration.id === "moomoo"
+                            ? "localhost:11111"
+                            : "Enter your API token..."
                       }
                       className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
                     />
                     <button
-                      onClick={() => onConnect(integration.id)}
-                      disabled={!apiToken}
+                      onClick={async () => {
+                        if (!apiToken) return;
+                        setIsConnecting(true);
+                        setConnectError(null);
+                        try {
+                          await onConnect(integration.id, apiToken);
+                        } catch (e) {
+                          setConnectError(e instanceof Error ? e.message : "Connection failed");
+                        } finally {
+                          setIsConnecting(false);
+                        }
+                      }}
+                      disabled={!apiToken || isConnecting}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
                     >
-                      Connect
+                      {isConnecting ? "Connecting..." : "Connect"}
                     </button>
                   </div>
                 </div>
@@ -233,12 +263,67 @@ function IntegrationCard({
 }
 
 export default function Integrations() {
-  const handleConnect = (integrationId: string) => {
-    // TODO: Implement actual connection logic when APIs are ready
-    console.log(`Connecting to ${integrationId}...`);
-    alert(
-      `Connection to ${integrationId} is not yet implemented.\n\nPlease ensure you have the required credentials ready, then check back later.`,
-    );
+  const [connectionOverrides, setConnectionOverrides] = useState<
+    Record<string, { status: "connected"; accountsLinked?: number; lastSync?: string }>
+  >({});
+  const credentialsRef = useRef<Record<string, string>>({});
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleConnect = async (integrationId: string, credential: string) => {
+    if (integrationId === "questrade") {
+      const res = await fetch(`${API_URL}/v1/integrations/questrade/test-connection`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: credential }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || res.statusText || "Connection failed");
+      }
+      const data = await res.json();
+      credentialsRef.current.questrade = credential;
+      setConnectionOverrides((prev) => ({
+        ...prev,
+        questrade: { status: "connected", accountsLinked: data.accounts_count },
+      }));
+      return;
+    }
+    throw new Error(`Connection to ${integrationId} is not yet implemented.`);
+  };
+
+  const handleSyncNow = async (integrationId: string) => {
+    if (integrationId !== "questrade") return;
+    const token = credentialsRef.current.questrade;
+    if (!token) {
+      alert("Refresh token not found. Please connect again.");
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`${API_URL}/v1/integrations/questrade/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: token }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || res.statusText || "Sync failed");
+      }
+      const data = await res.json();
+      setConnectionOverrides((prev) => ({
+        ...prev,
+        questrade: {
+          ...prev.questrade,
+          status: "connected",
+          lastSync: new Date().toLocaleString(),
+          accountsLinked: data.accounts,
+        },
+      }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -284,7 +369,10 @@ export default function Integrations() {
             <IntegrationCard
               key={integration.id}
               integration={integration}
+              connectionOverride={connectionOverrides[integration.id] ?? null}
               onConnect={handleConnect}
+              onSyncNow={integration.id === "questrade" ? handleSyncNow : undefined}
+              isSyncing={integration.id === "questrade" ? isSyncing : false}
             />
           ))}
         </div>

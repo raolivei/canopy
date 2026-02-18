@@ -3,6 +3,7 @@
 import logging
 from datetime import date
 from decimal import Decimal
+from typing import Optional
 
 from celery import Celery
 from celery.schedules import crontab
@@ -10,7 +11,7 @@ from sqlalchemy import select
 
 from backend.app.config import get_settings
 from backend.db.session import SessionLocal
-from backend.db.models.asset import Asset
+from backend.db.models.asset import Asset, AssetType, SyncSource
 from backend.db.models.lot import Lot
 from backend.db.models.portfolio_snapshot import PortfolioSnapshot, SnapshotHolding
 
@@ -35,6 +36,11 @@ celery_app.conf.beat_schedule = {
         "task": "ingest.create_daily_snapshot",
         "schedule": crontab(minute=0, hour=17, day_of_week="1-5"),
     },
+    # Sync Questrade positions (if QUESTRADE_REFRESH_TOKEN set) - daily at 6 PM ET
+    "sync-questrade": {
+        "task": "ingest.sync_questrade",
+        "schedule": crontab(minute=0, hour=18, day_of_week="1-5"),
+    },
 }
 
 celery_app.conf.timezone = "America/New_York"
@@ -44,6 +50,71 @@ celery_app.conf.timezone = "America/New_York"
 def import_csv(file_path: str) -> str:
     """Placeholder CSV import task."""
     return f"CSV import queued for {file_path}"
+
+
+@celery_app.task(name="ingest.sync_questrade")
+def sync_questrade(refresh_token: Optional[str] = None) -> dict:
+    """Sync Questrade accounts and positions into Canopy. Uses refresh_token or settings."""
+    token = refresh_token or get_settings().questrade_refresh_token
+    if not token:
+        logger.warning("Questrade sync skipped: no refresh token")
+        return {"status": "skipped", "reason": "no_refresh_token"}
+    from backend.services.questrade_integration import QuestradeIntegrationService
+    db = SessionLocal()
+    try:
+        with QuestradeIntegrationService(token) as qt:
+            accounts = qt.get_accounts()
+            created_assets = created_lots = updated_lots = 0
+            for acc in accounts:
+                for pos in qt.get_positions(acc.number):
+                    symbol = (pos.symbol or "").strip().upper()
+                    if not symbol:
+                        continue
+                    price = pos.average_entry_price or pos.current_price or Decimal("0")
+                    if price <= 0:
+                        price = Decimal("0.01")
+                    asset = db.execute(select(Asset).where(Asset.symbol == symbol)).scalar_one_or_none()
+                    if not asset:
+                        asset = Asset(
+                            symbol=symbol,
+                            name=symbol,
+                            asset_type=AssetType.STOCK,
+                            currency="CAD",
+                            institution="Questrade",
+                            country="CA",
+                            sync_source=SyncSource.QUESTRADE.value,
+                            external_account_id=acc.number,
+                        )
+                        db.add(asset)
+                        db.flush()
+                        created_assets += 1
+                    account_label = f"Questrade-{acc.number}"
+                    lot = db.execute(
+                        select(Lot).where(Lot.asset_id == asset.id).where(Lot.account == account_label)
+                    ).scalar_one_or_none()
+                    if lot:
+                        lot.quantity = pos.open_quantity
+                        lot.price_per_unit = price
+                        updated_lots += 1
+                    else:
+                        db.add(Lot(
+                            asset_id=asset.id,
+                            quantity=pos.open_quantity,
+                            price_per_unit=price,
+                            fees=Decimal("0"),
+                            purchase_date=date.today(),
+                            account=account_label,
+                            notes=f"Synced from Questrade {acc.type}",
+                        ))
+                        created_lots += 1
+            db.commit()
+            logger.info(f"Questrade sync: {len(accounts)} accounts, +{created_assets} assets, +{created_lots} lots, ~{updated_lots} updated")
+            return {"status": "synced", "accounts": len(accounts), "created_assets": created_assets, "created_lots": created_lots, "updated_lots": updated_lots}
+    except Exception as e:
+        logger.exception("Questrade sync failed")
+        return {"status": "error", "detail": str(e)}
+    finally:
+        db.close()
 
 
 @celery_app.task(name="ingest.update_all_prices")
