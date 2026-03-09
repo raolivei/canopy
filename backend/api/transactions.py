@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select, func, desc, or_
+from sqlalchemy import select, func, desc, or_, extract, case
 
 from backend.db.session import DbSession
 from backend.db.models.transaction import Transaction as TransactionModel
@@ -249,3 +249,138 @@ async def delete_all_transactions(
     db.commit()
     
     return {"message": f"Deleted {count} transactions"}
+
+
+# ── Annual Report ──────────────────────────────────────────────────────────────
+
+# Categories that represent internal money movement, not real income/spending
+NOISE_INCOME_CATS = {
+    "Transfer", "Credit Card Payment", "Loan Repayment",
+    "Sell", "Returned Purchase",
+}
+NOISE_EXPENSE_CATS = {
+    "Transfer", "Credit Card Payment", "Loan Repayment",
+    "Reimbursement",
+}
+INVESTMENT_CATS = {"Buy", "Investments", "Sell"}
+
+
+@router.get("/annual-report")
+async def get_annual_report(
+    db: DbSession,
+    year: int = Query(..., description="Year for the report"),
+):
+    """Annual spending report with clean income/expense figures.
+
+    Excludes internal transfers, credit card payments, and loan repayments
+    to show real money in vs real money spent.
+    """
+    from sqlalchemy import text
+
+    # Monthly summary
+    monthly_rows = db.execute(text("""
+        SELECT
+            EXTRACT(MONTH FROM date)::int AS month,
+            type,
+            category,
+            SUM(amount) AS total
+        FROM transactions
+        WHERE EXTRACT(YEAR FROM date) = :year
+          AND type IN ('income', 'expense')
+        GROUP BY month, type, category
+    """), {"year": year}).fetchall()
+
+    # Build monthly buckets
+    months: dict[int, dict] = {
+        m: {"month": m, "income": 0.0, "expenses": 0.0, "investments": 0.0}
+        for m in range(1, 13)
+    }
+    category_totals: dict[str, float] = {}
+    income_sources: dict[str, float] = {}
+
+    for row in monthly_rows:
+        m, typ, cat, total = row.month, row.type, row.category or "", float(row.total)
+        if typ == "income":
+            if cat not in NOISE_INCOME_CATS:
+                months[m]["income"] += total
+                income_sources[cat or "Uncategorized"] = income_sources.get(cat or "Uncategorized", 0) + total
+        elif typ == "expense":
+            if cat in INVESTMENT_CATS:
+                months[m]["investments"] += total
+            elif cat not in NOISE_EXPENSE_CATS:
+                months[m]["expenses"] += total
+                category_totals[cat or "Uncategorized"] = category_totals.get(cat or "Uncategorized", 0) + total
+
+    # Summary totals
+    total_income = sum(m["income"] for m in months.values())
+    total_expenses = sum(m["expenses"] for m in months.values())
+    total_investments = sum(m["investments"] for m in months.values())
+
+    # Sorted category breakdown (top 15 for pie chart)
+    sorted_cats = sorted(category_totals.items(), key=lambda x: -x[1])
+    top_cats = sorted_cats[:15]
+    other = sum(v for _, v in sorted_cats[15:])
+    if other > 0:
+        top_cats.append(("Other", other))
+
+    # Top merchants
+    merchant_rows = db.execute(text("""
+        SELECT
+            description,
+            category,
+            SUM(amount) AS total,
+            COUNT(*) AS cnt
+        FROM transactions
+        WHERE EXTRACT(YEAR FROM date) = :year
+          AND type = 'expense'
+          AND (category IS NULL OR category NOT IN (
+              'Transfer','Credit Card Payment','Loan Repayment',
+              'Buy','Sell','Investments','Reimbursement'
+          ))
+        GROUP BY description, category
+        ORDER BY total DESC
+        LIMIT 20
+    """), {"year": year}).fetchall()
+
+    # Available years
+    year_rows = db.execute(text("""
+        SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS y
+        FROM transactions ORDER BY y DESC
+    """)).fetchall()
+
+    month_names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
+    return {
+        "year": year,
+        "available_years": [r.y for r in year_rows],
+        "summary": {
+            "real_income": round(total_income, 2),
+            "real_expenses": round(total_expenses, 2),
+            "investments": round(total_investments, 2),
+            "net_savings": round(total_income - total_expenses, 2),
+            "savings_rate": round((total_income - total_expenses) / total_income * 100, 1) if total_income > 0 else 0,
+        },
+        "by_month": [
+            {
+                "month": m,
+                "month_name": month_names[m - 1],
+                "income": round(months[m]["income"], 2),
+                "expenses": round(months[m]["expenses"], 2),
+                "investments": round(months[m]["investments"], 2),
+                "net": round(months[m]["income"] - months[m]["expenses"], 2),
+            }
+            for m in range(1, 13)
+        ],
+        "by_category": [
+            {"category": cat, "amount": round(amt, 2), "pct": round(amt / total_expenses * 100, 1) if total_expenses > 0 else 0}
+            for cat, amt in top_cats
+        ],
+        "income_sources": [
+            {"category": cat, "amount": round(amt, 2), "pct": round(amt / total_income * 100, 1) if total_income > 0 else 0}
+            for cat, amt in sorted(income_sources.items(), key=lambda x: -x[1])
+        ],
+        "top_merchants": [
+            {"description": r.description, "category": r.category or "", "total": round(float(r.total), 2), "count": r.cnt}
+            for r in merchant_rows
+        ],
+    }

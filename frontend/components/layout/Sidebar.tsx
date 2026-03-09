@@ -13,6 +13,7 @@ import {
   Plug,
   ChevronLeft,
   Moon,
+  BarChart2,
   Sun,
   Command,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Transactions", href: "/transactions", icon: DollarSign },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Insights", href: "/insights", icon: Target },
+  { name: "Annual Report", href: "/report", icon: BarChart2 },
   { name: "Import", href: "/import", icon: Upload },
   { name: "Integrations", href: "/settings/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },
