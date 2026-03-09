@@ -29,7 +29,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, subDays } from "date-fns";
 import { formatCurrency, formatCurrencyCompact } from "@/utils/currency";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
@@ -103,41 +103,43 @@ export default function Dashboard() {
   }, [displayCurrency, fetchTransactions, fetchPortfolio]);
 
   const now = useMemo(() => new Date(), []);
-  const currentMonthStart = useMemo(() => startOfMonth(now), [now]);
-  const lastMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
-  const lastMonthEnd = useMemo(() => endOfMonth(subMonths(now, 1)), [now]);
+
+  // Derive time window from the selected chart range
+  const { periodStart, prevPeriodStart, prevPeriodEnd, periodLabel } = useMemo(() => {
+    const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
+    const start = subDays(now, days);
+    const prevEnd = subDays(start, 1);
+    const prevStart = subDays(prevEnd, days - 1);
+    const label = timeRange === "7d" ? "Last 7 days" : timeRange === "30d" ? "Last 30 days" : "Last 90 days";
+    return { periodStart: start, prevPeriodStart: prevStart, prevPeriodEnd: prevEnd, periodLabel: label };
+  }, [timeRange, now]);
 
   const { currentMonthIncome, currentMonthExpenses, lastMonthIncome, lastMonthExpenses } =
     useMemo(() => {
-      const currentMonth = transactions.filter(
-        (t) => new Date(t.date) >= currentMonthStart
-      );
-      const lastMonth = transactions.filter((t) => {
+      const current = transactions.filter((t) => new Date(t.date) >= periodStart);
+      const prev = transactions.filter((t) => {
         const d = new Date(t.date);
-        return d >= lastMonthStart && d <= lastMonthEnd;
+        return d >= prevPeriodStart && d <= prevPeriodEnd;
       });
 
       return {
-        currentMonthIncome: currentMonth
+        currentMonthIncome: current
           .filter((t) => t.type === "income")
           .reduce((sum, t) => sum + t.amount, 0),
-        currentMonthExpenses: currentMonth
+        currentMonthExpenses: current
           .filter((t) => t.type === "expense")
           .reduce((sum, t) => sum + t.amount, 0),
-        lastMonthIncome: lastMonth
+        lastMonthIncome: prev
           .filter((t) => t.type === "income")
           .reduce((sum, t) => sum + t.amount, 0),
-        lastMonthExpenses: lastMonth
+        lastMonthExpenses: prev
           .filter((t) => t.type === "expense")
           .reduce((sum, t) => sum + t.amount, 0),
       };
-    }, [transactions, currentMonthStart, lastMonthStart, lastMonthEnd]);
+    }, [transactions, periodStart, prevPeriodStart, prevPeriodEnd]);
 
-  const netWorth = useMemo(() => {
-    const portfolioValue = portfolio?.total_value || 0;
-    const cashFlow = currentMonthIncome - currentMonthExpenses;
-    return portfolioValue + cashFlow;
-  }, [portfolio, currentMonthIncome, currentMonthExpenses]);
+  // Net worth = portfolio total value only (portfolio already reflects all balances)
+  const netWorth = useMemo(() => portfolio?.total_value || 0, [portfolio]);
 
   const incomeChange = lastMonthIncome > 0
     ? ((currentMonthIncome - lastMonthIncome) / lastMonthIncome) * 100
@@ -149,9 +151,9 @@ export default function Dashboard() {
   const chartData = useMemo(() => {
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
     return Array.from({ length: days }, (_, i) => {
-      const date = subDays(now, days - i - 1);
-      const dayStart = new Date(date.setHours(0, 0, 0, 0));
-      const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+      const date = subDays(now, days - 1 - i);
+      const dayStart = new Date(new Date(date).setHours(0, 0, 0, 0));
+      const dayEnd = new Date(new Date(date).setHours(23, 59, 59, 999));
 
       const dayTx = transactions.filter((t) => {
         const d = new Date(t.date);
@@ -248,7 +250,7 @@ export default function Dashboard() {
                   {portfolio?.total_gain_loss_pct?.toFixed(1) || 0}% all time
                 </Badge>
                 <span className="text-sm text-slate-500 dark:text-slate-400">
-                  {format(now, "MMMM yyyy")}
+                  {portfolio?.holdings_count ?? 0} holdings
                 </span>
               </div>
             </div>
@@ -295,7 +297,7 @@ export default function Dashboard() {
           title="Income"
           value={formatCurrency(currentMonthIncome, displayCurrency)}
           change={incomeChange}
-          changeLabel="vs last month"
+          changeLabel={`vs prior ${timeRange}`}
           icon={<TrendingUp className="w-5 h-5" />}
           iconBg="bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400"
         />
@@ -303,7 +305,7 @@ export default function Dashboard() {
           title="Expenses"
           value={formatCurrency(currentMonthExpenses, displayCurrency)}
           change={expenseChange}
-          changeLabel="vs last month"
+          changeLabel={`vs prior ${timeRange}`}
           invertChange
           icon={<CreditCard className="w-5 h-5" />}
           iconBg="bg-danger-100 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400"
@@ -339,7 +341,7 @@ export default function Dashboard() {
               <div>
                 <CardTitle>Cash Flow</CardTitle>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Income vs expenses over time
+                  {periodLabel} — income vs expenses
                 </p>
               </div>
               <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
