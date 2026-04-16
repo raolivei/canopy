@@ -20,6 +20,12 @@ from backend.db.models.liability import (
     LiabilityPayment,
 )
 from backend.db.models.transaction import Transaction, TransactionType
+from backend.db.models.portfolio_review import (
+    PortfolioReview,
+    PortfolioReviewLine,
+    ReviewRegion,
+    ReviewSource,
+)
 
 __all__ = [
     # Core assets
@@ -47,4 +53,9 @@ __all__ = [
     # Transactions
     "Transaction",
     "TransactionType",
+    # Portfolio review (semi-annual snapshots)
+    "PortfolioReview",
+    "PortfolioReviewLine",
+    "ReviewRegion",
+    "ReviewSource",
 ]

@@ -12,6 +12,7 @@ import {
   Target,
   Plug,
   ChevronLeft,
+  ChevronDown,
   Moon,
   BarChart2,
   Sun,
@@ -20,16 +21,20 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
 
-const navigation = [
+const primaryNavigation = [
   { name: "Dashboard", href: "/", icon: Home },
-  { name: "Portfolio", href: "/portfolio", icon: TrendingUp },
-  { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
+  { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Insights", href: "/insights", icon: Target },
   { name: "Annual Report", href: "/report", icon: BarChart2 },
-  { name: "Import", href: "/import", icon: Upload },
-  { name: "Integrations", href: "/settings/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },
+];
+
+const advancedNavigation = [
+  { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Bank CSV import", href: "/import", icon: Upload },
+  { name: "Integrations", href: "/settings/integrations", icon: Plug },
 ];
 
 interface SidebarProps {
@@ -41,6 +46,7 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -161,7 +167,7 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {primaryNavigation.map((item) => {
             const isActive =
               router.pathname === item.href ||
               (item.href !== "/" && router.pathname.startsWith(item.href));
@@ -203,6 +209,56 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
               </Link>
             );
           })}
+
+          {!isCollapsed && (
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen(!advancedOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+            >
+              <ChevronDown
+                className={cn("w-4 h-4 transition-transform", advancedOpen ? "rotate-180" : "")}
+              />
+              Advanced / legacy
+            </button>
+          )}
+
+          {(advancedOpen || isCollapsed) &&
+            advancedNavigation.map((item) => {
+              const isActive =
+                router.pathname === item.href ||
+                (item.href !== "/" && router.pathname.startsWith(item.href));
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      : "text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-800 dark:hover:text-slate-200"
+                  )}
+                  title={isCollapsed ? item.name : undefined}
+                >
+                  <Icon className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500" />
+                  <AnimatePresence mode="wait">
+                    {!isCollapsed && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="truncate"
+                      >
+                        {item.name}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </Link>
+              );
+            })}
         </nav>
 
         {/* Footer */}

@@ -8,7 +8,7 @@ from backend.app.config import get_settings
 
 # Import transaction and currency routers if they exist
 try:
-    from backend.api import transactions, currency, csv_import
+    from backend.api import csv_import, currency, transactions
     HAS_TRANSACTION_ROUTERS = True
 except ImportError:
     HAS_TRANSACTION_ROUTERS = False
@@ -19,6 +19,12 @@ try:
     HAS_PORTFOLIO_ROUTER = True
 except ImportError:
     HAS_PORTFOLIO_ROUTER = False
+
+try:
+    from backend.api import portfolio_reviews
+    HAS_PORTFOLIO_REVIEWS_ROUTER = True
+except ImportError:
+    HAS_PORTFOLIO_REVIEWS_ROUTER = False
 
 # Import integrations router
 try:
@@ -67,6 +73,9 @@ def create_app() -> FastAPI:
     # Include portfolio router if available
     if HAS_PORTFOLIO_ROUTER:
         app.include_router(portfolio.router)
+
+    if HAS_PORTFOLIO_REVIEWS_ROUTER:
+        app.include_router(portfolio_reviews.router)
     
     # Include integrations router if available
     if HAS_INTEGRATIONS_ROUTER:

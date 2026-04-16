@@ -9,6 +9,23 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [0.7.0] - 2026-04-01 - Portfolio review (semi-annual) pivot
+
+### Added
+
+- **Portfolio review model**: `portfolio_reviews` and `portfolio_review_lines` (Alembic `20260401_0005`) for spreadsheet-style rows without requiring synced `Asset` records; one review per `as_of_date` by default.
+- **CSV/TSV parser** (`services/portfolio_review_parser.py`): multi-section Brazil / Canada / Crypto blocks, tab/comma detection, skips plan rows with empty values, normalizes `~`, commas, em-dash placeholders, footnotes on numeric cells.
+- **API** (`/v1/portfolio-reviews`): list, get by id, delete, `POST /import` (multipart file, optional `replace=true`), `GET /timeline`, `GET /{id}/allocation` (`group_by=region|platform|conviction`), `GET /compare`, `POST /import/preview`.
+- **Dashboard** (`pages/index.tsx`): total USD from latest review, change vs previous review, line chart over reviews, pie charts by region and platform; empty state links to import.
+- **Import page** (`/portfolio/import`): upload portfolio snapshot file.
+
+### Changed
+
+- **Navigation**: Primary items emphasize Dashboard, Import snapshot, Holdings, Accounts, Insights, Report, Settings. **Advanced / legacy** (collapsible): Transactions, Bank CSV import, Integrations. Command palette and mobile bottom nav aligned (mobile drops Transactions from the bar; use More / palette).
+- **Positioning**: README describes portfolio progress tracking as the main story; bank/API sync documented as advanced.
+
+---
+
 ## [0.6.0] - 2026-02-18 - Modern UI Redesign
 
 ### Changed

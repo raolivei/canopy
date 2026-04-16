@@ -18,6 +18,8 @@ from backend.db.models import (
     PriceHistory,
     PortfolioSnapshot,
     SnapshotHolding,
+    PortfolioReview,
+    PortfolioReviewLine,
 )
 
 # Alembic Config object

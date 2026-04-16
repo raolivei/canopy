@@ -3,16 +3,16 @@ import { useRouter } from "next/router";
 import {
   Home,
   TrendingUp,
-  DollarSign,
   Wallet,
   Menu,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 
 const mobileNavItems = [
   { name: "Home", href: "/", icon: Home },
-  { name: "Portfolio", href: "/portfolio", icon: TrendingUp },
-  { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Import", href: "/portfolio/import", icon: Upload },
+  { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "More", href: "/settings", icon: Menu },
 ];

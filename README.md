@@ -2,7 +2,9 @@
 
 **Your financial life. Under one canopy.**
 
-Canopy is a self-hosted personal finance, investment, and budgeting dashboard inspired by Monarch Money, Ghostfolio, and Firefly III. It runs fully local on Raspberry Pi k3s clusters with a lean footprint, storing all data locally without cloud dependencies.
+Canopy is a self-hosted personal finance dashboard. The **primary workflow** is a **semi-annual portfolio review**: import structured spreadsheet snapshots (Brazil / Canada / Crypto sections), store history by as-of date, and visualize allocation and total USD over time. Budgeting, bank CSV imports, Wise/Questrade-style integrations, and lot-level holdings remain available under **Advanced / legacy** in the sidebar—they are not the main navigation focus.
+
+It is inspired by Monarch Money, Ghostfolio, and Firefly III, runs fully local on Raspberry Pi k3s clusters with a lean footprint, and stores all data locally without cloud dependencies.
 
 ## Project Objectives
 
