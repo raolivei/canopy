@@ -57,24 +57,10 @@ const integrations: Integration[] = [
     docsUrl: "https://www.questrade.com/api/documentation",
   },
   {
-    id: "moomoo",
-    name: "Moomoo",
-    logo: "🐄",
-    description: "Commission-free trading. Requires OpenD gateway running locally.",
-    status: "disconnected",
-    setupSteps: [
-      "Download OpenD from Futu's developer portal",
-      "Install and run OpenD on your computer",
-      "Configure RSA key authentication",
-      "Connect Canopy to your local OpenD instance",
-    ],
-    docsUrl: "https://openapi.futunn.com/",
-  },
-  {
     id: "wise",
     name: "Wise",
     logo: "💱",
-    description: "Multi-currency account. Track your CAD, USD, BRL balances automatically.",
+    description: "Track your CAD balance automatically (FX conversions are folded into CAD).",
     status: "disconnected",
     setupSteps: [
       "Log in to Wise and go to Settings",
@@ -98,287 +84,6 @@ const integrations: Integration[] = [
     docsUrl: "",
   },
 ];
-
-interface MoomooAccount {
-  acc_id: number;
-  acc_type: string;
-  card_num: string;
-  currency: string;
-  market: string;
-  status: string;
-}
-
-interface MoomooPosition {
-  code: string;
-  name: string;
-  quantity: number;
-  cost_price: number | null;
-  current_price: number | null;
-  market_value: number | null;
-  profit_loss: number | null;
-  profit_loss_pct: number | null;
-  currency: string;
-  market: string;
-}
-
-function MoomooCard({ integration }: { integration: Integration }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [host, setHost] = useState("127.0.0.1");
-  const [port, setPort] = useState("11111");
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "pending">("disconnected");
-  const [connectionDetails, setConnectionDetails] = useState<Record<string, unknown> | null>(null);
-  const [accounts, setAccounts] = useState<MoomooAccount[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<MoomooAccount | null>(null);
-  const [positions, setPositions] = useState<MoomooPosition[]>([]);
-  const [loadingPositions, setLoadingPositions] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const testConnection = async () => {
-    setIsConnecting(true);
-    setError(null);
-    setConnectionStatus("pending");
-    
-    try {
-      const response = await fetch(`${INTEGRATIONS_BASE}/moomoo/test-connection`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host, port: parseInt(port) }),
-      });
-      
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || "Connection failed");
-      }
-      
-      const data = await response.json();
-      setConnectionStatus("connected");
-      setConnectionDetails(data.details);
-      
-      const accResponse = await fetch(`${INTEGRATIONS_BASE}/moomoo/accounts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host, port: parseInt(port) }),
-      });
-      
-      if (accResponse.ok) {
-        const accData = await accResponse.json();
-        setAccounts(accData);
-      }
-    } catch (err: unknown) {
-      setConnectionStatus("disconnected");
-      setError(err instanceof Error ? err.message : "Failed to connect to OpenD gateway");
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const fetchPositions = async (account: MoomooAccount) => {
-    setLoadingPositions(true);
-    setSelectedAccount(account);
-    
-    try {
-      const response = await fetch(`${INTEGRATIONS_BASE}/moomoo/positions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          host,
-          port: parseInt(port),
-          acc_id: account.acc_id,
-          market: account.market || "US",
-        }),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setPositions(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch positions:", err);
-    } finally {
-      setLoadingPositions(false);
-    }
-  };
-
-  return (
-    <Card>
-      <div
-        className="p-6 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-3xl">{integration.logo}</span>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                {integration.name}
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                {integration.description}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <StatusBadge status={connectionStatus} />
-            <ChevronRight className={cn("w-5 h-5 text-slate-400 transition-transform", isExpanded && "rotate-90")} />
-          </div>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="px-6 pb-6 border-t border-slate-100 dark:border-slate-800">
-              <div className="pt-4 space-y-6">
-                <SetupInstructions steps={integration.setupSteps} docsUrl={integration.docsUrl} docsLabel="Download OpenD" />
-
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                    <Server className="w-4 h-4" />
-                    OpenD Gateway Connection
-                  </h4>
-                  
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <Input
-                      label="Host"
-                      value={host}
-                      onChange={(e) => setHost(e.target.value)}
-                      placeholder="127.0.0.1"
-                      inputSize="sm"
-                    />
-                    <Input
-                      label="Port"
-                      value={port}
-                      onChange={(e) => setPort(e.target.value)}
-                      placeholder="11111"
-                      inputSize="sm"
-                    />
-                  </div>
-
-                  {error && (
-                    <div className="mb-3 p-2 bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 rounded text-sm text-danger-700 dark:text-danger-400">
-                      {error}
-                    </div>
-                  )}
-
-                  <Button
-                    variant="primary"
-                    className="w-full"
-                    onClick={(e) => { e.stopPropagation(); testConnection(); }}
-                    loading={isConnecting}
-                    leftIcon={<Plug className="w-4 h-4" />}
-                  >
-                    {isConnecting ? "Connecting..." : "Test Connection"}
-                  </Button>
-                </div>
-
-                {connectionStatus === "connected" && connectionDetails && (
-                  <div className="p-3 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg">
-                    <h5 className="text-sm font-medium text-success-800 dark:text-success-300 mb-2">Connected to OpenD</h5>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-success-700 dark:text-success-400">
-                      <span>US Market: {String(connectionDetails.market_us)}</span>
-                      <span>HK Market: {String(connectionDetails.market_hk)}</span>
-                      <span>Server Version: {String(connectionDetails.server_ver)}</span>
-                    </div>
-                  </div>
-                )}
-
-                {accounts.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Trading Accounts</h4>
-                    <div className="space-y-2">
-                      {accounts.map((account) => (
-                        <div
-                          key={account.acc_id}
-                          className={cn(
-                            "p-3 rounded-lg border cursor-pointer transition-colors",
-                            selectedAccount?.acc_id === account.acc_id
-                              ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
-                              : "border-slate-200 dark:border-slate-700 hover:border-primary-300"
-                          )}
-                          onClick={(e) => { e.stopPropagation(); fetchPositions(account); }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <span className="font-medium text-slate-900 dark:text-white">{account.acc_type}</span>
-                              <span className="ml-2 text-sm text-slate-500">#{account.card_num || account.acc_id}</span>
-                            </div>
-                            <Badge variant="secondary" size="sm">{account.currency} • {account.market}</Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedAccount && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
-                      Positions ({selectedAccount.acc_type})
-                    </h4>
-                    {loadingPositions ? (
-                      <div className="flex items-center justify-center py-4 text-slate-500">
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                        Loading positions...
-                      </div>
-                    ) : positions.length === 0 ? (
-                      <div className="text-center py-4 text-slate-500 dark:text-slate-400">No positions found</div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                        <table className="w-full text-sm">
-                          <thead className="bg-slate-50 dark:bg-slate-800">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Symbol</th>
-                              <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Qty</th>
-                              <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Price</th>
-                              <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Value</th>
-                              <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">P/L</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {positions.map((pos) => (
-                              <tr key={pos.code}>
-                                <td className="px-3 py-2">
-                                  <div className="font-medium text-slate-900 dark:text-white">{pos.code.split(".")[1] || pos.code}</div>
-                                  <div className="text-xs text-slate-500 truncate max-w-[150px]">{pos.name}</div>
-                                </td>
-                                <td className="px-3 py-2 text-right text-slate-900 dark:text-white">{pos.quantity}</td>
-                                <td className="px-3 py-2 text-right text-slate-900 dark:text-white">
-                                  {pos.current_price?.toFixed(2) ?? "-"}
-                                </td>
-                                <td className="px-3 py-2 text-right text-slate-900 dark:text-white">
-                                  {pos.market_value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "-"}
-                                </td>
-                                <td className={cn("px-3 py-2 text-right", (pos.profit_loss ?? 0) >= 0 ? "text-success-600" : "text-danger-600")}>
-                                  {pos.profit_loss !== null ? (
-                                    <>
-                                      {pos.profit_loss >= 0 ? "+" : ""}{pos.profit_loss.toFixed(2)}
-                                      <span className="text-xs ml-1">({pos.profit_loss_pct?.toFixed(2)}%)</span>
-                                    </>
-                                  ) : "-"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
-  );
-}
 
 function WiseCard({ integration }: { integration: Integration }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -840,7 +545,7 @@ function IntegrationCard({
               <div className="pt-4 space-y-4">
                 <SetupInstructions steps={integration.setupSteps} docsUrl={integration.docsUrl} />
 
-                {integration.id !== "wealthsimple" && integration.id !== "moomoo" && (
+                {integration.id !== "wealthsimple" && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       API Token
@@ -963,11 +668,10 @@ export default function Integrations() {
               <Check className="w-5 h-5 text-success-600 dark:text-success-400 flex-shrink-0 mt-0.5" />
               <div>
                 <h3 className="font-medium text-success-900 dark:text-success-300">
-                  Wise &amp; Moomoo integrations available
+                  Wise integration available
                 </h3>
                 <p className="text-sm text-success-700 dark:text-success-400 mt-1">
-                  <strong>Wise:</strong> Connect with an API token (wise.com → Settings → API tokens), then Sync to pull balances and transactions into Canopy.{" "}
-                  <strong className="ml-1">Moomoo:</strong> Connect via the local OpenD gateway to view positions and market data.
+                  <strong>Wise:</strong> Connect with an API token (wise.com → Settings → API tokens), then Sync to pull balances and transactions into Canopy.
                 </p>
               </div>
             </div>
@@ -985,8 +689,6 @@ export default function Integrations() {
         {integrations.map((integration) =>
           integration.id === "wise" ? (
             <WiseCard key={integration.id} integration={integration} />
-          ) : integration.id === "moomoo" ? (
-            <MoomooCard key={integration.id} integration={integration} />
           ) : integration.id === "questrade" ? (
             <QuestradeCard key={integration.id} integration={integration} />
           ) : (

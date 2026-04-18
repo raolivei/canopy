@@ -81,7 +81,7 @@ export default function AddAssetModal({ isOpen, onClose, onAdd, apiUrl }: AddAss
       symbol: symbol.toUpperCase(),
       name: quote?.name || symbol.toUpperCase(),
       asset_type: assetType,
-      currency: quote?.currency || "USD",
+      currency: quote?.currency || "CAD",
       quantity: parseFloat(quantity),
       price_per_unit: parseFloat(pricePerUnit),
       purchase_date: purchaseDate,
@@ -138,7 +138,7 @@ export default function AddAssetModal({ isOpen, onClose, onAdd, apiUrl }: AddAss
             <Input
               value={symbol}
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-              placeholder="AAPL, BTC-USD, VOO..."
+              placeholder="VFV.TO, XEQT.TO, AAPL..."
               leftIcon={<Search className="w-4 h-4" />}
               error={error || undefined}
             />
@@ -213,9 +213,9 @@ export default function AddAssetModal({ isOpen, onClose, onAdd, apiUrl }: AddAss
           <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
             <p className="text-sm text-slate-500 dark:text-slate-400">Total Cost</p>
             <p className="text-xl font-bold text-slate-900 dark:text-white">
-              {new Intl.NumberFormat("en-US", {
+              {new Intl.NumberFormat("en-CA", {
                 style: "currency",
-                currency: quote?.currency || "USD",
+                currency: quote?.currency || "CAD",
               }).format(parseFloat(quantity) * parseFloat(pricePerUnit))}
             </p>
           </div>

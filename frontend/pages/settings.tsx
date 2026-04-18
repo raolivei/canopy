@@ -17,9 +17,20 @@ import {
   Plug,
   ChevronRight,
   Check,
+  UploadCloud,
+  Upload,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+interface RowCounts {
+  counts: Record<string, number>;
+  total: number;
+}
 
 export default function Settings() {
   const [displayCurrency, setDisplayCurrency] = useState("CAD");
@@ -41,13 +52,7 @@ export default function Settings() {
     }
   };
 
-  const currencyOptions = [
-    { value: "CAD", label: "CAD - Canadian Dollar" },
-    { value: "USD", label: "USD - US Dollar" },
-    { value: "BRL", label: "BRL - Brazilian Real" },
-    { value: "EUR", label: "EUR - Euro" },
-    { value: "GBP", label: "GBP - British Pound" },
-  ];
+  const currencyOptions = [{ value: "CAD", label: "CAD - Canadian Dollar" }];
 
   return (
     <PageLayout title="Settings" description="Manage your preferences">

@@ -66,9 +66,7 @@ async def _collect_files(
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
     if len(files) > MAX_FILES:
-        raise HTTPException(
-            status_code=400, detail=f"Too many files (max {MAX_FILES})"
-        )
+        raise HTTPException(status_code=400, detail=f"Too many files (max {MAX_FILES})")
     collected: list[tuple[str, str]] = []
     for upload in files:
         if not upload.filename:
@@ -144,9 +142,6 @@ _INVESTMENT_TYPES = {
     AssetType.RETIREMENT_TFSA,
     AssetType.RETIREMENT_FHSA,
     AssetType.RETIREMENT_DPSP,
-    AssetType.RETIREMENT_401K,
-    AssetType.RETIREMENT_IRA,
-    AssetType.RETIREMENT_ROTH_IRA,
     AssetType.CRYPTO,
     AssetType.STOCK,
     AssetType.ETF,
@@ -166,9 +161,7 @@ _CASH_TYPES = {
 def list_accounts(db: DbSession) -> list[WsAccountSummary]:
     summaries: list[WsAccountSummary] = []
 
-    assets = db.execute(
-        select(Asset).where(Asset.sync_source == "wealthsimple")
-    ).scalars().all()
+    assets = db.execute(select(Asset).where(Asset.sync_source == "wealthsimple")).scalars().all()
     for asset in assets:
         latest = db.execute(
             select(AccountBalanceHistory)
@@ -181,9 +174,7 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
                 kind="asset",
                 symbol_or_name=asset.symbol,
                 display_name=asset.name,
-                account_type=asset.asset_type.value
-                if hasattr(asset.asset_type, "value")
-                else str(asset.asset_type),
+                account_type=asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
                 institution=asset.institution or "Wealthsimple",
                 currency=asset.currency,
                 current_balance=latest.balance if latest else None,
@@ -191,9 +182,7 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
             )
         )
 
-    liabilities = db.execute(
-        select(Liability).where(Liability.institution == "Wealthsimple")
-    ).scalars().all()
+    liabilities = db.execute(select(Liability).where(Liability.institution == "Wealthsimple")).scalars().all()
     for liab in liabilities:
         summaries.append(
             WsAccountSummary(
@@ -204,11 +193,7 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
                 institution=liab.institution,
                 currency=liab.currency,
                 current_balance=liab.current_balance,
-                balance_updated_at=(
-                    liab.balance_updated_at.date()
-                    if liab.balance_updated_at is not None
-                    else None
-                ),
+                balance_updated_at=(liab.balance_updated_at.date() if liab.balance_updated_at is not None else None),
             )
         )
     return summaries
@@ -244,9 +229,7 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
     # sorted chronologically, then carry forward.
     from collections import defaultdict
 
-    events: dict[date, dict[str, dict[int, Decimal]]] = defaultdict(
-        lambda: {"inv": {}, "cash": {}, "debt": {}}
-    )
+    events: dict[date, dict[str, dict[int, Decimal]]] = defaultdict(lambda: {"inv": {}, "cash": {}, "debt": {}})
 
     for as_of, asset_id, balance, asset_type in asset_rows:
         if as_of is None:

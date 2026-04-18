@@ -5,9 +5,10 @@ Revises: 20260401_0005
 Create Date: 2026-04-18
 
 """
-from alembic import op
+
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "20260418_0006"
 down_revision = "20260401_0005"
@@ -46,9 +47,7 @@ def upgrade() -> None:
         sa.Column("asset_id", sa.Integer(), nullable=False),
         sa.Column("as_of_date", sa.Date(), nullable=False),
         sa.Column("balance", sa.Numeric(precision=18, scale=2), nullable=False),
-        sa.Column(
-            "currency", sa.String(length=10), nullable=False, server_default="CAD"
-        ),
+        sa.Column("currency", sa.String(length=10), nullable=False, server_default="CAD"),
         sa.Column("source", sa.String(length=50), nullable=True),
         sa.Column(
             "created_at",
@@ -56,13 +55,9 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(
-            ["asset_id"], ["assets.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["asset_id"], ["assets.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "asset_id", "as_of_date", name="uq_account_balance_asset_date"
-        ),
+        sa.UniqueConstraint("asset_id", "as_of_date", name="uq_account_balance_asset_date"),
     )
     op.create_index(
         op.f("ix_account_balance_history_asset_id"),
@@ -88,7 +83,5 @@ def downgrade() -> None:
         table_name="account_balance_history",
     )
     op.drop_table("account_balance_history")
-    op.drop_index(
-        op.f("ix_imported_events_hash"), table_name="imported_events"
-    )
+    op.drop_index(op.f("ix_imported_events_hash"), table_name="imported_events")
     op.drop_table("imported_events")

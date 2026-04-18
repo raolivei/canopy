@@ -119,9 +119,7 @@ def detect_shape(header: list[str]) -> ShapeKind:
     norm = [h.strip().lower() for h in header]
     if {"date", "transaction", "description", "amount", "balance", "currency"}.issubset(set(norm)):
         return ShapeKind.SHAPE_A
-    if {"transaction_date", "post_date", "type", "details", "amount", "currency"}.issubset(
-        set(norm)
-    ):
+    if {"transaction_date", "post_date", "type", "details", "amount", "currency"}.issubset(set(norm)):
         return ShapeKind.SHAPE_B
     return ShapeKind.UNKNOWN
 

@@ -2,12 +2,12 @@
 15 Apr 2026,,,,,,,,,,,,,,
 Investment,Platform,Currency,Value (BRL),USD,% Brazil,% Global,Return,Div/Yr,Yield,FX,Target %,Delta,Conviction,Action
 CPTS11,FII XP,BRL,"10,000","2,000",1.50%,0.50%,~5.2%,—,—,BRL,—,—,4,Hold
-VTI (QT),Questrade,USD,—,—,—,—,—,—,—,—,—,—,—,—,—
 ,,,,,,,,,,,,,,
 🇨🇦 Canada Portfolio,,,,,,,,,,,,,,
 15 Apr 2026,,,,,,,,,,,,,,
-Investment,Platform,Currency,Value (CAD),USD,% Canada,% Global,Return,Div/Yr,Yield,FX,Target %,Delta,Conviction,Action
-VCN,Vanguard,CAD,"5,000","3,500",10%,5%,—,—,—,CAD,—,—,3,Hold
+Investment,Platform,Value (CAD),% Global,Return,Div/Yr,Yield,Target %,Delta,Conviction,Action
+VCN,Vanguard,"5,000",5,—,—,—,—,—,3,Hold
+VTI (QT),Questrade,—,—,—,—,—,—,—,—,—
 ,,,,,,,,,,,,,,
 ₿ CRYPTO Portfolio,,,,,,,,,,,,,,
 15 Apr 2026,,,,,,,,,,,,,,

@@ -32,9 +32,8 @@ import { motion } from "framer-motion";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const EXCHANGE_RATES: Record<string, Record<string, number>> = {
-  USD: { USD: 1, CAD: 1.35, BRL: 5.0, BTC: 0.000016, ETH: 0.00035 },
-  CAD: { USD: 0.74, CAD: 1, BRL: 3.7, BTC: 0.000012, ETH: 0.00026 },
-  BRL: { USD: 0.2, CAD: 0.27, BRL: 1, BTC: 0.0000032, ETH: 0.00007 },
+  USD: { CAD: 1.35 },
+  CAD: { CAD: 1 },
 };
 
 interface PortfolioSummary {
@@ -66,27 +65,17 @@ export default function Portfolio() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("holdings");
   const [performancePeriod, setPerformancePeriod] = useState("30d");
-  const [displayCurrency, setDisplayCurrency] = useState("CAD");
+  const displayCurrency = "CAD";
   const [currencyFilter, setCurrencyFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const convertToDisplay = (value: number | string | null, fromCurrency: string): number => {
     if (value === null) return 0;
     const numValue = Number(value);
-    if (fromCurrency === displayCurrency) return numValue;
-
-    if (fromCurrency === "BTC") {
-      const btcToUsd = numValue * 62000;
-      return convertToDisplay(btcToUsd, "USD");
-    }
-    if (fromCurrency === "ETH") {
-      const ethToUsd = numValue * 2400;
-      return convertToDisplay(ethToUsd, "USD");
-    }
-
+    if (fromCurrency === "CAD") return numValue;
     const rates = EXCHANGE_RATES[fromCurrency];
     if (!rates) return numValue;
-    return numValue * (rates[displayCurrency] || 1);
+    return numValue * (rates.CAD || 1);
   };
 
   const { data: summary, isLoading: summaryLoading } = useQuery<PortfolioSummary>({
@@ -231,12 +220,6 @@ export default function Portfolio() {
     ...availableCurrencies.map((c) => ({ value: c, label: c })),
   ];
 
-  const displayCurrencyOptions = [
-    { value: "CAD", label: "CAD" },
-    { value: "USD", label: "USD" },
-    { value: "BRL", label: "BRL" },
-  ];
-
   if (summaryLoading) {
     return (
       <PageLayout title="Portfolio">
@@ -292,12 +275,6 @@ export default function Portfolio() {
                 value={currencyFilter}
                 onChange={setCurrencyFilter}
                 className="w-36"
-              />
-              <Select
-                options={displayCurrencyOptions}
-                value={displayCurrency}
-                onChange={setDisplayCurrency}
-                className="w-24"
               />
               <Button
                 variant="secondary"

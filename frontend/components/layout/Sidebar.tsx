@@ -109,9 +109,11 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                 transition={{ duration: 0.15 }}
                 className="flex items-center gap-2"
               >
-                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">C</span>
-                </div>
+                <img
+                  src="/brand/canopy-icon.svg"
+                  alt="Canopy"
+                  className="w-8 h-8 rounded-lg"
+                />
                 <span className="font-semibold text-slate-900 dark:text-white">
                   Canopy
                 </span>
@@ -123,9 +125,13 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center mx-auto"
+                className="mx-auto"
               >
-                <span className="text-white font-bold text-sm">C</span>
+                <img
+                  src="/brand/canopy-icon.svg"
+                  alt="Canopy"
+                  className="w-8 h-8 rounded-lg"
+                />
               </motion.div>
             )}
           </AnimatePresence>

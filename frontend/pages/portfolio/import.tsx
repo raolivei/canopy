@@ -56,7 +56,7 @@ export default function PortfolioImportPage() {
     <PageLayout title="Import snapshot">
       <PageHeader
         title="Import portfolio snapshot"
-        description="Upload your Brazil / Canada / Crypto export (CSV or tab-separated). Same as-of date twice requires replace."
+        description="Upload a Canadian holdings snapshot (CSV or tab-separated) for assets that don't auto-sync — e.g. private equity, real estate, DPSP. Brazil and crypto sections are ignored."
       />
 
       <Card className="max-w-xl">

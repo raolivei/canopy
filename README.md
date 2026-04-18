@@ -1,23 +1,23 @@
 # Canopy
 
-**Your financial life. Under one canopy.**
+**Your Canadian investments. Under one canopy.**
 
-Canopy is a self-hosted personal finance dashboard built around **continuous net-worth tracking**:
+Canopy is a self-hosted Canadian-investment tracker built around **continuous net-worth tracking in CAD**:
 
-- **Drop Wealthsimple statements** (any mix of TFSA / RRSP / FHSA / Crypto / Chequing / Credit Card / Line of Credit CSVs) — they're auto-classified into investments, cash, and debt and de-duplicated on re-import.
-- **Capture everything that doesn't auto-sync** (Brazilian brokerages, Binance, private equity, real estate) as dated **portfolio review snapshots** — TSV/CSV in, history by as-of date out.
-- **See one net-worth number** on the dashboard (investments + cash − debt), with a combined timeline chart built from every statement drop and every review snapshot.
+- **Drop Wealthsimple statements** (any mix of TFSA / RRSP / FHSA / Crypto / Chequing / Credit Card / Line of Credit CSVs) — they're auto-classified into investments, cash, and debt and de-duplicated on re-import. Accounts are created automatically; they show up under Accounts (cash + credit + LOC) or Holdings (investments).
+- **Capture CAD-denominated holdings that don't auto-sync** (private equity, real estate, DPSP) as dated **portfolio review snapshots** — TSV/CSV in, history by as-of date out.
+- **See one net-worth number in CAD** on the dashboard (investments + cash − debt), with a combined timeline chart built from every statement drop and every review snapshot.
 
 It is inspired by Monarch Money, Ghostfolio, and Firefly III, runs fully local on Raspberry Pi k3s clusters (accessed privately over Tailscale — never on the public internet), and stores all data locally without cloud dependencies.
 
 ## Project Objectives
 
-- Combine portfolio, budgeting, and net-worth views into a single dashboard.
+- A single dashboard for Canadian net-worth tracking — investments, cash, and debt in **CAD only**.
+- Drop-in Wealthsimple statement support; Questrade / Wise / RBC CSV next.
 - Store all data locally — no cloud dependencies.
-- Support multi-currency (CAD, USD, BRL, EUR, GBP) assets.
-- Allow easy CSV/OFX imports for banks and brokerages.
+- Accounts page separates bank / credit / LOC from investment holdings.
 - Run lean — optimized for Raspberry Pi hardware.
-- Be modular so other developers can fork and extend.
+- Modular so other developers can fork and extend.
 
 ### Design Rationale
 
@@ -31,8 +31,8 @@ Financial health requires seeing the big picture. Combining portfolio, budgeting
 - **Control:** You decide when and how to back up
 - **Compliance:** Meets data residency requirements
 
-**Why Multi-Currency?**
-Modern users often have assets across currencies. Proper currency support enables accurate net worth calculation and meaningful spending analysis regardless of transaction currency.
+**Why CAD Only?**
+Scope keeps the product simple and the UX uncluttered. Canopy is built for Canadians tracking Canadian-registered accounts (TFSA / RRSP / FHSA / DPSP) and CAD-denominated debt. Foreign-listed securities inside a Wealthsimple account are still imported — only the reporting currency is fixed.
 
 **Why CSV/OFX Import?**
 Most banks don't offer APIs. CSV/OFX files are universal formats that allow users to import transaction history from any financial institution, making the tool truly platform-agnostic.
@@ -48,9 +48,9 @@ Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net wort
 
 **Supported account classes** (auto-classified from filename + header):
 
-- **Investments** → `Asset` (kind `investment_account`): TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging (`🇮🇳🇯🇵🇧🇷`), Crypto.
-- **Cash** → `Asset` (kind `bank_account`): Chequing.
-- **Debt** → `Liability`: credit card, Portfolio line of credit.
+- **Investments** → `Asset`: TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging (`🇮🇳🇯🇵🇧🇷`), Crypto. Shown on **Holdings**.
+- **Cash** → `Asset` (`BANK_CHECKING`): Chequing. Shown on **Accounts**.
+- **Debt** → `Liability`: credit card, Portfolio line of credit. Shown on **Accounts**.
 - **Skipped**: Direct Indexing (flagged but never written).
 
 **Flow**:
@@ -68,29 +68,27 @@ Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net wort
 - Migration: `backend/alembic/versions/20260419_0007_add_liability_opening_balance.py`
 - Tests: `backend/tests/test_wealthsimple_{filename_parser,description_parser,importer}.py` (30 tests)
 
-### Portfolio Review Snapshots (✅ Implemented in 0.7.0)
+### Portfolio Review Snapshots (✅ Implemented in 0.7.0, CAD-only in 0.9.0)
 
-For anything that doesn't export a machine-readable CSV (Brazilian brokerages, Binance, private assets, real estate), drop a TSV/CSV snapshot at `/portfolio/import` and Canopy persists it as a dated review row. These snapshots feed the same net-worth timeline as the Wealthsimple imports.
+For CAD-denominated holdings that don't export a machine-readable CSV (private equity, real estate, DPSP), drop a TSV/CSV snapshot at `/portfolio/import` and Canopy persists it as a dated review row. Non-Canadian sections (Brazil, Crypto) in legacy spreadsheets are ignored; only the Canadian block is ingested.
 
 ### Transaction Management (✅ Implemented)
 
 - ✅ Transaction tracking with categories and types (income, expense, transfer, buy, sell)
-- ✅ Multi-currency FX conversions with display currency toggle
+- ✅ Single-currency (CAD) display across the app
 - ✅ Modern Monarch Money-inspired UI with dark mode support
 - ✅ Dashboard with charts and statistics (cash flow, spending by category)
 - ✅ Transaction CRUD API endpoints
-- ✅ Currency conversion API endpoints
-- ✅ CSV import with smart format detection (Monarch Money, Chase, Bank of America, etc.)
+- ✅ CSV import for Wealthsimple / RBC / TD / Scotiabank / generic CSV
 - ✅ Duplicate detection and validation
 - ✅ Investment transaction tracking with ticker symbols
 - ✅ Rich transaction data (merchant, notes, tags, original statement)
 
 ### Portfolio & Insights (✅ Implemented)
 
-- ✅ Investment portfolio tracking (stocks, ETFs, crypto, retirement accounts)
-- ✅ Net worth dashboard with multi-currency support (USD/CAD/BRL/EUR base)
-- ✅ Asset allocation by type, currency, country, and institution
-- ✅ Currency exposure analysis with risk assessment
+- ✅ Investment portfolio tracking (stocks, ETFs, crypto, registered accounts TFSA / RRSP / FHSA / DPSP)
+- ✅ Net worth dashboard in CAD
+- ✅ Asset allocation by type, country, and institution
 - ✅ Growth metrics (monthly/yearly rates, best/worst months)
 - ✅ Historical portfolio snapshots and trends
 - ✅ Real estate tracking with payment schedules (50% partnership support)
@@ -107,9 +105,9 @@ For anything that doesn't export a machine-readable CSV (Brazilian brokerages, B
 ### Integrations (🔄 In Progress)
 
 - 🔄 Questrade API (OAuth 2.0) - UI ready, API pending
-- 🔄 Moomoo/Futu OpenAPI - UI ready, API pending
-- 🔄 Wise API - UI ready, API pending
-- ✅ CSV import for all major institutions
+- 🔄 Wise API - UI ready, API pending (CAD balance only)
+- 🔄 RBC Canada CSV export - planned
+- ✅ Wealthsimple CSV drop (`/portfolio/wealthsimple-import`)
 
 ### Planned Features
 
@@ -288,7 +286,7 @@ Canopy now supports importing transactions from CSV files with smart format dete
 
 - 🎯 Automatic format detection
 - 🔍 Duplicate transaction detection
-- 💰 Multi-currency support
+- 🇨🇦 CAD-only (USD-listed securities inside Wealthsimple accounts are still imported)
 - 📊 Import preview before committing
 - 🏷️ Rich data support (merchant, tags, notes, original statement)
 - 📈 Investment transaction tracking (Buy/Sell with ticker symbols)
@@ -302,9 +300,9 @@ The Insights page (`/insights`) provides comprehensive financial analytics:
 
 ### Net Worth Dashboard
 
-- Total net worth with multi-currency support
+- Total net worth in CAD
 - Assets vs liabilities breakdown
-- Currency exposure analysis
+- Allocation by account type / country / institution
 - Growth metrics (monthly, yearly, YTD)
 
 ### FIRE Calculator
@@ -318,7 +316,7 @@ Calculate your path to Financial Independence:
 
 Default assumptions (customizable):
 
-- Monthly expenses: $5,000 CAD (~$3,600 USD)
+- Monthly expenses: C$5,000
 - Safe Withdrawal Rate: 4%
 - Expected Return: 7%
 
@@ -331,27 +329,14 @@ Compare different scenarios:
 - Reduce expenses by 10%
 - 8% vs 7% vs 5% annual returns
 
-## Database Seeding
+## Bootstrapping data
 
-To populate the database with sample data:
+Canopy has no seed script — it is designed to be populated from your own statements:
 
-```bash
-cd backend
+1. Drop a Wealthsimple monthly statement (any combination of TFSA / RRSP / FHSA / Chequing / Credit Card / LOC / Crypto CSVs) at `/portfolio/wealthsimple-import`. Accounts + transactions + balance snapshots are created automatically.
+2. (Optional) Drop a CAD portfolio snapshot (TSV/CSV) at `/portfolio/import` for holdings that don't auto-sync (private equity, real estate, DPSP).
 
-# Seed the database
-python -m backend.scripts.seed_portfolio
-
-# Clear and reseed
-python -m backend.scripts.seed_portfolio --clear
-```
-
-The seed script includes:
-
-- 40+ accounts across Canada, USA, and Brazil
-- Historical snapshots from Sep 2024 to present
-- Real estate (apartment with 50% ownership)
-- Liabilities (credit cards, car loan)
-- Crypto holdings (by platform and aggregated by coin)
+Both paths feed the same net-worth timeline and Accounts page.
 
 ## Documentation
 
@@ -367,7 +352,6 @@ The seed script includes:
 Track ongoing development:
 
 - [#21 - Questrade API Integration](https://github.com/raolivei/canopy/issues/21)
-- [#22 - Moomoo API Integration](https://github.com/raolivei/canopy/issues/22)
 - [#23 - Wise API Integration](https://github.com/raolivei/canopy/issues/23)
 - [#24 - Dividend Tracking](https://github.com/raolivei/canopy/issues/24)
 - [#25 - Real-time Currency Rates](https://github.com/raolivei/canopy/issues/25)

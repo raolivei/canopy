@@ -40,7 +40,7 @@ cd frontend && npm run lint                   # TypeScript
 
 ## Project Overview
 
-Self-hosted personal finance dashboard. Runs on **eldertree** k3s cluster.
+Self-hosted Canadian investment tracker (CAD only). Runs on **eldertree** k3s cluster. The app ingests Wealthsimple monthly statements and optional CAD portfolio snapshots; all dashboard numbers are CAD. When adding features, assume CAD is the only reporting currency and that the Accounts page is for cash / credit / LOC while Holdings is for investments.
 
 ```
 canopy/
@@ -91,5 +91,6 @@ canopy/
 
 - **Self-hosted only**: No cloud dependencies
 - **Privacy-first**: All data stored locally
-- **Multi-currency**: CAD, USD, BRL, EUR, GBP
+- **CAD only**: Canadian investments focus — no multi-currency FX plumbing
+- **Wealthsimple-first**: Importer auto-creates accounts (cash → Accounts page, investments → Holdings, debt → Accounts page)
 - **Raspberry Pi optimized**: Low-power hardware

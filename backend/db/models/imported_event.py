@@ -26,12 +26,7 @@ class ImportedEvent(Base):
     target_table: Mapped[str] = mapped_column(String(50))
     target_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    imported_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:
-        return (
-            f"<ImportedEvent(hash={self.hash[:8]}..., "
-            f"target={self.target_table}:{self.target_id})>"
-        )
+        return f"<ImportedEvent(hash={self.hash[:8]}..., target={self.target_table}:{self.target_id})>"

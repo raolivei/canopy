@@ -1,6 +1,9 @@
-"""Semi-annual portfolio review snapshots (manual / CSV import).
+"""Portfolio review snapshots (CAD only, Canadian holdings).
 
-Independent of Asset rows — each line is a spreadsheet row (same ticker on two brokers = two lines).
+Manual / CSV import of dated snapshots for holdings that don't auto-sync via
+Wealthsimple. One row per spreadsheet line (same ticker on two brokers = two
+lines). Values are always CAD; the app no longer tracks multi-currency or
+multi-region portfolios.
 """
 
 from datetime import date, datetime
@@ -8,7 +11,17 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, UniqueConstraint, func
+from sqlalchemy import (
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,17 +38,8 @@ class ReviewSource(str, Enum):
     CSV_IMPORT = "csv_import"
 
 
-class ReviewRegion(str, Enum):
-    """Geographic / section bucket from the spreadsheet."""
-
-    BR = "BR"
-    CA = "CA"
-    CRYPTO = "CRYPTO"
-    OTHER = "OTHER"
-
-
 class PortfolioReview(Base):
-    """One portfolio review as-of a date (e.g. semi-annual snapshot)."""
+    """One Canadian portfolio review as-of a date."""
 
     __tablename__ = "portfolio_reviews"
 
@@ -45,7 +49,7 @@ class PortfolioReview(Base):
     source: Mapped[str] = mapped_column(
         String(32), nullable=False, default=ReviewSource.CSV_IMPORT.value
     )
-    total_value_usd: Mapped[Optional[Decimal]] = mapped_column(
+    total_value_cad: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(precision=18, scale=4), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -65,7 +69,7 @@ class PortfolioReview(Base):
 
 
 class PortfolioReviewLine(Base):
-    """Single holding row within a portfolio review."""
+    """Single Canadian holding row within a portfolio review."""
 
     __tablename__ = "portfolio_review_lines"
 
@@ -77,21 +81,13 @@ class PortfolioReviewLine(Base):
     )
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    region: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     investment: Mapped[str] = mapped_column(String(512), nullable=False)
     platform: Mapped[str] = mapped_column(String(256), nullable=False, default="")
-    currency: Mapped[str] = mapped_column(String(16), nullable=False, default="")
 
-    value_native: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=18, scale=4), nullable=True
-    )
-    value_usd: Mapped[Optional[Decimal]] = mapped_column(
+    value_cad: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(precision=18, scale=4), nullable=True
     )
 
-    pct_region: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=10, scale=6), nullable=True
-    )
     pct_global: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(precision=10, scale=6), nullable=True
     )
@@ -105,7 +101,6 @@ class PortfolioReviewLine(Base):
         Numeric(precision=10, scale=6), nullable=True
     )
 
-    fx_note: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     target_pct: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     delta: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     conviction: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
+import PageLayout from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -11,7 +11,11 @@ import {
   Upload,
   ArrowRight,
   RefreshCw,
-  LineChart as LineChartIcon,
+  UploadCloud,
+  Wallet,
+  PiggyBank,
+  CreditCard,
+  Sparkles,
 } from "lucide-react";
 import {
   LineChart,
@@ -40,29 +44,29 @@ import {
 } from "@/utils/chartTheme";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-const USD = "USD";
+const CAD = "CAD";
 
 interface TimelinePoint {
   id: number;
   as_of_date: string;
-  total_value_usd: string | null;
+  total_value_cad: string | null;
 }
 
 interface AllocationSlice {
   key: string;
-  value_usd: string;
+  value_cad: string;
   pct: number;
 }
 
 interface AllocationResponse {
   review_id: number;
   group_by: string;
-  total_usd: string;
+  total_cad: string;
   slices: AllocationSlice[];
 }
 
 interface CompareResponse {
-  total_usd_delta: string | null;
+  total_cad_delta: string | null;
   pct_change: number | null;
 }
 
@@ -86,7 +90,6 @@ export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
-  const [regionAlloc, setRegionAlloc] = useState<AllocationResponse | null>(null);
   const [platformAlloc, setPlatformAlloc] = useState<AllocationResponse | null>(null);
   const [compare, setCompare] = useState<CompareResponse | null>(null);
   const [netWorth, setNetWorth] = useState<NetWorthResponse | null>(null);
@@ -105,14 +108,11 @@ export default function Dashboard() {
 
       const last = tl.length ? tl[tl.length - 1] : null;
       if (last) {
-        const [rRes, pRes] = await Promise.all([
-          fetch(`${API_URL}/v1/portfolio-reviews/${last.id}/allocation?group_by=region`),
-          fetch(`${API_URL}/v1/portfolio-reviews/${last.id}/allocation?group_by=platform`),
-        ]);
-        if (rRes.ok) setRegionAlloc(await rRes.json());
+        const pRes = await fetch(
+          `${API_URL}/v1/portfolio-reviews/${last.id}/allocation?group_by=platform`,
+        );
         if (pRes.ok) setPlatformAlloc(await pRes.json());
       } else {
-        setRegionAlloc(null);
         setPlatformAlloc(null);
       }
 
@@ -157,7 +157,7 @@ export default function Dashboard() {
     () =>
       timeline.map((p) => ({
         date: format(new Date(p.as_of_date), "MMM yyyy"),
-        total: p.total_value_usd ? parseFloat(p.total_value_usd) : 0,
+        total: p.total_value_cad ? parseFloat(p.total_value_cad) : 0,
       })),
     [timeline]
   );
@@ -174,10 +174,8 @@ export default function Dashboard() {
     [netWorth]
   );
 
-  const CAD = "CAD";
-
   const latestTotal = latestId
-    ? timeline.find((t) => t.id === latestId)?.total_value_usd
+    ? timeline.find((t) => t.id === latestId)?.total_value_cad
     : null;
   const latestNum = latestTotal ? parseFloat(latestTotal) : 0;
 
@@ -186,8 +184,10 @@ export default function Dashboard() {
   if (loading) {
     return (
       <PageLayout title="Dashboard">
-        <PageHeader title="Portfolio review" description="Snapshot progress" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <BrandHeader />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <SkeletonMetricCard />
+          <SkeletonMetricCard />
           <SkeletonMetricCard />
           <SkeletonMetricCard />
         </div>
@@ -196,95 +196,139 @@ export default function Dashboard() {
     );
   }
 
+  // Net-worth numbers (primary hero when available)
+  const hasNetWorth = !!netWorth;
+  const nwValue = hasNetWorth ? parseFloat(netWorth!.latest_net_worth) : 0;
+  const nwInvestments = hasNetWorth ? parseFloat(netWorth!.latest_investments) : 0;
+  const nwCash = hasNetWorth ? parseFloat(netWorth!.latest_cash) : 0;
+  const nwDebt = hasNetWorth ? parseFloat(netWorth!.latest_debt) : 0;
+
+  // Month-over-month delta for net worth (from last 2 timeline points)
+  const nwDelta = (() => {
+    const pts = netWorth?.points ?? [];
+    if (pts.length < 2) return null;
+    const prev = parseFloat(pts[pts.length - 2].net_worth);
+    const now = parseFloat(pts[pts.length - 1].net_worth);
+    if (!isFinite(prev) || prev === 0) return null;
+    const absDelta = now - prev;
+    const pctDelta = (absDelta / Math.abs(prev)) * 100;
+    return { abs: absDelta, pct: pctDelta };
+  })();
+
   return (
-    <PageLayout title="Dashboard" description="Portfolio allocation and progress across reviews">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <Card variant="highlight" className="p-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <p className="text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">
-                Portfolio (review, USD)
-              </p>
-              <h1 className="text-4xl lg:text-5xl font-semibold tracking-tight text-slate-900 dark:text-white mb-2">
-                {latestId
-                  ? formatCurrency(latestNum, USD)
-                  : "No reviews yet"}
-              </h1>
-              <div className="flex flex-wrap items-center gap-2">
-                {compare?.pct_change != null && (
-                  <Badge
-                    variant={compare.pct_change >= 0 ? "success" : "danger"}
-                    className="text-sm"
-                  >
-                    {compare.pct_change >= 0 ? (
-                      <TrendingUp className="w-3 h-3 mr-1" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3 mr-1" />
+    <PageLayout
+      title="Dashboard"
+      description="Continuous net-worth tracking across Wealthsimple statements and portfolio snapshots"
+    >
+      <BrandHeader
+        actions={
+          <>
+            <Button
+              variant="primary"
+              leftIcon={<UploadCloud className="w-4 h-4" />}
+              onClick={() => router.push("/portfolio/wealthsimple-import")}
+            >
+              Wealthsimple import
+            </Button>
+            <Button
+              variant="secondary"
+              leftIcon={<Upload className="w-4 h-4" />}
+              onClick={() => router.push("/portfolio/import")}
+            >
+              Snapshot
+            </Button>
+            <Button
+              variant="ghost"
+              leftIcon={<RefreshCw className="w-4 h-4" />}
+              onClick={() => load()}
+              aria-label="Refresh"
+            >
+              <span className="sr-only">Refresh</span>
+            </Button>
+          </>
+        }
+      />
+
+      {hasNetWorth && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Card variant="highlight" className="overflow-hidden">
+            <div className="p-8 bg-gradient-to-br from-primary-50 via-white to-emerald-50 dark:from-primary-950/40 dark:via-slate-900 dark:to-emerald-950/30">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                    <p className="text-sm font-medium text-primary-700 dark:text-primary-300 uppercase tracking-wide">
+                      Net worth
+                    </p>
+                  </div>
+                  <h2 className="text-5xl lg:text-6xl font-semibold tracking-tight text-slate-900 dark:text-white mb-3">
+                    {formatCurrency(nwValue, CAD)}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {nwDelta && (
+                      <Badge
+                        variant={nwDelta.abs >= 0 ? "success" : "danger"}
+                        className="text-sm"
+                      >
+                        {nwDelta.abs >= 0 ? (
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                        ) : (
+                          <TrendingDown className="w-3 h-3 mr-1" />
+                        )}
+                        {nwDelta.abs >= 0 ? "+" : ""}
+                        {formatCurrency(nwDelta.abs, CAD)} ({nwDelta.pct >= 0 ? "+" : ""}
+                        {nwDelta.pct.toFixed(2)}%) vs last month
+                      </Badge>
                     )}
-                    {compare.pct_change >= 0 ? "+" : ""}
-                    {compare.pct_change.toFixed(2)}% vs last review
-                  </Badge>
-                )}
-                <span className="text-sm text-slate-500 dark:text-slate-400">
-                  {timeline.length} snapshot{timeline.length === 1 ? "" : "s"} imported
-                </span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">
+                      {(netWorth!.points?.length ?? 0)} month
+                      {(netWorth!.points?.length ?? 0) === 1 ? "" : "s"} of data
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="primary"
-                leftIcon={<Upload className="w-4 h-4" />}
-                onClick={() => router.push("/portfolio/import")}
-              >
-                Import snapshot
-              </Button>
-              <Button
-                variant="secondary"
-                leftIcon={<RefreshCw className="w-4 h-4" />}
-                onClick={() => load()}
-              >
-                Refresh
-              </Button>
-            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <NetWorthTile
+              label="Investments"
+              value={nwInvestments}
+              icon={<PiggyBank className="w-4 h-4" />}
+              accent="primary"
+            />
+            <NetWorthTile
+              label="Cash"
+              value={nwCash}
+              icon={<Wallet className="w-4 h-4" />}
+              accent="success"
+            />
+            <NetWorthTile
+              label="Debt"
+              value={nwDebt}
+              icon={<CreditCard className="w-4 h-4" />}
+              accent="danger"
+              negative
+            />
           </div>
-        </Card>
-      </motion.div>
+        </motion.div>
+      )}
 
       {error && (
         <p className="text-sm text-danger-600 dark:text-danger-400 mb-4">{error}</p>
       )}
 
-      {netWorth && (
+      {hasNetWorth && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.03 }}
           className="mb-8"
         >
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <NetWorthTile
-              label="Net worth"
-              value={parseFloat(netWorth.latest_net_worth)}
-              emphasis
-            />
-            <NetWorthTile
-              label="Investments"
-              value={parseFloat(netWorth.latest_investments)}
-            />
-            <NetWorthTile
-              label="Cash"
-              value={parseFloat(netWorth.latest_cash)}
-            />
-            <NetWorthTile
-              label="Debt"
-              value={parseFloat(netWorth.latest_debt)}
-              negative
-            />
-          </div>
 
           {networthData.length > 0 && (
             <Card>
@@ -355,19 +399,48 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {!latestId && (
-        <Card className="mb-8">
-          <CardContent className="py-12 text-center">
-            <LineChartIcon className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-            <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto">
-              Drop a Wealthsimple monthly statement, or import a portfolio snapshot
-              (Brazil / Canada / Crypto sections) for anything that doesn't auto-sync.
-            </p>
-            <Button variant="primary" onClick={() => router.push("/portfolio/import")}>
-              Import portfolio CSV
-            </Button>
-          </CardContent>
-        </Card>
+      {!hasNetWorth && !latestId && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Card className="overflow-hidden">
+            <div className="p-10 lg:p-14 text-center bg-gradient-to-br from-primary-50/60 via-white to-emerald-50/40 dark:from-primary-950/30 dark:via-slate-900 dark:to-emerald-950/20">
+              <img
+                src="/brand/canopy-icon.svg"
+                alt="Canopy"
+                className="w-24 h-24 mx-auto mb-6 rounded-2xl shadow-lg ring-1 ring-slate-200/50 dark:ring-slate-800/50"
+              />
+              <h2 className="text-2xl lg:text-3xl font-semibold text-slate-900 dark:text-white mb-2">
+                Welcome to Canopy
+              </h2>
+              <p className="text-slate-600 dark:text-slate-400 max-w-lg mx-auto mb-8">
+                One number for your net worth, built from every account you own.
+                Start by dropping a Wealthsimple monthly statement, or import a
+                dated portfolio snapshot for holdings that don't auto-sync.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  leftIcon={<UploadCloud className="w-4 h-4" />}
+                  onClick={() => router.push("/portfolio/wealthsimple-import")}
+                >
+                  Drop Wealthsimple CSVs
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  leftIcon={<Upload className="w-4 h-4" />}
+                  onClick={() => router.push("/portfolio/import")}
+                >
+                  Import snapshot
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
       )}
 
       {latestId && lineData.length > 0 && (
@@ -379,9 +452,12 @@ export default function Dashboard() {
         >
           <Card>
             <CardHeader>
-              <CardTitle>Total USD over reviews</CardTitle>
+              <CardTitle>Portfolio snapshot — total CAD</CardTitle>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                From imported snapshots (as-of dates)
+                Canadian holdings that don't auto-sync from Wealthsimple (private equity, real estate, DPSP)
+                {latestNum > 0 && (
+                  <> — latest review {formatCurrency(latestNum, CAD)}</>
+                )}
               </p>
             </CardHeader>
             <CardContent>
@@ -392,11 +468,11 @@ export default function Dashboard() {
                     <XAxis dataKey="date" {...getAxisProps(checkDarkMode())} />
                     <YAxis
                       {...getAxisProps(checkDarkMode())}
-                      tickFormatter={(v) => formatCurrency(v as number, USD)}
+                      tickFormatter={(v) => formatCurrency(v as number, CAD)}
                     />
                     <Tooltip
                       contentStyle={getTooltipStyle(checkDarkMode())}
-                      formatter={(v: number) => [formatCurrency(v, USD), "Total USD"]}
+                      formatter={(v: number) => [formatCurrency(v, CAD), "Total CAD"]}
                     />
                     <Line
                       type="monotone"
@@ -413,67 +489,58 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {latestId && (regionAlloc || platformAlloc) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {[regionAlloc, platformAlloc].map(
-            (alloc, idx) =>
-              alloc &&
-              alloc.slices.length > 0 && (
-                <motion.div
-                  key={alloc.group_by}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + idx * 0.05 }}
-                >
-                  <Card className="h-full">
-                    <CardHeader>
-                      <CardTitle>
-                        {alloc.group_by === "region" ? "By region" : "By platform"}
-                      </CardTitle>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Latest review — {formatCurrency(parseFloat(alloc.total_usd), USD)} total
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={alloc.slices.map((s) => ({
-                                name: s.key,
-                                value: parseFloat(s.value_usd),
-                              }))}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={50}
-                              outerRadius={80}
-                              paddingAngle={2}
-                            >
-                              {alloc.slices.map((slice, i) => (
-                                <Cell
-                                  key={slice.key}
-                                  fill={pieColors[i % pieColors.length]}
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={getTooltipStyle(checkDarkMode())}
-                              formatter={(v: number, name: string) => [
-                                formatCurrency(v, USD),
-                                name,
-                              ]}
-                            />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )
-          )}
+      {latestId && platformAlloc && platformAlloc.slices.length > 0 && (
+        <div className="grid grid-cols-1 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>By platform</CardTitle>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Latest review — {formatCurrency(parseFloat(platformAlloc.total_cad), CAD)} total
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={platformAlloc.slices.map((s) => ({
+                          name: s.key,
+                          value: parseFloat(s.value_cad),
+                        }))}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                      >
+                        {platformAlloc.slices.map((slice, i) => (
+                          <Cell
+                            key={slice.key}
+                            fill={pieColors[i % pieColors.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={getTooltipStyle(checkDarkMode())}
+                        formatter={(v: number, name: string) => [
+                          formatCurrency(v, CAD),
+                          name,
+                        ]}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       )}
 
@@ -498,32 +565,95 @@ export default function Dashboard() {
   );
 }
 
+function BrandHeader({ actions }: { actions?: React.ReactNode } = {}) {
+  return (
+    <div className="mb-6 lg:mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <img
+            src="/brand/canopy-icon.svg"
+            alt="Canopy"
+            className="w-14 h-14 rounded-xl shadow-md ring-1 ring-slate-200/60 dark:ring-slate-700/60"
+          />
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white leading-none">
+              Canopy
+            </h1>
+            <p className="mt-1.5 text-sm text-primary-700 dark:text-primary-300">
+              Continuous net-worth tracking
+            </p>
+          </div>
+        </div>
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type TileAccent = "primary" | "success" | "danger" | "neutral";
+
+const ACCENT_STYLES: Record<
+  TileAccent,
+  { iconBg: string; iconFg: string; valueText: string }
+> = {
+  primary: {
+    iconBg: "bg-primary-100 dark:bg-primary-950/50",
+    iconFg: "text-primary-600 dark:text-primary-400",
+    valueText: "text-slate-900 dark:text-white",
+  },
+  success: {
+    iconBg: "bg-success-100 dark:bg-success-950/50",
+    iconFg: "text-success-600 dark:text-success-400",
+    valueText: "text-slate-900 dark:text-white",
+  },
+  danger: {
+    iconBg: "bg-danger-100 dark:bg-danger-950/50",
+    iconFg: "text-danger-600 dark:text-danger-400",
+    valueText: "text-danger-700 dark:text-danger-400",
+  },
+  neutral: {
+    iconBg: "bg-slate-100 dark:bg-slate-800",
+    iconFg: "text-slate-600 dark:text-slate-400",
+    valueText: "text-slate-900 dark:text-white",
+  },
+};
+
 function NetWorthTile({
   label,
   value,
+  icon,
+  accent = "neutral",
   emphasis = false,
   negative = false,
 }: {
   label: string;
   value: number;
+  icon?: React.ReactNode;
+  accent?: TileAccent;
   emphasis?: boolean;
   negative?: boolean;
 }) {
   const displayValue = negative ? -Math.abs(value) : value;
+  const styles = ACCENT_STYLES[accent];
   return (
-    <Card className={emphasis ? "" : ""} variant={emphasis ? "highlight" : "default"}>
+    <Card variant={emphasis ? "highlight" : "default"} className="group transition-shadow hover:shadow-md">
       <CardContent className="py-5">
-        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          {label}
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {icon && (
+            <span
+              className={`inline-flex items-center justify-center w-6 h-6 rounded-md ${styles.iconBg} ${styles.iconFg}`}
+            >
+              {icon}
+            </span>
+          )}
+          <span>{label}</span>
         </div>
         <div
-          className={`mt-1 font-semibold ${
+          className={`mt-2 font-semibold tracking-tight ${
             emphasis ? "text-3xl" : "text-2xl"
-          } ${
-            negative
-              ? "text-danger-600 dark:text-danger-400"
-              : "text-slate-900 dark:text-white"
-          }`}
+          } ${negative ? styles.valueText : "text-slate-900 dark:text-white"}`}
         >
           {formatCurrency(displayValue, "CAD")}
         </div>

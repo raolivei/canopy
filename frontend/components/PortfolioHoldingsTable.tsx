@@ -31,7 +31,7 @@ interface HoldingsTableProps {
 
 function formatCurrency(
   value: number | null,
-  currency: string = "USD",
+  currency: string = "CAD",
 ): string {
   if (value === null) return "—";
   return new Intl.NumberFormat("en-US", {
@@ -44,7 +44,7 @@ function formatCurrency(
 export default function PortfolioHoldingsTable({
   holdings,
   onSelect,
-  currency = "USD",
+  currency = "CAD",
   convertToDisplay,
 }: HoldingsTableProps) {
   const getDisplayValue = (

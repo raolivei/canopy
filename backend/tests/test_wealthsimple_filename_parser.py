@@ -93,9 +93,7 @@ def test_parse_filename_classifies_correctly(
 
 
 def test_direct_indexing_is_marked_skip() -> None:
-    meta = parse_filename(
-        "Direct Indexing-monthly-statement-transactions-WZ0BM4C09CAD-2026-03-01.csv"
-    )
+    meta = parse_filename("Direct Indexing-monthly-statement-transactions-WZ0BM4C09CAD-2026-03-01.csv")
     assert meta.is_skipped
     assert meta.skip_reason is not None
     assert "Direct Indexing" in meta.skip_reason
@@ -109,8 +107,6 @@ def test_unknown_filename_is_skipped() -> None:
 
 
 def test_path_prefix_is_stripped() -> None:
-    meta = parse_filename(
-        "/tmp/uploads/TFSA-monthly-statement-transactions-HQB2DBYK0CAD-2026-03-01.csv"
-    )
+    meta = parse_filename("/tmp/uploads/TFSA-monthly-statement-transactions-HQB2DBYK0CAD-2026-03-01.csv")
     assert meta.account_kind is WsAccountKind.TFSA
     assert meta.filename.startswith("TFSA-")

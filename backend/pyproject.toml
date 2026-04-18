@@ -29,17 +29,18 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
 [tool.ruff.lint.per-file-ignores]
-# Long regex strings are hard to read when wrapped; tests include literal CSV
-# rows that must stay on one line.
+# Long regex strings and literal CSV rows must stay on one line.
 "services/wealthsimple/description_parser.py" = ["E501"]
 "tests/test_wealthsimple_importer.py" = ["E501"]
+"tests/test_portfolio_review_parser.py" = ["E501"]
+"scripts/seed_portfolio.py" = ["E501"]
 
 [build-system]
 requires = ["setuptools>=65.0"]

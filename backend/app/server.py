@@ -6,9 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.v1.routes import router as v1_router
 from backend.app.config import get_settings
 
-# Import transaction and currency routers if they exist
+# Import transaction and CSV import routers if they exist
 try:
-    from backend.api import csv_import, currency, transactions
+    from backend.api import csv_import, transactions
+
     HAS_TRANSACTION_ROUTERS = True
 except ImportError:
     HAS_TRANSACTION_ROUTERS = False
@@ -16,25 +17,43 @@ except ImportError:
 # Import portfolio router
 try:
     from backend.api import portfolio
+
     HAS_PORTFOLIO_ROUTER = True
 except ImportError:
     HAS_PORTFOLIO_ROUTER = False
 
 try:
     from backend.api import portfolio_reviews
+
     HAS_PORTFOLIO_REVIEWS_ROUTER = True
 except ImportError:
     HAS_PORTFOLIO_REVIEWS_ROUTER = False
 
 try:
     from backend.api import wealthsimple_import
+
     HAS_WEALTHSIMPLE_IMPORT_ROUTER = True
 except ImportError:
     HAS_WEALTHSIMPLE_IMPORT_ROUTER = False
 
+try:
+    from backend.api import admin as admin_api
+
+    HAS_ADMIN_ROUTER = True
+except ImportError:
+    HAS_ADMIN_ROUTER = False
+
+try:
+    from backend.api import accounts as accounts_api
+
+    HAS_ACCOUNTS_ROUTER = True
+except ImportError:
+    HAS_ACCOUNTS_ROUTER = False
+
 # Import integrations router
 try:
     from backend.api import integrations
+
     HAS_INTEGRATIONS_ROUTER = True
 except ImportError:
     HAS_INTEGRATIONS_ROUTER = False
@@ -42,6 +61,7 @@ except ImportError:
 # Import insights router
 try:
     from backend.api import insights
+
     HAS_INSIGHTS_ROUTER = True
 except ImportError:
     HAS_INSIGHTS_ROUTER = False
@@ -57,25 +77,29 @@ def create_app() -> FastAPI:
         debug=settings.debug,
         version="1.0.0",
     )
-    
+
     # Add CORS middleware for frontend communication
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:3001",
+            "http://127.0.0.1:3001",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Include v1 router (health, summary endpoints)
     app.include_router(v1_router)
-    
-    # Include transaction and currency routers if available
+
+    # Include transaction + CSV import routers if available
     if HAS_TRANSACTION_ROUTERS:
         app.include_router(transactions.router)
-        app.include_router(currency.router)
         app.include_router(csv_import.router)
-    
+
     # Include portfolio router if available
     if HAS_PORTFOLIO_ROUTER:
         app.include_router(portfolio.router)
@@ -85,15 +109,21 @@ def create_app() -> FastAPI:
 
     if HAS_WEALTHSIMPLE_IMPORT_ROUTER:
         app.include_router(wealthsimple_import.router)
-    
+
+    if HAS_ADMIN_ROUTER:
+        app.include_router(admin_api.router)
+
+    if HAS_ACCOUNTS_ROUTER:
+        app.include_router(accounts_api.router)
+
     # Include integrations router if available
     if HAS_INTEGRATIONS_ROUTER:
         app.include_router(integrations.router)
-    
+
     # Include insights router if available
     if HAS_INSIGHTS_ROUTER:
         app.include_router(insights.router)
-    
+
     return app
 
 

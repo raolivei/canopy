@@ -2,27 +2,14 @@
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
-from alembic import context
-
 # Import the app config to get the database URL
 from backend.app.config import get_settings
 
 # Import Base and all models so they're registered for autogenerate
 from backend.db.base import Base
-from backend.db.models import (
-    Asset,
-    Lot,
-    Dividend,
-    PriceHistory,
-    PortfolioSnapshot,
-    SnapshotHolding,
-    PortfolioReview,
-    PortfolioReviewLine,
-    ImportedEvent,
-    AccountBalanceHistory,
-)
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Alembic Config object
 config = context.config
@@ -75,7 +62,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, 
+            connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
         )

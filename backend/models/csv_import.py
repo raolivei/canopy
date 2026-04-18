@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List, Dict, Any
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class ImportStatus(str, Enum):
     PENDING = "pending"
@@ -9,6 +11,7 @@ class ImportStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     PARTIALLY_COMPLETED = "partially_completed"
+
 
 class BankFormat(str, Enum):
     GENERIC = "generic"
@@ -45,8 +48,10 @@ class BankFormat(str, Enum):
     # Custom
     CUSTOM = "custom"
 
+
 class FieldMapping(BaseModel):
     """Maps CSV columns to transaction fields"""
+
     date_column: str
     description_column: str
     amount_column: Optional[str] = None  # Optional if using debit/credit columns
@@ -55,35 +60,37 @@ class FieldMapping(BaseModel):
     account_column: Optional[str] = None
     currency_column: Optional[str] = None
     balance_column: Optional[str] = None  # For reconciliation
-    
+
     # Additional columns for better data extraction
     debit_column: Optional[str] = None  # Some banks split debit/credit
     credit_column: Optional[str] = None
     transaction_id_column: Optional[str] = None  # For duplicate detection
-    
+
     # Monarch-style enhanced fields
     merchant_column: Optional[str] = None  # Clean merchant name
     original_statement_column: Optional[str] = None  # Raw bank text
     notes_column: Optional[str] = None  # User notes
     tags_column: Optional[str] = None  # Tags (comma-separated or similar)
-    
+
     # Investment-specific fields
     ticker_column: Optional[str] = None
     shares_column: Optional[str] = None
     price_column: Optional[str] = None
     fees_column: Optional[str] = None
     operation_column: Optional[str] = None  # Buy/Sell/Dividend
-    
+
     # Date parsing configuration
     date_format: str = "%Y-%m-%d"  # Default format
-    
+
     # Amount parsing configuration
     amount_is_absolute: bool = False  # If true, use type to determine sign
     negative_means_expense: bool = True  # If false, negative means income
     decimal_separator: str = "."  # Some countries use comma
 
+
 class CSVImportConfig(BaseModel):
     """Configuration for importing a CSV file"""
+
     bank_format: BankFormat = BankFormat.GENERIC
     field_mapping: FieldMapping
     default_currency: str = "USD"
@@ -92,12 +99,14 @@ class CSVImportConfig(BaseModel):
     skip_duplicates: bool = True
     date_range_start: Optional[datetime] = None
     date_range_end: Optional[datetime] = None
-    
+
     # Type inference rules
     type_inference_rules: Optional[Dict[str, str]] = None  # keyword -> type mapping
-    
+
+
 class TransactionPreview(BaseModel):
     """Preview of a transaction to be imported"""
+
     row_number: int
     description: str
     amount: float
@@ -106,27 +115,29 @@ class TransactionPreview(BaseModel):
     category: Optional[str] = None
     date: datetime
     account: Optional[str] = None
-    
+
     # Monarch-style enhanced fields
     merchant: Optional[str] = None
     original_statement: Optional[str] = None
     notes: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-    
+
     # Investment fields
     ticker: Optional[str] = None
     shares: Optional[float] = None
     price_per_share: Optional[float] = None
     fees: Optional[float] = None
-    
+
     is_duplicate: bool = False
     duplicate_reason: Optional[str] = None
     has_error: bool = False
     error_message: Optional[str] = None
     raw_data: Dict[str, Any] = Field(default_factory=dict)  # Original CSV row
 
+
 class CSVImportPreview(BaseModel):
     """Preview of entire import before committing"""
+
     total_rows: int
     valid_rows: int
     duplicate_rows: int
@@ -136,15 +147,19 @@ class CSVImportPreview(BaseModel):
     detected_account: Optional[str] = None
     date_range: Optional[Dict[str, datetime]] = None
 
+
 class CSVImportRequest(BaseModel):
     """Request to import transactions from preview"""
+
     import_id: str
     skip_duplicates: bool = True
     skip_errors: bool = True
     selected_rows: Optional[List[int]] = None  # If None, import all valid rows
 
+
 class ImportResult(BaseModel):
     """Result of import operation"""
+
     import_id: str
     status: ImportStatus
     total_rows: int
@@ -156,8 +171,10 @@ class ImportResult(BaseModel):
     duration_seconds: float = 0.0
     created_at: datetime = Field(default_factory=datetime.now)
 
+
 class ImportHistory(BaseModel):
     """Historical record of an import"""
+
     import_id: str
     filename: str
     bank_format: BankFormat
@@ -170,7 +187,9 @@ class ImportHistory(BaseModel):
     completed_at: Optional[datetime] = None
     config: Optional[CSVImportConfig] = None
 
+
 class ImportHistoryList(BaseModel):
     """List of import history records"""
+
     imports: List[ImportHistory]
     total: int

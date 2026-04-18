@@ -2,8 +2,8 @@
 
 import uvicorn
 
-from backend.app.server import app
 from backend.app.config import get_settings
+from backend.app.server import app
 
 
 def run() -> None:
@@ -20,4 +20,3 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
-

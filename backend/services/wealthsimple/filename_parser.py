@@ -127,9 +127,7 @@ def parse_filename(filename: str) -> WsFileMeta:
             label = _label_from_stem(stem, prefix)
             skip_reason = None
             if cls == AccountClass.SKIP:
-                skip_reason = (
-                    f"{kind.value.replace('_', ' ').title()} account is not imported"
-                )
+                skip_reason = f"{kind.value.replace('_', ' ').title()} account is not imported"
             return WsFileMeta(
                 filename=base,
                 account_label=label,

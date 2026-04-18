@@ -31,7 +31,7 @@ const PERIODS = [
   { value: "all", label: "All" },
 ];
 
-function formatCurrency(value: number, currency: string = "USD"): string {
+function formatCurrency(value: number, currency: string = "CAD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -47,7 +47,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function PerformanceChart({ data, currency = "USD", onPeriodChange }: PerformanceChartProps) {
+export default function PerformanceChart({ data, currency = "CAD", onPeriodChange }: PerformanceChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState("30d");
 
   const handlePeriodChange = (period: string) => {

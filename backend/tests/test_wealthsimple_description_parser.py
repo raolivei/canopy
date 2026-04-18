@@ -14,10 +14,7 @@ from backend.services.wealthsimple.description_parser import (
 
 
 def test_parse_buy_with_fx_rate() -> None:
-    desc = (
-        "CRM - Salesforce Inc.: Bought 0.0371 shares at $192.11 per share "
-        "(executed at 2026-03-03), FX Rate: 1.3679"
-    )
+    desc = "CRM - Salesforce Inc.: Bought 0.0371 shares at $192.11 per share (executed at 2026-03-03), FX Rate: 1.3679"
     info = parse_buy(desc)
     assert info is not None
     assert info.ticker == "CRM"
@@ -29,10 +26,7 @@ def test_parse_buy_with_fx_rate() -> None:
 
 
 def test_parse_buy_without_fx() -> None:
-    desc = (
-        "MSFT - Microsoft CDR (CAD Hedged): Bought 30.0000 shares at "
-        "$27.78 per share (executed at 2026-03-02)"
-    )
+    desc = "MSFT - Microsoft CDR (CAD Hedged): Bought 30.0000 shares at $27.78 per share (executed at 2026-03-02)"
     info = parse_buy(desc)
     assert info is not None
     assert info.ticker == "MSFT"
@@ -40,10 +34,7 @@ def test_parse_buy_without_fx() -> None:
 
 
 def test_parse_sell_with_backtick_name() -> None:
-    desc = (
-        "LOW - Lowe`s Cos., Inc.: Sold 0.0073 shares at $253.47 per share "
-        "(executed at 2026-03-03), FX Rate: 1.3679"
-    )
+    desc = "LOW - Lowe`s Cos., Inc.: Sold 0.0073 shares at $253.47 per share (executed at 2026-03-03), FX Rate: 1.3679"
     info = parse_sell(desc)
     assert info is not None
     assert info.ticker == "LOW"

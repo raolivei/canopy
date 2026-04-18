@@ -28,4 +28,3 @@ def summary() -> dict[str, dict[str, str]]:
         "budget": {"status": "pending", "detail": "No transactions ingested yet"},
         "ingest": {"status": "idle", "detail": "Celery workers not yet configured"},
     }
-

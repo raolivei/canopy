@@ -89,9 +89,7 @@ def test_tfsa_creates_account_asset_and_transactions(db: Session) -> None:
     WealthsimpleImporter(db).ingest([_tfsa_file()])
     db.commit()
 
-    asset = db.execute(
-        select(Asset).where(Asset.symbol == "WS:HQB2DBYK0CAD")
-    ).scalar_one()
+    asset = db.execute(select(Asset).where(Asset.symbol == "WS:HQB2DBYK0CAD")).scalar_one()
     assert asset.name == "TFSA"
     assert asset.sync_source == "wealthsimple"
     assert asset.asset_type.value == "retirement_tfsa"
@@ -104,9 +102,7 @@ def test_buy_row_creates_lot_and_ticker_asset(db: Session) -> None:
     WealthsimpleImporter(db).ingest([_tfsa_file()])
     db.commit()
 
-    ticker_asset = db.execute(
-        select(Asset).where(Asset.symbol == "QCN")
-    ).scalar_one()
+    ticker_asset = db.execute(select(Asset).where(Asset.symbol == "QCN")).scalar_one()
     lots = db.execute(select(Lot).where(Lot.asset_id == ticker_asset.id)).scalars().all()
     assert len(lots) == 1
     assert lots[0].quantity == Decimal("0.2994")
@@ -123,21 +119,15 @@ def test_chequing_file_creates_bank_asset(db: Session) -> None:
         ]
     )
     db.commit()
-    asset = db.execute(
-        select(Asset).where(Asset.symbol == "WS:WK15SYK37CAD")
-    ).scalar_one()
+    asset = db.execute(select(Asset).where(Asset.symbol == "WS:WK15SYK37CAD")).scalar_one()
     assert asset.asset_type.value == "bank_checking"
 
 
 def test_credit_card_creates_liability_and_running_balance(db: Session) -> None:
-    WealthsimpleImporter(db).ingest(
-        [("credit-card-statement-transactions-2025-12-01.csv", CC_CSV)]
-    )
+    WealthsimpleImporter(db).ingest([("credit-card-statement-transactions-2025-12-01.csv", CC_CSV)])
     db.commit()
 
-    liab = db.execute(
-        select(Liability).where(Liability.institution == "Wealthsimple")
-    ).scalar_one()
+    liab = db.execute(select(Liability).where(Liability.institution == "Wealthsimple")).scalar_one()
     assert liab.liability_type == "credit_card"
     # 16.25 - 10.00 = 6.25 delta against opening_balance=0
     assert liab.current_balance == Decimal("6.25")
@@ -153,9 +143,7 @@ def test_loc_creates_liability_and_uses_balance_column(db: Session) -> None:
         ]
     )
     db.commit()
-    liab = db.execute(
-        select(Liability).where(Liability.liability_type == "line_of_credit")
-    ).scalar_one()
+    liab = db.execute(select(Liability).where(Liability.liability_type == "line_of_credit")).scalar_one()
     # The LOC's final balance column reads 0.00 (all transferred out)
     assert liab.current_balance == Decimal("0.00")
     snapshots = db.execute(select(LiabilityBalanceHistory)).scalars().all()

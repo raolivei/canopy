@@ -9,6 +9,33 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [0.9.0] - 2026-04-18 — CAD-only, Canadian investments focus
+
+Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Brazil and USD multi-currency plumbing is removed. The Accounts page is wired to a dedicated endpoint that only shows cash / credit / LOC — investments stay on Holdings.
+
+### Added
+
+- **`GET /v1/accounts`** (`backend/api/accounts.py`): unified view of cash assets (checking / savings / cash) and liabilities (credit, line of credit, loan). Powers the Accounts page directly from records created by the Wealthsimple importer.
+- **Accounts page** (`pages/accounts.tsx`) rewritten to fetch from `/v1/accounts` — total cash, total debt, net position, and a per-account card grid. Empty state links straight to the Wealthsimple importer.
+
+### Changed
+
+- **Single currency**: the product is CAD only. The multi-currency API (`/v1/currency`), exchange-rate service, `CurrencySelector` component, and currency dropdowns on Transactions / Insights / Import / Settings / Portfolio are all removed.
+- **Portfolio review parser**: Brazil and Crypto sections are now ignored; only the Canadian section is ingested. Intended for CAD-denominated holdings that don't auto-sync (private equity, real estate, DPSP). Columns collapse to `Value (CAD)`.
+- **Database** (Alembic `20260420_0008`): `portfolio_reviews.total_value_usd` → `total_value_cad`; `portfolio_review_lines.value_usd` → `value_cad`; `region`, `currency`, `value_native`, `pct_region`, `fx_note` columns dropped.
+- **Insights / FIRE calculators** (`services/insights_calculator.py`, `services/fire_calculator.py`) rewritten to operate on CAD directly — no conversion step, no `base_currency` parameter, no currency-exposure section.
+- **Asset model**: default `currency="CAD"`, default `country="CA"`. `RETIREMENT_401K`, `RETIREMENT_IRA`, `RETIREMENT_ROTH_IRA` enum values dropped (Canadian-registered accounts only).
+- **Bank CSV import** (`pages/import.tsx`): institution list trimmed to Wealthsimple / RBC / TD / Scotiabank / Generic CSV — US banks removed.
+- **Dev workflow**: `backend/scripts/seed_portfolio.py` and the `make reseed` target are deleted. Bootstrap Canopy by dropping a Wealthsimple statement or a CAD portfolio snapshot.
+
+### Removed
+
+- `backend/api/currency.py`, `backend/models/currency.py`, `backend/services/exchange_rate_service.py`, `backend/scripts/seed_portfolio.py`.
+- `frontend/components/CurrencySelector.tsx`; all USD / BRL / EUR dropdown options in forms.
+- "Moomoo" integration references from the settings integrations catalog.
+
+---
+
 ## [0.8.0] - 2026-04-18 — Continuous net-worth tracking
 
 This release re-frames Canopy around **continuous** net-worth tracking rather than semi-annual reviews. Monthly Wealthsimple statement drops now auto-classify into investments, cash, and debt and feed a unified net-worth dashboard; the 0.7.0 portfolio-review importer remains the input channel for holdings that don't export machine-readable CSVs (Brazilian brokerages, Binance, etc.).

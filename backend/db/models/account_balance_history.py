@@ -29,25 +29,14 @@ class AccountBalanceHistory(Base):
     __tablename__ = "account_balance_history"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    asset_id: Mapped[int] = mapped_column(
-        ForeignKey("assets.id", ondelete="CASCADE"), index=True
-    )
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), index=True)
     as_of_date: Mapped[date] = mapped_column(Date, index=True)
     balance: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=2))
     currency: Mapped[str] = mapped_column(String(10), default="CAD")
     source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        UniqueConstraint(
-            "asset_id", "as_of_date", name="uq_account_balance_asset_date"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("asset_id", "as_of_date", name="uq_account_balance_asset_date"),)
 
     def __repr__(self) -> str:
-        return (
-            f"<AccountBalanceHistory(asset_id={self.asset_id}, "
-            f"as_of={self.as_of_date}, balance={self.balance})>"
-        )
+        return f"<AccountBalanceHistory(asset_id={self.asset_id}, as_of={self.as_of_date}, balance={self.balance})>"

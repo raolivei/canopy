@@ -136,10 +136,7 @@ def _hash_event(
     amount: Decimal,
     description: str,
 ) -> str:
-    payload = (
-        f"{SOURCE}|{account_key}|{occurred_on.isoformat()}|{raw_code}|"
-        f"{amount}|{description}"
-    )
+    payload = f"{SOURCE}|{account_key}|{occurred_on.isoformat()}|{raw_code}|{amount}|{description}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -217,9 +214,7 @@ class WealthsimpleImporter:
         self.dry_run = dry_run
         self._event_cache: set[str] = set()
 
-    def ingest(
-        self, files: Iterable[tuple[str, str]]
-    ) -> ImportSummary:
+    def ingest(self, files: Iterable[tuple[str, str]]) -> ImportSummary:
         summary = ImportSummary()
         for filename, content in files:
             report = self._ingest_file(filename, content, summary)
@@ -230,9 +225,7 @@ class WealthsimpleImporter:
     # File-level
     # ------------------------------------------------------------------
 
-    def _ingest_file(
-        self, filename: str, content: str, summary: ImportSummary
-    ) -> FileReport:
+    def _ingest_file(self, filename: str, content: str, summary: ImportSummary) -> FileReport:
         meta = parse_filename(filename)
         report = FileReport(filename=meta.filename, meta=meta)
 
@@ -274,8 +267,7 @@ class WealthsimpleImporter:
             if parsed.kind == RowKind.UNKNOWN:
                 report.rows_unknown += 1
                 report.warnings.append(
-                    f"Unknown transaction code '{parsed.raw_code}' "
-                    f"on {parsed.occurred_on.isoformat()}"
+                    f"Unknown transaction code '{parsed.raw_code}' on {parsed.occurred_on.isoformat()}"
                 )
             # Track the last row per currency (for end-of-statement snapshot)
             prev = last_row_by_currency.get(parsed.currency)
@@ -284,9 +276,7 @@ class WealthsimpleImporter:
             # Credit-card running delta
             if meta.account_kind == WsAccountKind.CREDIT_CARD:
                 cc_delta += parsed.amount
-                if parsed.post_date is not None and (
-                    cc_last_post is None or parsed.post_date >= cc_last_post
-                ):
+                if parsed.post_date is not None and (cc_last_post is None or parsed.post_date >= cc_last_post):
                     cc_last_post = parsed.post_date
 
         report.shape = detected_shape
@@ -365,9 +355,7 @@ class WealthsimpleImporter:
                     added = self._upsert_liability_snapshot(
                         liability_id=liability.id,
                         balance=row.balance,
-                        recorded_at=_statement_end(
-                            meta.statement_period_start, row.occurred_on
-                        ),
+                        recorded_at=_statement_end(meta.statement_period_start, row.occurred_on),
                         is_statement_balance=True,
                     )
                     if added:
@@ -381,17 +369,13 @@ class WealthsimpleImporter:
                 # all Transaction.amount rows for this liability is the delta;
                 # add opening_balance for pre-history correction.
                 ledger_delta = self._credit_card_ledger_delta(liability.id)
-                liability.current_balance = (
-                    (liability.opening_balance or Decimal("0")) + ledger_delta
-                )
+                liability.current_balance = (liability.opening_balance or Decimal("0")) + ledger_delta
                 liability.balance_updated_at = datetime.now(timezone.utc)
                 if cc_last_post is not None:
                     added = self._upsert_liability_snapshot(
                         liability_id=liability.id,
                         balance=liability.current_balance,
-                        recorded_at=datetime.combine(
-                            cc_last_post, datetime.min.time(), tzinfo=timezone.utc
-                        ),
+                        recorded_at=datetime.combine(cc_last_post, datetime.min.time(), tzinfo=timezone.utc),
                         is_statement_balance=True,
                     )
                     if added:
@@ -405,9 +389,7 @@ class WealthsimpleImporter:
 
     def _upsert_account_asset(self, meta: WsFileMeta) -> Asset:
         symbol = f"WS:{meta.account_number}"
-        existing = self.db.execute(
-            select(Asset).where(Asset.symbol == symbol)
-        ).scalar_one_or_none()
+        existing = self.db.execute(select(Asset).where(Asset.symbol == symbol)).scalar_one_or_none()
         if existing is not None:
             # Keep the most informative name
             if existing.name != meta.account_label:
@@ -431,18 +413,15 @@ class WealthsimpleImporter:
         self.db.flush()
         return asset
 
-    def _upsert_ticker_asset(
-        self, ticker: str, name: str, meta: WsFileMeta
-    ) -> Asset:
-        existing = self.db.execute(
-            select(Asset).where(Asset.symbol == ticker)
-        ).scalar_one_or_none()
+    def _upsert_ticker_asset(self, ticker: str, name: str, meta: WsFileMeta) -> Asset:
+        existing = self.db.execute(select(Asset).where(Asset.symbol == ticker)).scalar_one_or_none()
         if existing is not None:
             return existing
         asset_type = (
             AssetType.CRYPTO
             if meta.account_kind == WsAccountKind.CRYPTO
-            else AssetType.ETF if ticker.endswith((".B", ".F")) or "." in ticker
+            else AssetType.ETF
+            if ticker.endswith((".B", ".F")) or "." in ticker
             else AssetType.STOCK
         )
         asset = Asset(
@@ -593,9 +572,7 @@ class WealthsimpleImporter:
     def _create_transaction(self, row: ParsedRow, account_label: str) -> Transaction:
         tx_type = _row_to_transaction_type(row.kind, row.amount)
         category = _KIND_CATEGORY.get(row.kind)
-        occurred_at = datetime.combine(
-            row.occurred_on, datetime.min.time(), tzinfo=timezone.utc
-        )
+        occurred_at = datetime.combine(row.occurred_on, datetime.min.time(), tzinfo=timezone.utc)
         return Transaction(
             description=row.description[:500] or row.raw_code or "Wealthsimple row",
             amount=row.amount,
@@ -620,17 +597,19 @@ class WealthsimpleImporter:
         Partial lot sales split the remaining quantity onto a fresh lot so
         cost-basis math downstream stays accurate.
         """
-        asset = self.db.execute(
-            select(Asset).where(Asset.symbol == ticker)
-        ).scalar_one_or_none()
+        asset = self.db.execute(select(Asset).where(Asset.symbol == ticker)).scalar_one_or_none()
         if asset is None:
             return
         remaining = quantity
-        lots = self.db.execute(
-            select(Lot)
-            .where(Lot.asset_id == asset.id, Lot.is_sold.is_(False))
-            .order_by(Lot.purchase_date.asc(), Lot.id.asc())
-        ).scalars().all()
+        lots = (
+            self.db.execute(
+                select(Lot)
+                .where(Lot.asset_id == asset.id, Lot.is_sold.is_(False))
+                .order_by(Lot.purchase_date.asc(), Lot.id.asc())
+            )
+            .scalars()
+            .all()
+        )
         for lot in lots:
             if remaining <= 0:
                 break
@@ -660,9 +639,7 @@ class WealthsimpleImporter:
 
     def _event_exists(self, hashed: str) -> bool:
         return (
-            self.db.execute(
-                select(ImportedEvent.id).where(ImportedEvent.hash == hashed)
-            ).scalar_one_or_none()
+            self.db.execute(select(ImportedEvent.id).where(ImportedEvent.hash == hashed)).scalar_one_or_none()
             is not None
         )
 
@@ -724,17 +701,18 @@ class WealthsimpleImporter:
             else datetime.combine(recorded_at, datetime.min.time(), tzinfo=timezone.utc)
         )
         # Simple idempotency: skip if a row with the same liability + day + balance exists.
-        existing = self.db.execute(
-            select(LiabilityBalanceHistory).where(
-                LiabilityBalanceHistory.liability_id == liability_id,
-                LiabilityBalanceHistory.balance == balance,
+        existing = (
+            self.db.execute(
+                select(LiabilityBalanceHistory).where(
+                    LiabilityBalanceHistory.liability_id == liability_id,
+                    LiabilityBalanceHistory.balance == balance,
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for row in existing:
-            if (
-                row.recorded_at is not None
-                and row.recorded_at.date() == when.date()
-            ):
+            if row.recorded_at is not None and row.recorded_at.date() == when.date():
                 return False
         self.db.add(
             LiabilityBalanceHistory(
@@ -758,7 +736,5 @@ class WealthsimpleImporter:
         liability = self.db.get(Liability, liability_id)
         if liability is None:
             return Decimal("0")
-        total = self.db.execute(
-            select(Transaction.amount).where(Transaction.account == liability.name)
-        ).scalars().all()
+        total = self.db.execute(select(Transaction.amount).where(Transaction.account == liability.name)).scalars().all()
         return sum(total, Decimal("0"))

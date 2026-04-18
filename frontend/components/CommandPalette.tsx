@@ -40,8 +40,14 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  // Portal must only mount after hydration to avoid SSR/CSR mismatch.
+  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -398,7 +404,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     </AnimatePresence>
   );
 
-  if (typeof window === "undefined") return null;
+  if (!mounted) return null;
 
   return createPortal(content, document.body);
 }

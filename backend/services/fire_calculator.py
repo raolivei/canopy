@@ -10,33 +10,32 @@ Provides:
 - Passive income projections
 """
 
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Optional
 
+from backend.services.insights_calculator import InsightsCalculator
 from sqlalchemy.orm import Session
-
-from backend.services.insights_calculator import InsightsCalculator, DEFAULT_EXCHANGE_RATES
 
 
 @dataclass
 class FIREMetrics:
     """FIRE calculation results."""
+
     # Core metrics
     fire_number: Decimal  # Target net worth for FIRE
     current_net_worth: Decimal
     progress_percentage: Decimal  # How close to FIRE (%)
-    
+
     # Timeline
     years_to_fire: Optional[float]  # Years until FIRE at current rate
     fire_date: Optional[date]  # Projected FIRE date
-    
+
     # At FIRE
     monthly_income_at_fire: Decimal  # Safe withdrawal amount per month
     annual_income_at_fire: Decimal  # Safe withdrawal amount per year
-    
+
     # Inputs used
     monthly_expenses: Decimal
     annual_expenses: Decimal
@@ -48,6 +47,7 @@ class FIREMetrics:
 @dataclass
 class ProjectionPoint:
     """A single point in a projection timeline."""
+
     year: int
     date: date
     net_worth: Decimal
@@ -59,6 +59,7 @@ class ProjectionPoint:
 @dataclass
 class WhatIfScenario:
     """Results of a what-if scenario analysis."""
+
     name: str
     years_to_fire: Optional[float]
     fire_date: Optional[date]
@@ -68,43 +69,31 @@ class WhatIfScenario:
 
 class FIRECalculator:
     """Calculator for FIRE planning and projections."""
-    
+
     # Default values
     DEFAULT_SWR = Decimal("0.04")  # 4% safe withdrawal rate
     DEFAULT_RETURN = Decimal("0.07")  # 7% annual return
     DEFAULT_INFLATION = Decimal("0.025")  # 2.5% inflation
-    
-    def __init__(
-        self,
-        db: Optional[Session] = None,
-        exchange_rates: Optional[dict[str, Decimal]] = None,
-    ):
+
+    def __init__(self, db: Optional[Session] = None):
         self.db = db
-        self.exchange_rates = exchange_rates or DEFAULT_EXCHANGE_RATES
-    
-    def _convert_to_usd(self, amount: Decimal, currency: str) -> Decimal:
-        """Convert amount to USD."""
-        if currency == "USD":
-            return amount
-        rate = self.exchange_rates.get(currency, Decimal("1"))
-        return amount * rate
-    
+
     def calculate_fire_number(
         self,
         annual_expenses: Decimal,
         safe_withdrawal_rate: Decimal = None,
     ) -> Decimal:
         """Calculate the FIRE number (target net worth).
-        
+
         FIRE Number = Annual Expenses / Safe Withdrawal Rate
-        
+
         Example: $43,200/year expenses / 0.04 SWR = $1,080,000 FIRE number
         """
         swr = safe_withdrawal_rate or self.DEFAULT_SWR
         if swr <= 0:
             return Decimal("0")
         return annual_expenses / swr
-    
+
     def calculate_years_to_fire(
         self,
         current_net_worth: Decimal,
@@ -113,104 +102,90 @@ class FIRECalculator:
         annual_return: Decimal = None,
     ) -> Optional[float]:
         """Calculate years until reaching FIRE number.
-        
+
         Uses the future value formula with regular contributions:
         FV = PV * (1 + r)^n + PMT * (((1 + r)^n - 1) / r)
-        
+
         Solving for n requires numerical methods or logarithms.
         """
         if current_net_worth >= fire_number:
             return 0.0
-        
+
         if monthly_savings <= 0 and current_net_worth <= 0:
             return None  # Can't reach FIRE
-        
+
         annual_return = annual_return or self.DEFAULT_RETURN
-        
+
         # Convert to monthly rate
         monthly_rate = float(annual_return) / 12
-        
+
         # Use numerical approach
         current = float(current_net_worth)
         target = float(fire_number)
         monthly_contrib = float(monthly_savings)
-        
+
         if monthly_rate == 0:
             # No growth, simple division
             if monthly_contrib <= 0:
                 return None
             months = (target - current) / monthly_contrib
             return months / 12 if months > 0 else None
-        
+
         # Iterative calculation
         months = 0
         max_months = 1200  # 100 years max
-        
+
         while current < target and months < max_months:
             current = current * (1 + monthly_rate) + monthly_contrib
             months += 1
-        
+
         if months >= max_months:
             return None  # Would take too long
-        
+
         return months / 12
-    
+
     def calculate_fire_metrics(
         self,
         current_net_worth: Decimal,
         monthly_expenses: Decimal,
         monthly_savings: Decimal,
-        currency: str = "CAD",
         safe_withdrawal_rate: Decimal = None,
         expected_return: Decimal = None,
     ) -> FIREMetrics:
-        """Calculate comprehensive FIRE metrics.
-        
+        """Calculate comprehensive FIRE metrics (CAD).
+
         Args:
-            current_net_worth: Current total net worth
-            monthly_expenses: Monthly living expenses
-            monthly_savings: Monthly amount saved/invested
-            currency: Currency of the expenses (will convert to USD)
+            current_net_worth: Current total net worth (CAD)
+            monthly_expenses: Monthly living expenses (CAD)
+            monthly_savings: Monthly amount saved/invested (CAD)
             safe_withdrawal_rate: SWR (default 4%)
             expected_return: Expected annual return (default 7%)
         """
         swr = safe_withdrawal_rate or self.DEFAULT_SWR
         expected_return = expected_return or self.DEFAULT_RETURN
-        
-        # Convert to USD if needed
-        monthly_expenses_usd = self._convert_to_usd(monthly_expenses, currency)
-        monthly_savings_usd = self._convert_to_usd(monthly_savings, currency)
-        
-        annual_expenses = monthly_expenses_usd * 12
-        
-        # Calculate FIRE number
+
+        annual_expenses = monthly_expenses * 12
+
         fire_number = self.calculate_fire_number(annual_expenses, swr)
-        
-        # Calculate progress
-        progress = (current_net_worth / fire_number * 100) if fire_number > 0 else Decimal("0")
-        
-        # Calculate years to FIRE
+        progress = (
+            current_net_worth / fire_number * 100 if fire_number > 0 else Decimal("0")
+        )
+
         years = self.calculate_years_to_fire(
             current_net_worth,
             fire_number,
-            monthly_savings_usd,
+            monthly_savings,
             expected_return,
         )
-        
-        # Calculate FIRE date
+
         fire_date = None
         if years is not None:
             today = date.today()
-            fire_date = date(
-                today.year + int(years),
-                today.month,
-                today.day
-            )
-        
-        # Income at FIRE
+            fire_date = date(today.year + int(years), today.month, today.day)
+
         annual_income = fire_number * swr
         monthly_income = annual_income / 12
-        
+
         return FIREMetrics(
             fire_number=fire_number,
             current_net_worth=current_net_worth,
@@ -219,13 +194,13 @@ class FIRECalculator:
             fire_date=fire_date,
             monthly_income_at_fire=monthly_income,
             annual_income_at_fire=annual_income,
-            monthly_expenses=monthly_expenses_usd,
+            monthly_expenses=monthly_expenses,
             annual_expenses=annual_expenses,
             safe_withdrawal_rate=swr,
             expected_return=expected_return,
-            monthly_savings=monthly_savings_usd,
+            monthly_savings=monthly_savings,
         )
-    
+
     def project_net_worth(
         self,
         current_net_worth: Decimal,
@@ -235,49 +210,50 @@ class FIRECalculator:
         safe_withdrawal_rate: Decimal = None,
     ) -> list[ProjectionPoint]:
         """Project net worth over time.
-        
+
         Returns yearly data points for charting.
         """
         annual_return = annual_return or self.DEFAULT_RETURN
         swr = safe_withdrawal_rate or self.DEFAULT_SWR
-        
+
         projections = []
         current = float(current_net_worth)
         cumulative_contributions = float(current_net_worth)
         monthly_rate = float(annual_return) / 12
         monthly_contrib = float(monthly_savings)
-        
+
         today = date.today()
-        
+
         for year in range(years + 1):
             # Calculate passive income at this net worth
             passive_income = Decimal(str(current)) * swr
-            
-            projections.append(ProjectionPoint(
-                year=year,
-                date=date(today.year + year, today.month, today.day),
-                net_worth=Decimal(str(round(current, 2))),
-                contributions=Decimal(str(round(cumulative_contributions, 2))),
-                growth=Decimal(str(round(current - cumulative_contributions, 2))),
-                passive_income=passive_income,
-            ))
-            
+
+            projections.append(
+                ProjectionPoint(
+                    year=year,
+                    date=date(today.year + year, today.month, today.day),
+                    net_worth=Decimal(str(round(current, 2))),
+                    contributions=Decimal(str(round(cumulative_contributions, 2))),
+                    growth=Decimal(str(round(current - cumulative_contributions, 2))),
+                    passive_income=passive_income,
+                )
+            )
+
             # Project forward one year (12 months)
             for _ in range(12):
                 current = current * (1 + monthly_rate) + monthly_contrib
                 cumulative_contributions += monthly_contrib
-        
+
         return projections
-    
+
     def run_what_if_scenarios(
         self,
         current_net_worth: Decimal,
         monthly_expenses: Decimal,
         monthly_savings: Decimal,
-        currency: str = "CAD",
     ) -> list[WhatIfScenario]:
-        """Run common what-if scenarios.
-        
+        """Run common what-if scenarios (CAD).
+
         Compares:
         - Baseline
         - Increase savings by $500/month
@@ -286,97 +262,100 @@ class FIRECalculator:
         - Higher return (8% vs 7%)
         - Lower return (5% vs 7%)
         """
-        monthly_expenses_usd = self._convert_to_usd(monthly_expenses, currency)
-        monthly_savings_usd = self._convert_to_usd(monthly_savings, currency)
-        annual_expenses = monthly_expenses_usd * 12
+        annual_expenses = monthly_expenses * 12
         fire_number = self.calculate_fire_number(annual_expenses)
-        
-        scenarios = []
-        
-        # Baseline
+
+        scenarios: list[WhatIfScenario] = []
+
         baseline_years = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings_usd
+            current_net_worth, fire_number, monthly_savings
         )
-        
-        scenarios.append(WhatIfScenario(
-            name="Baseline",
-            years_to_fire=baseline_years,
-            fire_date=self._years_to_date(baseline_years),
-            final_net_worth=fire_number,
-            difference_years=None,
-        ))
-        
-        # Increase savings by $500/month
+        scenarios.append(
+            WhatIfScenario(
+                name="Baseline",
+                years_to_fire=baseline_years,
+                fire_date=self._years_to_date(baseline_years),
+                final_net_worth=fire_number,
+                difference_years=None,
+            )
+        )
+
         years_500 = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings_usd + Decimal("500")
+            current_net_worth, fire_number, monthly_savings + Decimal("500")
         )
-        scenarios.append(WhatIfScenario(
-            name="Save $500 more/month",
-            years_to_fire=years_500,
-            fire_date=self._years_to_date(years_500),
-            final_net_worth=fire_number,
-            difference_years=self._diff_years(baseline_years, years_500),
-        ))
-        
-        # Increase savings by $1000/month
+        scenarios.append(
+            WhatIfScenario(
+                name="Save $500 more/month",
+                years_to_fire=years_500,
+                fire_date=self._years_to_date(years_500),
+                final_net_worth=fire_number,
+                difference_years=self._diff_years(baseline_years, years_500),
+            )
+        )
+
         years_1000 = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings_usd + Decimal("1000")
+            current_net_worth, fire_number, monthly_savings + Decimal("1000")
         )
-        scenarios.append(WhatIfScenario(
-            name="Save $1000 more/month",
-            years_to_fire=years_1000,
-            fire_date=self._years_to_date(years_1000),
-            final_net_worth=fire_number,
-            difference_years=self._diff_years(baseline_years, years_1000),
-        ))
-        
-        # Reduce expenses by 10%
+        scenarios.append(
+            WhatIfScenario(
+                name="Save $1000 more/month",
+                years_to_fire=years_1000,
+                fire_date=self._years_to_date(years_1000),
+                final_net_worth=fire_number,
+                difference_years=self._diff_years(baseline_years, years_1000),
+            )
+        )
+
         reduced_expenses = annual_expenses * Decimal("0.9")
         reduced_fire = self.calculate_fire_number(reduced_expenses)
         years_reduced = self.calculate_years_to_fire(
-            current_net_worth, reduced_fire, monthly_savings_usd
+            current_net_worth, reduced_fire, monthly_savings
         )
-        scenarios.append(WhatIfScenario(
-            name="Reduce expenses 10%",
-            years_to_fire=years_reduced,
-            fire_date=self._years_to_date(years_reduced),
-            final_net_worth=reduced_fire,
-            difference_years=self._diff_years(baseline_years, years_reduced),
-        ))
-        
-        # Higher return (8%)
+        scenarios.append(
+            WhatIfScenario(
+                name="Reduce expenses 10%",
+                years_to_fire=years_reduced,
+                fire_date=self._years_to_date(years_reduced),
+                final_net_worth=reduced_fire,
+                difference_years=self._diff_years(baseline_years, years_reduced),
+            )
+        )
+
         years_8pct = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings_usd, Decimal("0.08")
+            current_net_worth, fire_number, monthly_savings, Decimal("0.08")
         )
-        scenarios.append(WhatIfScenario(
-            name="8% annual return",
-            years_to_fire=years_8pct,
-            fire_date=self._years_to_date(years_8pct),
-            final_net_worth=fire_number,
-            difference_years=self._diff_years(baseline_years, years_8pct),
-        ))
-        
-        # Lower return (5%)
+        scenarios.append(
+            WhatIfScenario(
+                name="8% annual return",
+                years_to_fire=years_8pct,
+                fire_date=self._years_to_date(years_8pct),
+                final_net_worth=fire_number,
+                difference_years=self._diff_years(baseline_years, years_8pct),
+            )
+        )
+
         years_5pct = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings_usd, Decimal("0.05")
+            current_net_worth, fire_number, monthly_savings, Decimal("0.05")
         )
-        scenarios.append(WhatIfScenario(
-            name="5% annual return",
-            years_to_fire=years_5pct,
-            fire_date=self._years_to_date(years_5pct),
-            final_net_worth=fire_number,
-            difference_years=self._diff_years(baseline_years, years_5pct),
-        ))
-        
+        scenarios.append(
+            WhatIfScenario(
+                name="5% annual return",
+                years_to_fire=years_5pct,
+                fire_date=self._years_to_date(years_5pct),
+                final_net_worth=fire_number,
+                difference_years=self._diff_years(baseline_years, years_5pct),
+            )
+        )
+
         return scenarios
-    
+
     def _years_to_date(self, years: Optional[float]) -> Optional[date]:
         """Convert years from now to a date."""
         if years is None:
             return None
         today = date.today()
         return date(today.year + int(years), today.month, today.day)
-    
+
     def _diff_years(self, baseline: Optional[float], new: Optional[float]) -> Optional[float]:
         """Calculate difference in years (negative = faster)."""
         if baseline is None or new is None:
@@ -386,46 +365,32 @@ class FIRECalculator:
 
 def get_fire_summary(
     db: Session,
-    monthly_expenses: Decimal = Decimal("5000"),  # Default: $5,000 CAD
-    monthly_savings: Decimal = Decimal("2000"),  # Estimated savings
-    currency: str = "CAD",
+    monthly_expenses: Decimal = Decimal("5000"),
+    monthly_savings: Decimal = Decimal("2000"),
 ) -> dict:
-    """Get a complete FIRE summary for the dashboard.
-    
-    Args:
-        db: Database session
-        monthly_expenses: Monthly living expenses
-        monthly_savings: Monthly savings amount
-        currency: Currency of expenses/savings
-    """
-    # Get current net worth
+    """Get a complete FIRE summary (CAD) for the dashboard."""
     insights_calc = InsightsCalculator(db)
     net_worth = insights_calc.calculate_net_worth()
-    
-    # Calculate FIRE metrics
+
     fire_calc = FIRECalculator(db)
     metrics = fire_calc.calculate_fire_metrics(
-        current_net_worth=net_worth.net_worth_usd,
+        current_net_worth=net_worth.net_worth_cad,
         monthly_expenses=monthly_expenses,
         monthly_savings=monthly_savings,
-        currency=currency,
     )
-    
-    # Get projections (30 years)
+
     projections = fire_calc.project_net_worth(
-        current_net_worth=net_worth.net_worth_usd,
-        monthly_savings=fire_calc._convert_to_usd(monthly_savings, currency),
+        current_net_worth=net_worth.net_worth_cad,
+        monthly_savings=monthly_savings,
         years=30,
     )
-    
-    # Get what-if scenarios
+
     scenarios = fire_calc.run_what_if_scenarios(
-        current_net_worth=net_worth.net_worth_usd,
+        current_net_worth=net_worth.net_worth_cad,
         monthly_expenses=monthly_expenses,
         monthly_savings=monthly_savings,
-        currency=currency,
     )
-    
+
     return {
         "metrics": {
             "fire_number": float(metrics.fire_number),
