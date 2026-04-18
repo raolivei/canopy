@@ -4,13 +4,15 @@ frontend/.next
 frontend/out
 frontend/tsconfig.tsbuildinfo
 
-# Pytest
+# Pytest / Ruff
 .pytest_cache/
+.ruff_cache/
 
 # Python
 __pycache__/
 *.pyc
 .venv/
+.venv-ci/
 venv/
 
 # Env files
@@ -23,4 +25,10 @@ k8s/secrets.yaml
 # macOS
 .DS_Store
 
+# Editor / agent local state
+.claude/
+.vscode/
+.idea/
+
+# One-off generated docs
 TEST_RESULTS.md
