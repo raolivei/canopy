@@ -26,6 +26,8 @@ from backend.db.models.portfolio_review import (
     ReviewRegion,
     ReviewSource,
 )
+from backend.db.models.imported_event import ImportedEvent
+from backend.db.models.account_balance_history import AccountBalanceHistory
 
 __all__ = [
     # Core assets
@@ -58,4 +60,7 @@ __all__ = [
     "PortfolioReviewLine",
     "ReviewRegion",
     "ReviewSource",
+    # CSV auto-import
+    "ImportedEvent",
+    "AccountBalanceHistory",
 ]

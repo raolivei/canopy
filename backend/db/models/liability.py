@@ -19,7 +19,6 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
-    Enum,
     ForeignKey,
     Numeric,
     String,
@@ -86,6 +85,15 @@ class Liability(Base):
     balance_updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True
+    )
+    # Opening balance at the time of first CSV import. Used for credit cards
+    # where the CSV only contains the current month's deltas: the absolute
+    # ``current_balance`` then equals ``opening_balance + sum(deltas)``.
+    opening_balance: Mapped[Decimal] = mapped_column(
+        Numeric(precision=18, scale=2),
+        default=Decimal("0"),
+        server_default="0",
+        nullable=False,
     )
     
     # Credit details (for credit cards and lines of credit)

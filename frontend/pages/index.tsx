@@ -66,6 +66,22 @@ interface CompareResponse {
   pct_change: number | null;
 }
 
+interface NetWorthPoint {
+  date: string;
+  investments: string;
+  cash: string;
+  debt: string;
+  net_worth: string;
+}
+
+interface NetWorthResponse {
+  points: NetWorthPoint[];
+  latest_investments: string;
+  latest_cash: string;
+  latest_debt: string;
+  latest_net_worth: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -73,6 +89,7 @@ export default function Dashboard() {
   const [regionAlloc, setRegionAlloc] = useState<AllocationResponse | null>(null);
   const [platformAlloc, setPlatformAlloc] = useState<AllocationResponse | null>(null);
   const [compare, setCompare] = useState<CompareResponse | null>(null);
+  const [netWorth, setNetWorth] = useState<NetWorthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const latestId = timeline.length ? timeline[timeline.length - 1].id : null;
@@ -110,6 +127,20 @@ export default function Dashboard() {
       } else {
         setCompare(null);
       }
+
+      try {
+        const nwRes = await fetch(
+          `${API_URL}/v1/wealthsimple-import/networth-timeline`
+        );
+        if (nwRes.ok) {
+          const data: NetWorthResponse = await nwRes.json();
+          setNetWorth(data.points.length > 0 ? data : null);
+        } else {
+          setNetWorth(null);
+        }
+      } catch {
+        setNetWorth(null);
+      }
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : "Failed to load data");
@@ -130,6 +161,20 @@ export default function Dashboard() {
       })),
     [timeline]
   );
+
+  const networthData = useMemo(
+    () =>
+      (netWorth?.points ?? []).map((p) => ({
+        date: format(new Date(p.date), "MMM yyyy"),
+        investments: parseFloat(p.investments),
+        cash: parseFloat(p.cash),
+        debt: -Math.abs(parseFloat(p.debt)),
+        net_worth: parseFloat(p.net_worth),
+      })),
+    [netWorth]
+  );
+
+  const CAD = "CAD";
 
   const latestTotal = latestId
     ? timeline.find((t) => t.id === latestId)?.total_value_usd
@@ -211,6 +256,103 @@ export default function Dashboard() {
 
       {error && (
         <p className="text-sm text-danger-600 dark:text-danger-400 mb-4">{error}</p>
+      )}
+
+      {netWorth && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.03 }}
+          className="mb-8"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <NetWorthTile
+              label="Net worth"
+              value={parseFloat(netWorth.latest_net_worth)}
+              emphasis
+            />
+            <NetWorthTile
+              label="Investments"
+              value={parseFloat(netWorth.latest_investments)}
+            />
+            <NetWorthTile
+              label="Cash"
+              value={parseFloat(netWorth.latest_cash)}
+            />
+            <NetWorthTile
+              label="Debt"
+              value={parseFloat(netWorth.latest_debt)}
+              negative
+            />
+          </div>
+
+          {networthData.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Net worth over time</CardTitle>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Built from Wealthsimple statement uploads (investments + cash
+                  minus debt)
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={networthData}>
+                      <CartesianGrid {...getGridProps(checkDarkMode())} />
+                      <XAxis
+                        dataKey="date"
+                        {...getAxisProps(checkDarkMode())}
+                      />
+                      <YAxis
+                        {...getAxisProps(checkDarkMode())}
+                        tickFormatter={(v) =>
+                          formatCurrency(v as number, CAD)
+                        }
+                      />
+                      <Tooltip
+                        contentStyle={getTooltipStyle(checkDarkMode())}
+                        formatter={(v: number, name: string) => [
+                          formatCurrency(v, CAD),
+                          name,
+                        ]}
+                      />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="investments"
+                        stroke={CHART_COLORS.primary}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="cash"
+                        stroke={CHART_COLORS.success}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="debt"
+                        stroke={CHART_COLORS.danger}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="net_worth"
+                        stroke={CHART_COLORS.accent}
+                        strokeWidth={3}
+                        dot={{ r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
       )}
 
       {!latestId && (
@@ -353,5 +495,39 @@ export default function Dashboard() {
         </Card>
       </motion.div>
     </PageLayout>
+  );
+}
+
+function NetWorthTile({
+  label,
+  value,
+  emphasis = false,
+  negative = false,
+}: {
+  label: string;
+  value: number;
+  emphasis?: boolean;
+  negative?: boolean;
+}) {
+  const displayValue = negative ? -Math.abs(value) : value;
+  return (
+    <Card className={emphasis ? "" : ""} variant={emphasis ? "highlight" : "default"}>
+      <CardContent className="py-5">
+        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {label}
+        </div>
+        <div
+          className={`mt-1 font-semibold ${
+            emphasis ? "text-3xl" : "text-2xl"
+          } ${
+            negative
+              ? "text-danger-600 dark:text-danger-400"
+              : "text-slate-900 dark:text-white"
+          }`}
+        >
+          {formatCurrency(displayValue, "CAD")}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

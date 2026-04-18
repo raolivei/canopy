@@ -77,6 +77,32 @@ Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 
 - 🔄 Wise API - UI ready, API pending
 - ✅ CSV import for all major institutions
 
+### Wealthsimple CSV Auto-Importer (✅ Implemented in 0.8.0)
+
+Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net worth (investments + cash − debt) works from a single drop, no API keys required.
+
+**Supported account classes** (auto-classified from filename + header):
+
+- **Investments** → `Asset` (kind `investment_account`): TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging (`🇮🇳🇯🇵🇧🇷`), Crypto.
+- **Cash** → `Asset` (kind `bank_account`): Chequing.
+- **Debt** → `Liability`: credit card, Portfolio line of credit.
+- **Skipped**: Direct Indexing (flagged but never written).
+
+**How it works**:
+
+1. Drop any mix of CSVs at `/portfolio/wealthsimple-import`.
+2. Preview shows account label, type, row counts, duplicates, and warnings.
+3. Commit writes normalized `Transaction`, `Lot` (on BUY), `Dividend` (on DIV), `AccountBalanceHistory` / `LiabilityBalanceHistory` end-of-statement snapshots. Credit-card balances are reconstructed from `opening_balance + sum(deltas)`.
+4. Each row is hashed into `ImportedEvent` so re-dropping the same file is a no-op.
+5. Dashboard net-worth hero and timeline chart (`/v1/wealthsimple-import/networth-timeline`) update immediately.
+
+**Relevant files**:
+
+- Backend: `backend/services/wealthsimple/{filename_parser,row_parser,description_parser,importer}.py`, `backend/api/wealthsimple_import.py`
+- Frontend: `frontend/pages/portfolio/wealthsimple-import.tsx`, `frontend/pages/index.tsx` (net-worth hero)
+- Migration: `backend/alembic/versions/20260419_0007_add_liability_opening_balance.py`
+- Tests: `backend/tests/test_wealthsimple_{filename_parser,description_parser,importer}.py` (30 tests)
+
 ### Planned Features
 
 - 💰 Budgeting with categories and goals

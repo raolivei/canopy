@@ -15,6 +15,7 @@ import {
   Moon,
   Sun,
   ArrowRight,
+  UploadCloud,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
@@ -70,6 +71,25 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         category: "Navigation",
         action: () => router.push("/"),
         keywords: ["home", "overview"],
+      },
+      {
+        id: "wealthsimple-import",
+        title: "Wealthsimple CSV import",
+        description: "Drop monthly statements from any Wealthsimple account",
+        icon: <UploadCloud className="w-4 h-4" />,
+        category: "Navigation",
+        action: () => router.push("/portfolio/wealthsimple-import"),
+        keywords: [
+          "wealthsimple",
+          "ws",
+          "csv",
+          "statement",
+          "tfsa",
+          "rrsp",
+          "fhsa",
+          "chequing",
+          "credit",
+        ],
       },
       {
         id: "import-snapshot",

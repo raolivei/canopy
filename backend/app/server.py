@@ -26,6 +26,12 @@ try:
 except ImportError:
     HAS_PORTFOLIO_REVIEWS_ROUTER = False
 
+try:
+    from backend.api import wealthsimple_import
+    HAS_WEALTHSIMPLE_IMPORT_ROUTER = True
+except ImportError:
+    HAS_WEALTHSIMPLE_IMPORT_ROUTER = False
+
 # Import integrations router
 try:
     from backend.api import integrations
@@ -76,6 +82,9 @@ def create_app() -> FastAPI:
 
     if HAS_PORTFOLIO_REVIEWS_ROUTER:
         app.include_router(portfolio_reviews.router)
+
+    if HAS_WEALTHSIMPLE_IMPORT_ROUTER:
+        app.include_router(wealthsimple_import.router)
     
     # Include integrations router if available
     if HAS_INTEGRATIONS_ROUTER:

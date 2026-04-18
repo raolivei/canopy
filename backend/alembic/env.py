@@ -20,6 +20,8 @@ from backend.db.models import (
     SnapshotHolding,
     PortfolioReview,
     PortfolioReviewLine,
+    ImportedEvent,
+    AccountBalanceHistory,
 )
 
 # Alembic Config object

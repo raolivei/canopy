@@ -9,6 +9,30 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [0.8.0] - 2026-04-18 - Wealthsimple CSV auto-importer + net-worth dashboard
+
+### Added
+
+- **Wealthsimple CSV drop zone** (`/portfolio/wealthsimple-import`): drop any combination of monthly-statement CSV exports (TFSA, RRSP, FHSA, Emerging, TFSA Long, Chequing, Crypto, credit card, Portfolio line of credit). Files are auto-classified from their filename, previewed with row counts / duplicates / warnings, then committed in one click.
+- **Filename parser** (`services/wealthsimple/filename_parser.py`): 9 WS filename patterns supported (including emoji-labelled accounts like `Retirement ⛱️` and `Emerging 🇮🇳🇯🇵🇧🇷`); Direct Indexing is recognized and explicitly marked `skip` (account closed).
+- **Row and description parsers** (`services/wealthsimple/row_parser.py`, `description_parser.py`): detects the two WS CSV shapes (investment/cash vs. credit-card), maps native transaction codes to a canonical `RowKind`, and extracts structured fields from `description` text (ticker / shares / price / exec date / FX for BUY, SELL, DIV, SHARE_TRANSFER, DIRECT_DEPOSIT).
+- **Importer service** (`services/wealthsimple/importer.py`): upserts account-level `Asset` (investment/cash) and `Liability` (credit card, line of credit) records, writes `Lot` on BUY, marks lots sold on SELL, creates `Dividend` on DIV, records every row as a normalized `Transaction`, dedups via `ImportedEvent` hashes so re-imports are no-ops, and writes end-of-statement snapshots into `AccountBalanceHistory` / `LiabilityBalanceHistory`.
+- **Alembic `20260419_0007`**: adds `liabilities.opening_balance Numeric(18,2) default 0` so credit-card balances can be reconstructed from partial monthly deltas.
+- **API `/v1/wealthsimple-import`**:
+  - `POST /preview` — multipart upload, dry-run classification + row counts + duplicate counts per file.
+  - `POST /commit` — multipart upload, persists all rows; returns per-file summary.
+  - `GET /accounts` — lists Wealthsimple `Asset` and `Liability` accounts currently known to Canopy.
+  - `GET /networth-timeline` — combined timeline of investments + cash − debt, built by forward-filling `AccountBalanceHistory` and `LiabilityBalanceHistory` snapshots.
+- **Dashboard net-worth hero** (`pages/index.tsx`): four KPI tiles (Net worth, Investments, Cash, Debt) and a multi-line timeline chart (investments / cash / debt / net worth) fed by `/networth-timeline`.
+- **Navigation**: "Wealthsimple import" added as a primary sidebar item and to the command palette (keywords: `wealthsimple`, `ws`, `csv`, `tfsa`, `rrsp`, `fhsa`, `chequing`, `credit`).
+- **Tests**: 30 new tests under `backend/tests/` — filename parser (13), description parser (8), importer service (9: classification, credit-card running balance, LOC balance, Direct Indexing skip, end-of-statement snapshot, idempotent re-import, multi-file drop). `backend/tests/conftest.py` maps PostgreSQL `ARRAY` / `JSONB` types to SQLite-compatible `TEXT` / `JSON` so the suite can run against an in-memory SQLite database.
+
+### Changed
+
+- **Dashboard**: net-worth hero and combined timeline now sit above the portfolio-review card; review-driven USD total remains below for semi-annual snapshots.
+
+---
+
 ## [0.7.0] - 2026-04-01 - Portfolio review (semi-annual) pivot
 
 ### Added
