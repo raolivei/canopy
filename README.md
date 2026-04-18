@@ -2,9 +2,13 @@
 
 **Your financial life. Under one canopy.**
 
-Canopy is a self-hosted personal finance dashboard. The **primary workflow** is a **semi-annual portfolio review**: import structured spreadsheet snapshots (Brazil / Canada / Crypto sections), store history by as-of date, and visualize allocation and total USD over time. Budgeting, bank CSV imports, Wise/Questrade-style integrations, and lot-level holdings remain available under **Advanced / legacy** in the sidebar—they are not the main navigation focus.
+Canopy is a self-hosted personal finance dashboard built around **continuous net-worth tracking**:
 
-It is inspired by Monarch Money, Ghostfolio, and Firefly III, runs fully local on Raspberry Pi k3s clusters with a lean footprint, and stores all data locally without cloud dependencies.
+- **Drop Wealthsimple statements** (any mix of TFSA / RRSP / FHSA / Crypto / Chequing / Credit Card / Line of Credit CSVs) — they're auto-classified into investments, cash, and debt and de-duplicated on re-import.
+- **Capture everything that doesn't auto-sync** (Brazilian brokerages, Binance, private equity, real estate) as dated **portfolio review snapshots** — TSV/CSV in, history by as-of date out.
+- **See one net-worth number** on the dashboard (investments + cash − debt), with a combined timeline chart built from every statement drop and every review snapshot.
+
+It is inspired by Monarch Money, Ghostfolio, and Firefly III, runs fully local on Raspberry Pi k3s clusters (accessed privately over Tailscale — never on the public internet), and stores all data locally without cloud dependencies.
 
 ## Project Objectives
 
@@ -37,6 +41,36 @@ Most banks don't offer APIs. CSV/OFX files are universal formats that allow user
 Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.
 
 ## Core Features
+
+### Wealthsimple CSV Auto-Importer (✅ Primary input channel — 0.8.0)
+
+Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net worth (investments + cash − debt) works from a single drop, no API keys required.
+
+**Supported account classes** (auto-classified from filename + header):
+
+- **Investments** → `Asset` (kind `investment_account`): TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging (`🇮🇳🇯🇵🇧🇷`), Crypto.
+- **Cash** → `Asset` (kind `bank_account`): Chequing.
+- **Debt** → `Liability`: credit card, Portfolio line of credit.
+- **Skipped**: Direct Indexing (flagged but never written).
+
+**Flow**:
+
+1. Drop any mix of CSVs at `/portfolio/wealthsimple-import`.
+2. Preview shows account label, type, row counts, duplicates, and warnings.
+3. Commit writes normalized `Transaction`, `Lot` (on BUY), `Dividend` (on DIV), `AccountBalanceHistory` / `LiabilityBalanceHistory` end-of-statement snapshots. Credit-card balances are reconstructed from `opening_balance + sum(deltas)`.
+4. Each row is hashed into `ImportedEvent` so re-dropping the same file is a no-op.
+5. Dashboard net-worth hero and timeline chart (`/v1/wealthsimple-import/networth-timeline`) update immediately.
+
+**Relevant files**:
+
+- Backend: `backend/services/wealthsimple/{filename_parser,row_parser,description_parser,importer}.py`, `backend/api/wealthsimple_import.py`
+- Frontend: `frontend/pages/portfolio/wealthsimple-import.tsx`, `frontend/pages/index.tsx` (net-worth hero)
+- Migration: `backend/alembic/versions/20260419_0007_add_liability_opening_balance.py`
+- Tests: `backend/tests/test_wealthsimple_{filename_parser,description_parser,importer}.py` (30 tests)
+
+### Portfolio Review Snapshots (✅ Implemented in 0.7.0)
+
+For anything that doesn't export a machine-readable CSV (Brazilian brokerages, Binance, private assets, real estate), drop a TSV/CSV snapshot at `/portfolio/import` and Canopy persists it as a dated review row. These snapshots feed the same net-worth timeline as the Wealthsimple imports.
 
 ### Transaction Management (✅ Implemented)
 
@@ -77,32 +111,6 @@ Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 
 - 🔄 Wise API - UI ready, API pending
 - ✅ CSV import for all major institutions
 
-### Wealthsimple CSV Auto-Importer (✅ Implemented in 0.8.0)
-
-Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net worth (investments + cash − debt) works from a single drop, no API keys required.
-
-**Supported account classes** (auto-classified from filename + header):
-
-- **Investments** → `Asset` (kind `investment_account`): TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging (`🇮🇳🇯🇵🇧🇷`), Crypto.
-- **Cash** → `Asset` (kind `bank_account`): Chequing.
-- **Debt** → `Liability`: credit card, Portfolio line of credit.
-- **Skipped**: Direct Indexing (flagged but never written).
-
-**How it works**:
-
-1. Drop any mix of CSVs at `/portfolio/wealthsimple-import`.
-2. Preview shows account label, type, row counts, duplicates, and warnings.
-3. Commit writes normalized `Transaction`, `Lot` (on BUY), `Dividend` (on DIV), `AccountBalanceHistory` / `LiabilityBalanceHistory` end-of-statement snapshots. Credit-card balances are reconstructed from `opening_balance + sum(deltas)`.
-4. Each row is hashed into `ImportedEvent` so re-dropping the same file is a no-op.
-5. Dashboard net-worth hero and timeline chart (`/v1/wealthsimple-import/networth-timeline`) update immediately.
-
-**Relevant files**:
-
-- Backend: `backend/services/wealthsimple/{filename_parser,row_parser,description_parser,importer}.py`, `backend/api/wealthsimple_import.py`
-- Frontend: `frontend/pages/portfolio/wealthsimple-import.tsx`, `frontend/pages/index.tsx` (net-worth hero)
-- Migration: `backend/alembic/versions/20260419_0007_add_liability_opening_balance.py`
-- Tests: `backend/tests/test_wealthsimple_{filename_parser,description_parser,importer}.py` (30 tests)
-
 ### Planned Features
 
 - 💰 Budgeting with categories and goals
@@ -113,9 +121,15 @@ Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net wort
 
 ## Current Version
 
-**v0.4.0** - Insights & FIRE Planning release with portfolio analytics.
+**v0.8.0** — Wealthsimple CSV auto-importer + unified net-worth dashboard. See [CHANGELOG.md](./CHANGELOG.md).
 
-See [CHANGELOG.md](./CHANGELOG.md) for detailed release notes.
+## Deployment & Security
+
+Canopy handles personal financial data (bank transactions, investment positions, account numbers, net worth). The recommended deployment:
+
+- **Private ingress only** — expose `canopy.eldertree.local` inside the cluster and **do not** publish a public `canopy.eldertree.xyz` (or equivalent) host. HTTP Basic Auth on a public URL is not sufficient protection for this data.
+- **Access from anywhere via Tailscale** — all client devices (Mac, iOS, Android) join the tailnet and resolve `canopy.eldertree.local` through Pi-hole. See `pi-fleet/docs/TAILSCALE.md` in the infra repo for the iOS/Android setup.
+- **Secrets in Vault** — database passwords and any future API keys are managed by External Secrets Operator, never committed to Git.
 
 ## Quick Start
 

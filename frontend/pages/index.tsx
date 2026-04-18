@@ -186,7 +186,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <PageLayout title="Dashboard">
-        <PageHeader title="Portfolio review" description="Semi-annual snapshot progress" />
+        <PageHeader title="Portfolio review" description="Snapshot progress" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <SkeletonMetricCard />
           <SkeletonMetricCard />
@@ -360,8 +360,8 @@ export default function Dashboard() {
           <CardContent className="py-12 text-center">
             <LineChartIcon className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
             <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto">
-              Import your semi-annual spreadsheet (Brazil / Canada / Crypto sections) to see
-              allocation charts and progress over time.
+              Drop a Wealthsimple monthly statement, or import a portfolio snapshot
+              (Brazil / Canada / Crypto sections) for anything that doesn't auto-sync.
             </p>
             <Button variant="primary" onClick={() => router.push("/portfolio/import")}>
               Import portfolio CSV

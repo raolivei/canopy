@@ -32,3 +32,4 @@ k8s/secrets.yaml
 
 # One-off generated docs
 TEST_RESULTS.md
+.github/PR_*_DESCRIPTION.md

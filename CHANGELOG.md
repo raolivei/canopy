@@ -9,7 +9,9 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
-## [0.8.0] - 2026-04-18 - Wealthsimple CSV auto-importer + net-worth dashboard
+## [0.8.0] - 2026-04-18 — Continuous net-worth tracking
+
+This release re-frames Canopy around **continuous** net-worth tracking rather than semi-annual reviews. Monthly Wealthsimple statement drops now auto-classify into investments, cash, and debt and feed a unified net-worth dashboard; the 0.7.0 portfolio-review importer remains the input channel for holdings that don't export machine-readable CSVs (Brazilian brokerages, Binance, etc.).
 
 ### Added
 
@@ -29,7 +31,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Dashboard**: net-worth hero and combined timeline now sit above the portfolio-review card; review-driven USD total remains below for semi-annual snapshots.
+- **Dashboard**: net-worth hero and combined timeline now sit above the portfolio-review card; review-driven USD total remains below for holdings that don't sync from Wealthsimple.
+- **Product positioning**: README and sidebar language shift from "semi-annual portfolio review" to "continuous net-worth tracking" — portfolio reviews are now documented as one of two input channels (Wealthsimple CSV drops being the other), not the primary workflow.
 
 ---
 
