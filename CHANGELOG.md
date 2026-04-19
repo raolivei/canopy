@@ -8,7 +8,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [0.10.3] - 2026-04-19
 
-- README refresh; FIRE optional CAGR from snapshots; net worth chart (stacked area + debt axis); portfolio dividends + positions split; accounts grouping; nav/import/integrations polish + logos; privacy “hide amounts”.
+- README refresh; FIRE optional CAGR from snapshots; net worth chart (stacked area + debt axis); portfolio dividends + positions split; accounts grouping; nav/import/integrations polish + logos; privacy “hide amounts”; **Cursor** project agent skills under `.cursor/skills/` (repo conventions, stack map, UI/backend/import notes).
 - Wise sync writes prices; insights use balance history; holdings cash rows show display name (hide Monarch internal symbols).
 - CI may tag `v$(VERSION)` after image push on `main`.
 

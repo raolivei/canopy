@@ -1,22 +1,29 @@
 ---
 name: canopy-agent-conventions
 description: >-
-  Canopy repo norms for AI agents: CHANGELOG style, privacy, and scope. Apply
-  when editing Canopy, writing changelog/commits, or handling user/financial data.
+  Canopy: CHANGELOG/commits, privacy, PR/git habits, and change scope. Use for
+  any Canopy edit that touches docs, release notes, or shared artifacts.
 ---
 
-# Canopy agent conventions
+# Agent conventions (Canopy)
 
 ## Changelog
 
-- Keep entries **short**: one line per theme when possible; avoid repeating the same story across Changed/Fixed.
-- No multi-paragraph feature specs in `CHANGELOG.md` — link to PR/issue if detail is needed.
+- **Minimal**: themes only; one line per release section when possible. Detail belongs in **commits / PRs**, not `CHANGELOG.md`.
+- Do not balloon entries with API field lists, file paths, or duplicate Changed vs Fixed narratives.
 
-## Privacy and public artifacts
+## Privacy (non-negotiable)
 
-- **Never** put real names, account numbers, full card/bank numbers, addresses, or transaction amounts from the author’s data into: commits, PR text, `CHANGELOG`, README examples, tests, fixtures, screenshots, or logs.
-- Use placeholders (`****8813`, `example@…`, synthetic CSV snippets) in examples and tests.
+- Never put **real** names, institutions, account or card identifiers, addresses, or **real dollar amounts** from user data into: commits, PR bodies, `CHANGELOG`, README/examples, tests, fixtures, screenshots, or pasted logs.
+- Use synthetic placeholders: `****8813`, `example@local`, tiny made-up CSV rows.
 
-## Code changes
+## Code and docs scope
 
-- Touch only what the task needs; match existing patterns; no drive-by refactors or unsolicited docs.
+- Change only what the task requires; match existing style and abstractions.
+- Do not add unsolicited markdown guides or expand scope with drive-by refactors.
+
+## Git / PR
+
+- Work on **`feat/*`** (or `fix/*`, etc.); avoid committing directly to `main`.
+- Conventional commits (`feat:`, `fix:`, `docs:`, …). PR titles should describe outcome, not only branch name.
+- Open PRs may overlap: a large **`feat/portfolio-review-pivot`-style** branch can supersede older topic branches—rebase or close stale PRs that **conflict** with `main`.
