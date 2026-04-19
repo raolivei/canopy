@@ -334,7 +334,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               <div ref={listRef} className="max-h-80 overflow-y-auto p-2">
                 {filteredCommands.length === 0 ? (
                   <div className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
-                    No results found for "{query}"
+                    No results found for &quot;{query}&quot;
                   </div>
                 ) : (
                   Object.entries(groupedCommands).map(([category, items]) => (
