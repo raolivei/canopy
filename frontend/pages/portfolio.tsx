@@ -234,8 +234,10 @@ export default function Portfolio() {
 
   if (summaryLoading) {
     return (
-      <PageLayout title="Portfolio">
-        <PageHeader title="Portfolio" description="Track your investments and assets" />
+      <PageLayout
+        title="Portfolio"
+        description="Track your investments and assets"
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[1, 2, 3, 4].map((i) => (
             <SkeletonMetricCard key={i} />
