@@ -79,11 +79,12 @@ export default function Portfolio() {
   const usdCadRate = fx.data?.rate ?? null;
 
   const convertToDisplay = (
-    value: number | string | null,
+    value: number | string | null | undefined,
     fromCurrency: string,
   ): number => {
-    if (value === null) return 0;
+    if (value === null || value === undefined) return 0;
     const numValue = Number(value);
+    if (!Number.isFinite(numValue)) return 0;
     return convertForView(numValue, fromCurrency || "CAD", view, usdCadRate);
   };
 

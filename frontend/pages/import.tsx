@@ -70,6 +70,8 @@ interface ImportResult {
 
 const bankFormats = [
   { value: "generic", label: "Generic CSV" },
+  { value: "monarch", label: "Monarch Money" },
+  { value: "amex_year_end_summary", label: "Amex Year-End Summary (CA)" },
   { value: "wealthsimple", label: "Wealthsimple" },
   { value: "rbc", label: "RBC" },
   { value: "td_bank", label: "TD" },

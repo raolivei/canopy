@@ -137,6 +137,12 @@ class Asset(Base):
         return self.asset_type.value.startswith("bank_")
 
     @property
+    def is_wise_api_asset(self) -> bool:
+        """Wise sync only updates ``current_price``; do not let CSV balance snapshots override it."""
+        sym = (self.symbol or "").upper()
+        return (self.sync_source or "").upper() == "WISE" or sym.startswith("WISE_")
+
+    @property
     def effective_value(self) -> Optional[Decimal]:
         """Get the effective value considering ownership percentage.
 

@@ -1,8 +1,6 @@
 # Canopy - Docker Compose for Local Development
 # Uses port assignments from workspace-config
 
-version: "3.9"
-
 services:
   # PostgreSQL Database
   postgres:

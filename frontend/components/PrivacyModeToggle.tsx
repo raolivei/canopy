@@ -2,6 +2,7 @@
  * Icon button to toggle amount masking (privacy overlay).
  */
 
+import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
@@ -18,6 +19,26 @@ export function PrivacyModeToggle({
 }: PrivacyModeToggleProps) {
   const { privacyMode, togglePrivacyMode, hydrated } = usePrivacyMode();
   const active = hydrated && privacyMode;
+  const [mounted, setMounted] = useState(false);
+
+  // Avoid hydration mismatch: Dark Reader injects attributes onto lucide SVGs
+  // before React hydrates (same pattern as MobileNav / Sidebar).
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <span
+        className={cn(
+          "inline-flex h-8 min-w-[2rem] items-center justify-center shrink-0 rounded-lg border border-transparent",
+          showLabel && "min-w-[7rem]",
+          className,
+        )}
+        aria-hidden
+      />
+    );
+  }
 
   return (
     <button

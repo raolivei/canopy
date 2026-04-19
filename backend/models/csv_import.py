@@ -31,6 +31,7 @@ class BankFormat(str, Enum):
     CITIBANK = "citibank"
     CAPITAL_ONE = "capital_one"
     AMEX = "amex"
+    AMEX_YEAR_END_SUMMARY = "amex_year_end_summary"
     DISCOVER = "discover"
     SCHWAB = "schwab"
     # Canadian Banks
