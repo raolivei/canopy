@@ -7,6 +7,7 @@ import {
   Wallet,
   Menu,
   UploadCloud,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 
@@ -17,6 +18,7 @@ const mobileNavItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
+  { name: "Txns", href: "/transactions", icon: DollarSign },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "More", href: "/settings", icon: Menu },
 ];
@@ -51,6 +53,8 @@ export default function MobileNav() {
                   path === "/import" ||
                   path.startsWith("/import/")
                 )
+              : item.href === "/transactions"
+                ? path === "/transactions"
               : item.href === "/settings"
                 ? path === "/settings" || path.startsWith("/settings/")
                 : path === item.href ||

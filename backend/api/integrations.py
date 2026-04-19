@@ -279,9 +279,14 @@ async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
 
 
 class QuestradeConnectRequest(BaseModel):
-    """Request to connect Questrade (manual authorization token from API Centre)."""
+    """Request to connect Questrade (manual authorization token from API Centre).
 
-    refresh_token: str
+    If ``refresh_token`` is omitted or empty, the API uses ``QUESTRADE_REFRESH_TOKEN``
+    from the environment (e.g. injected from Vault / External Secrets in cluster).
+    A non-empty body value wins over the environment.
+    """
+
+    refresh_token: Optional[str] = None
 
 
 class QuestradeAccountResponse(BaseModel):
@@ -315,13 +320,37 @@ class QuestradeSyncResponse(BaseModel):
     updated_lots: int = 0
 
 
+@router.get("/questrade/status")
+async def get_questrade_status():
+    """Return whether ``QUESTRADE_REFRESH_TOKEN`` is set (e.g. Vault → External Secrets → pod env)."""
+    settings = get_settings()
+    return {"connected": bool((settings.questrade_refresh_token or "").strip())}
+
+
+def _resolve_questrade_refresh_token(request: QuestradeConnectRequest) -> str:
+    body = (request.refresh_token or "").strip()
+    if body:
+        return body
+    env_token = (get_settings().questrade_refresh_token or "").strip()
+    if env_token:
+        return env_token
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            "No Questrade refresh token. Paste a token in the UI, or set QUESTRADE_REFRESH_TOKEN "
+            "(e.g. from Vault via External Secrets)."
+        ),
+    )
+
+
 @router.post("/questrade/test-connection")
 async def test_questrade_connection(request: QuestradeConnectRequest):
     """Test Questrade API connection with provided refresh token."""
     try:
         from backend.services.questrade_integration import QuestradeIntegrationService
 
-        with QuestradeIntegrationService(request.refresh_token) as qt:
+        token = _resolve_questrade_refresh_token(request)
+        with QuestradeIntegrationService(token) as qt:
             accounts = qt.get_accounts()
             if not accounts:
                 raise HTTPException(status_code=400, detail="No accounts found")
@@ -362,7 +391,8 @@ async def get_questrade_accounts(request: QuestradeConnectRequest):
     try:
         from backend.services.questrade_integration import QuestradeIntegrationService
 
-        with QuestradeIntegrationService(request.refresh_token) as qt:
+        token = _resolve_questrade_refresh_token(request)
+        with QuestradeIntegrationService(token) as qt:
             accounts = qt.get_accounts()
             return [
                 QuestradeAccountResponse(
@@ -388,7 +418,8 @@ async def get_questrade_positions(
     try:
         from backend.services.questrade_integration import QuestradeIntegrationService
 
-        with QuestradeIntegrationService(request.refresh_token) as qt:
+        token = _resolve_questrade_refresh_token(request)
+        with QuestradeIntegrationService(token) as qt:
             positions = qt.get_positions(account_number)
             return [
                 QuestradePositionResponse(
@@ -416,7 +447,8 @@ async def sync_questrade(request: QuestradeConnectRequest, db: DbSession):
     created_lots = 0
     updated_lots = 0
 
-    with QuestradeIntegrationService(request.refresh_token) as qt:
+    token = _resolve_questrade_refresh_token(request)
+    with QuestradeIntegrationService(token) as qt:
         accounts = qt.get_accounts()
 
         for acc in accounts:

@@ -174,6 +174,8 @@ def _row_to_transaction_type(kind: RowKind, amount: Decimal) -> str:
         return TransactionType.TRANSFER.value
     if kind in {RowKind.TRANSFER_IN, RowKind.TRANSFER_OUT, RowKind.SHARE_TRANSFER}:
         return TransactionType.TRANSFER.value
+    if kind == RowKind.SPEND:
+        return TransactionType.EXPENSE.value if amount < 0 else TransactionType.INCOME.value
     if amount >= 0:
         return TransactionType.INCOME.value
     return TransactionType.EXPENSE.value
@@ -191,6 +193,7 @@ _KIND_CATEGORY: dict[RowKind, str] = {
     RowKind.TRANSFER_OUT: "transfer",
     RowKind.SHARE_TRANSFER: "share_transfer",
     RowKind.GIVEAWAY: "giveaway",
+    RowKind.SPEND: "cash_spend",
     RowKind.BUY: "investment",
     RowKind.SELL: "investment",
     RowKind.CC_PURCHASE: "credit_card_purchase",

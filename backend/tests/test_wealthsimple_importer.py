@@ -52,6 +52,13 @@ CHEQUING_CSV = (
     '"2025-12-22","EFTOUT","Withdrawal","-1000.00","3000.00","CAD"\n'
 )
 
+# Shape-A codes SPEND (cash debit) and TRFINTF (registered transfer in) — no rows_unknown
+REGISTERED_CSV = (
+    '"date","transaction","description","amount","balance","currency"\n'
+    '"2026-02-01","TRFINTF","Tax-free transfer in","500.00","500.00","CAD"\n'
+    '"2026-02-02","SPEND","Merchant","-12.34","487.66","CAD"\n'
+)
+
 
 CC_CSV = (
     '"transaction_date","post_date","type","details","amount","currency"\n'
@@ -107,6 +114,21 @@ def test_buy_row_creates_lot_and_ticker_asset(db: Session) -> None:
     assert len(lots) == 1
     assert lots[0].quantity == Decimal("0.2994")
     assert lots[0].price_per_unit == Decimal("191.55")
+
+
+def test_shape_a_spend_and_trfintf_are_known_kinds(db: Session) -> None:
+    summary = WealthsimpleImporter(db).ingest(
+        [
+            (
+                "TFSA-monthly-statement-transactions-HQB2DBYK0CAD-2026-02-01.csv",
+                REGISTERED_CSV,
+            )
+        ]
+    )
+    db.commit()
+    assert summary.files[0].rows_unknown == 0
+    assert summary.files[0].by_kind.get("spend") == 1
+    assert summary.files[0].by_kind.get("transfer_in") == 1
 
 
 def test_chequing_file_creates_bank_asset(db: Session) -> None:

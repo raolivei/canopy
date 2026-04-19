@@ -92,9 +92,10 @@ async def preview_csv_import(
     except ValueError:
         bank_format_enum = BankFormat.GENERIC
 
-    # Prefer Amex Year-End when headers match (Import UI may default to Monarch).
+    # Prefer Amex presets when headers match (Import UI may default to Monarch).
     if (
-        detected_format == BankFormat.AMEX_YEAR_END_SUMMARY
+        detected_format
+        in (BankFormat.AMEX_YEAR_END_SUMMARY, BankFormat.AMEX_MONTHLY_STATEMENT_CA)
         and detected_format in csv_service.BANK_FORMATS
         and bank_format_enum == BankFormat.MONARCH
     ):
