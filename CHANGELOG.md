@@ -39,6 +39,10 @@ Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Bra
 
 - **Five logo explorations** added under `frontend/public/brand/concepts/` (three AI-generated PNGs — wallet-leaf, tree-coin, maple-shield — and two hand-authored monoline SVGs — leaf-chart, monogram). Reviewable at [`/logos`](https://canopy.eldertree.xyz/logos). The active logo (`canopy-icon.svg`, banner) is unchanged.
 
+### Fixed
+
+- **Wealthsimple DIV rows no longer blow up the importer.** `Dividend.dividend_type` column now uses `values_callable` so SQLAlchemy emits the enum **value** (`"cash"`) instead of the enum **name** (`"CASH"`), matching the lowercase values stored in the Postgres `dividendtype` enum. Same fix pattern as the earlier `AssetType` column. Previously, any file with a DIV transaction failed with `invalid input value for enum dividendtype: "CASH"`.
+
 ---
 
 ## [0.8.0] - 2026-04-18 — Continuous net-worth tracking

@@ -33,7 +33,10 @@ class Dividend(Base):
     # Dividend details
     amount: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=4))
     payment_date: Mapped[date] = mapped_column(Date, index=True)
-    dividend_type: Mapped[DividendType] = mapped_column(Enum(DividendType), default=DividendType.CASH)
+    dividend_type: Mapped[DividendType] = mapped_column(
+        Enum(DividendType, values_callable=lambda x: [e.value for e in x]),
+        default=DividendType.CASH,
+    )
 
     # For stock dividends or reinvested dividends
     shares_received: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
