@@ -50,6 +50,7 @@ class RowKind(str, enum.Enum):
     DEPOSIT = "deposit"
     SHARE_TRANSFER = "share_transfer"
     GIVEAWAY = "giveaway"
+    SPEND = "spend"  # debit-card / bill pay from cash (chequing)
     # Credit card row kinds
     CC_PURCHASE = "cc_purchase"
     CC_REFUND = "cc_refund"
@@ -87,9 +88,11 @@ _SHAPE_A_MAP: dict[str, RowKind] = {
     "EFTOUT": RowKind.WITHDRAW,
     "WD": RowKind.WITHDRAW,
     "TRFIN": RowKind.TRANSFER_IN,
+    "TRFINTF": RowKind.TRANSFER_IN,  # tax-free / registered transfer in
     "TRFOUT": RowKind.TRANSFER_OUT,
     "TRFOUTTF": RowKind.SHARE_TRANSFER,
     "GIVEAWAY": RowKind.GIVEAWAY,
+    "SPEND": RowKind.SPEND,
 }
 
 

@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"  # Overridden by SECRET_KEY env var from Vault in production
     environment: str = "development"
 
-    # Optional integration tokens (can be set via env / Vault; UI can also send token per request)
+    # Optional integration tokens (can be set via env / Vault + ESO; UI can also send per request)
     wise_api_token: Optional[str] = None  # WISE_API_TOKEN
+    questrade_refresh_token: Optional[str] = None  # QUESTRADE_REFRESH_TOKEN
 
     model_config = SettingsConfigDict(
         env_file=".env",

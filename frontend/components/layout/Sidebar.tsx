@@ -29,6 +29,7 @@ const primaryNavigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
+  { name: "Transactions", href: "/transactions", icon: DollarSign },
   { name: "Insights", href: "/insights", icon: Target },
   { name: "Annual Report", href: "/report", icon: BarChart2 },
   { name: "Integrations", href: "/settings/integrations", icon: Plug },
@@ -41,8 +42,6 @@ const importNavigation = [
   { name: "Bank CSV import", href: "/import", icon: Upload },
   { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
 ];
-
-const advancedNavigation = [{ name: "Transactions", href: "/transactions", icon: DollarSign }];
 
 interface NavItem {
   name: string;
@@ -69,9 +68,7 @@ interface RenderSectionArgs {
   router: ReturnType<typeof useRouter>;
 }
 
-// Shared rendering for the collapsible Advanced / Legacy sections.
-// Keeps both groups visually identical while letting each own its own
-// expand/collapse state.
+// Shared rendering for the collapsible Import section.
 function renderSection({
   title,
   items,
@@ -143,7 +140,6 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [importOpen, setImportOpen] = useState(true);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const { privacyMode, togglePrivacyMode, hydrated: privacyHydrated } = usePrivacyMode();
 
   useEffect(() => {
@@ -328,15 +324,6 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
             items: importNavigation,
             open: importOpen,
             setOpen: setImportOpen,
-            isCollapsed,
-            router,
-          })}
-
-          {renderSection({
-            title: "Advanced",
-            items: advancedNavigation,
-            open: advancedOpen,
-            setOpen: setAdvancedOpen,
             isCollapsed,
             router,
           })}

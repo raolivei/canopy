@@ -50,6 +50,13 @@ Export from the Amex website **Year-End Summary** (not the regular activity CSV)
 - **Date Format:** DD/MM/YYYY
 - **Default currency:** Choose **CAD** on the Import page when previewing.
 
+### American Express monthly statement (Canada)
+Regular **monthly** exports from Amex Canada (e.g. `jan-2026.csv`) use a different layout than Year-End: one **Amount** column (positive charges, negative credits/refunds), **Date Processed**, **Card Member**, **Account #**, **Merchant**, etc. Dates look like `17 Apr 2026`.
+
+- **Columns:** Date, Date Processed, Description, Card Member, Account #, Amount, … Merchant, Reference (full export may include multi-line quoted fields; that is normal).
+- **Date Format:** `DD Mon YYYY` (English month abbreviation)
+- **Import page:** Choose **Amex Monthly Statement (CA)** or **Generic CSV** (auto-detect).
+
 ### TD Bank
 - **Columns:** Date, Description, Debit, Credit
 - **Date Format:** MM/DD/YYYY

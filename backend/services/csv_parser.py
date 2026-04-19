@@ -73,6 +73,16 @@ class CSVParserService:
             account_column="Account Number",
             date_format="%d/%m/%Y",
         ),
+        # Amex Canada monthly activity CSV (website export): "17 Apr 2026", positive Amount = charge
+        BankFormat.AMEX_MONTHLY_STATEMENT_CA: FieldMapping(
+            date_column="Date",
+            description_column="Description",
+            amount_column="Amount",
+            merchant_column="Merchant",
+            account_column="Account #",
+            date_format="%d %b %Y",
+            negative_means_expense=False,
+        ),
         BankFormat.CAPITAL_ONE: FieldMapping(
             date_column="Transaction Date",
             description_column="Description",
@@ -159,6 +169,16 @@ class CSVParserService:
             and any(h == "transaction" for h in headers_lower)
         ):
             return BankFormat.AMEX_YEAR_END_SUMMARY
+
+        # Amex Canada monthly statement export (Date / Description / Amount, Date Processed, Card Member)
+        if (
+            "date processed" in headers_lower
+            and "card member" in headers_lower
+            and any(h.strip() == "account #" for h in headers_lower)
+            and "merchant" in headers_lower
+            and "reference" in headers_lower
+        ):
+            return BankFormat.AMEX_MONTHLY_STATEMENT_CA
 
         # Monarch Money detection (very specific pattern)
         if (
@@ -297,7 +317,7 @@ class CSVParserService:
             transaction_date = datetime.strptime(date_str, mapping.date_format)
         except ValueError:
             # Try common formats as fallback
-            for fmt in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d"]:
+            for fmt in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%d %b %Y"]:
                 try:
                     transaction_date = datetime.strptime(date_str, fmt)
                     break

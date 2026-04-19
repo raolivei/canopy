@@ -376,6 +376,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [serverTokenConfigured, setServerTokenConfigured] = useState(false);
   const [accounts, setAccounts] = useState<{ number: string; type: string; status: string }[]>([]);
   const [syncResult, setSyncResult] = useState<{ accounts_synced: number; assets_created: number; assets_updated: number; positions_synced: number } | null>(null);
 
@@ -386,22 +387,38 @@ function QuestradeCard({ integration }: { integration: Integration }) {
       setConnected(true);
       setRefreshToken(token);
     }
+    const root = integrationsRoot();
+    if (!root) return;
+    fetch(`${root}/questrade/status`)
+      .then((r) => r.json())
+      .then((data: { connected?: boolean }) => {
+        if (data.connected) setServerTokenConfigured(true);
+      })
+      .catch(() => {});
   }, []);
 
+  const questradeBrowserToken = () =>
+    (typeof window !== "undefined" ? localStorage.getItem(QUESTRADE_TOKEN_KEY) : null) || refreshToken;
+
+  const questradeRequestBody = () => {
+    const fromBrowser = questradeBrowserToken().trim();
+    return fromBrowser ? { refresh_token: fromBrowser } : {};
+  };
+
   const handleConnect = async () => {
-    if (!refreshToken.trim()) return;
     const root = integrationsRoot();
     if (!root) {
       setError(missingApiUrlMessage());
       return;
     }
+    if (!refreshToken.trim() && !serverTokenConfigured) return;
     setIsConnecting(true);
     setError(null);
     try {
       const res = await fetch(`${root}/questrade/test-connection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken.trim() }),
+        body: JSON.stringify(questradeRequestBody()),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -418,7 +435,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
       setAccounts(data.accounts || []);
     } catch (e: unknown) {
       setError(integrationNetworkError(e));
-      setConnected(false);
+      if (!serverTokenConfigured) setConnected(false);
     } finally {
       setIsConnecting(false);
     }
@@ -426,15 +443,18 @@ function QuestradeCard({ integration }: { integration: Integration }) {
 
   const handleDisconnect = () => {
     localStorage.removeItem(QUESTRADE_TOKEN_KEY);
-    setConnected(false);
     setAccounts([]);
     setSyncResult(null);
     setRefreshToken("");
+    if (!serverTokenConfigured) setConnected(false);
   };
 
   const handleSync = async () => {
-    const token = localStorage.getItem(QUESTRADE_TOKEN_KEY) || refreshToken;
-    if (!token) { setError("No token. Connect first."); return; }
+    const hasBrowserToken = !!questradeBrowserToken().trim();
+    if (!hasBrowserToken && !serverTokenConfigured) {
+      setError("No token. Paste a refresh token, connect, or set QUESTRADE_REFRESH_TOKEN on the API (e.g. Vault).");
+      return;
+    }
     const root = integrationsRoot();
     if (!root) {
       setError(missingApiUrlMessage());
@@ -447,7 +467,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
       const res = await fetch(`${root}/questrade/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: token }),
+        body: JSON.stringify(questradeRequestBody()),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -477,7 +497,9 @@ function QuestradeCard({ integration }: { integration: Integration }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <StatusBadge status={connected ? "connected" : "disconnected"} />
+            <StatusBadge
+              status={connected || serverTokenConfigured ? "connected" : "disconnected"}
+            />
             <ChevronRight className={cn("w-5 h-5 text-slate-400 transition-transform", isExpanded && "rotate-90")} />
           </div>
         </div>
@@ -502,6 +524,13 @@ function QuestradeCard({ integration }: { integration: Integration }) {
               <div className="pt-4 space-y-4">
                 <SetupInstructions steps={integration.setupSteps} docsUrl={integration.docsUrl} />
 
+                {serverTokenConfigured && (
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    API has <code className="text-xs">QUESTRADE_REFRESH_TOKEN</code> (e.g. from Vault). You can use
+                    Connect / Sync without pasting; a token in the field overrides the server copy.
+                  </p>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Refresh Token
@@ -514,7 +543,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
                       placeholder="Paste your Questrade refresh token..."
                       className="flex-1"
                     />
-                    {connected ? (
+                    {questradeBrowserToken().trim() ? (
                       <Button variant="danger" onClick={(e) => { e.stopPropagation(); handleDisconnect(); }}>
                         Disconnect
                       </Button>
@@ -522,7 +551,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
                       <Button
                         variant="primary"
                         onClick={(e) => { e.stopPropagation(); handleConnect(); }}
-                        disabled={!refreshToken.trim() || isConnecting}
+                        disabled={(!refreshToken.trim() && !serverTokenConfigured) || isConnecting}
                       >
                         {isConnecting ? "Connecting..." : "Connect"}
                       </Button>
@@ -530,7 +559,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
                   </div>
                 </div>
 
-                {connected && (
+                {(connected || serverTokenConfigured) && (
                   <div className="flex items-center gap-3">
                     <Button
                       variant="secondary"
