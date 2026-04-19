@@ -224,7 +224,7 @@ export default function MonarchImportPage() {
                   </li>
                   <li>
                     Liability balances (credit cards, LOC) are stored as
-                    positive "amount owed" — Monarch's negative sign is
+                    positive &ldquo;amount owed&rdquo; — Monarch&apos;s negative sign is
                     flipped automatically.
                   </li>
                 </ul>

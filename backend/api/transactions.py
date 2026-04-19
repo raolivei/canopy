@@ -1,6 +1,6 @@
 """Transactions API endpoints for managing income, expenses, and transfers."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -131,101 +131,9 @@ async def get_categories(db: DbSession):
     return sorted([c for c in categories if c])
 
 
-@router.get("/{transaction_id}", response_model=Transaction)
-async def get_transaction(transaction_id: int, db: DbSession):
-    """Get a specific transaction by ID."""
-    tx = db.execute(select(TransactionModel).where(TransactionModel.id == transaction_id)).scalar_one_or_none()
+# ── Annual Report (must be registered before ``/{transaction_id}`` or
+# ``annual-report`` is parsed as an integer path param → 422).
 
-    if not tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    return _db_to_response(tx)
-
-
-@router.post("/", response_model=Transaction)
-async def create_transaction(transaction: TransactionCreate, db: DbSession):
-    """Create a new transaction."""
-    new_tx = TransactionModel(
-        description=transaction.description,
-        amount=Decimal(str(transaction.amount)),
-        currency=transaction.currency,
-        type=transaction.type.value,
-        date=transaction.date or datetime.now(),
-        category=transaction.category,
-        account=transaction.account,
-        merchant=transaction.merchant,
-        original_statement=transaction.original_statement,
-        notes=transaction.notes,
-        tags=transaction.tags,
-        ticker=transaction.ticker,
-    )
-
-    db.add(new_tx)
-    db.commit()
-    db.refresh(new_tx)
-
-    return _db_to_response(new_tx)
-
-
-@router.put("/{transaction_id}", response_model=Transaction)
-async def update_transaction(transaction_id: int, transaction: TransactionCreate, db: DbSession):
-    """Update an existing transaction."""
-    tx = db.execute(select(TransactionModel).where(TransactionModel.id == transaction_id)).scalar_one_or_none()
-
-    if not tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    tx.description = transaction.description
-    tx.amount = Decimal(str(transaction.amount))
-    tx.currency = transaction.currency
-    tx.type = transaction.type.value
-    tx.date = transaction.date or tx.date
-    tx.category = transaction.category
-    tx.account = transaction.account
-    tx.merchant = transaction.merchant
-    tx.original_statement = transaction.original_statement
-    tx.notes = transaction.notes
-    tx.tags = transaction.tags
-    tx.ticker = transaction.ticker
-
-    db.commit()
-    db.refresh(tx)
-
-    return _db_to_response(tx)
-
-
-@router.delete("/{transaction_id}")
-async def delete_transaction(transaction_id: int, db: DbSession):
-    """Delete a transaction."""
-    tx = db.execute(select(TransactionModel).where(TransactionModel.id == transaction_id)).scalar_one_or_none()
-
-    if not tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    db.delete(tx)
-    db.commit()
-
-    return {"message": "Transaction deleted"}
-
-
-@router.delete("/")
-async def delete_all_transactions(
-    db: DbSession, confirm: bool = Query(False, description="Must be true to confirm deletion")
-):
-    """Delete all transactions. Requires confirmation."""
-    if not confirm:
-        raise HTTPException(status_code=400, detail="Must set confirm=true to delete all transactions")
-
-    count = db.execute(select(func.count(TransactionModel.id))).scalar()
-    db.execute(select(TransactionModel).delete())
-    db.commit()
-
-    return {"message": f"Deleted {count} transactions"}
-
-
-# ── Annual Report ──────────────────────────────────────────────────────────────
-
-# Categories that represent internal money movement, not real income/spending
 NOISE_INCOME_CATS = {
     "Transfer",
     "Credit Card Payment",
@@ -245,7 +153,12 @@ INVESTMENT_CATS = {"Buy", "Investments", "Sell"}
 @router.get("/annual-report")
 async def get_annual_report(
     db: DbSession,
-    year: int = Query(..., description="Year for the report"),
+    year: Optional[int] = Query(
+        None,
+        ge=2000,
+        le=2100,
+        description="Year for the report (defaults to the current calendar year)",
+    ),
 ):
     """Annual spending report with clean income/expense figures.
 
@@ -253,6 +166,9 @@ async def get_annual_report(
     to show real money in vs real money spent.
     """
     from sqlalchemy import text
+
+    if year is None:
+        year = date.today().year
 
     # Monthly summary
     monthly_rows = db.execute(
@@ -394,3 +310,95 @@ async def get_annual_report(
             for r in merchant_rows
         ],
     }
+
+
+@router.get("/{transaction_id}", response_model=Transaction)
+async def get_transaction(transaction_id: int, db: DbSession):
+    """Get a specific transaction by ID."""
+    tx = db.execute(select(TransactionModel).where(TransactionModel.id == transaction_id)).scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    return _db_to_response(tx)
+
+
+@router.post("/", response_model=Transaction)
+async def create_transaction(transaction: TransactionCreate, db: DbSession):
+    """Create a new transaction."""
+    new_tx = TransactionModel(
+        description=transaction.description,
+        amount=Decimal(str(transaction.amount)),
+        currency=transaction.currency,
+        type=transaction.type.value,
+        date=transaction.date or datetime.now(),
+        category=transaction.category,
+        account=transaction.account,
+        merchant=transaction.merchant,
+        original_statement=transaction.original_statement,
+        notes=transaction.notes,
+        tags=transaction.tags,
+        ticker=transaction.ticker,
+    )
+
+    db.add(new_tx)
+    db.commit()
+    db.refresh(new_tx)
+
+    return _db_to_response(new_tx)
+
+
+@router.put("/{transaction_id}", response_model=Transaction)
+async def update_transaction(transaction_id: int, transaction: TransactionCreate, db: DbSession):
+    """Update an existing transaction."""
+    tx = db.execute(select(TransactionModel).where(TransactionModel.id == transaction_id)).scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    tx.description = transaction.description
+    tx.amount = Decimal(str(transaction.amount))
+    tx.currency = transaction.currency
+    tx.type = transaction.type.value
+    tx.date = transaction.date or tx.date
+    tx.category = transaction.category
+    tx.account = transaction.account
+    tx.merchant = transaction.merchant
+    tx.original_statement = transaction.original_statement
+    tx.notes = transaction.notes
+    tx.tags = transaction.tags
+    tx.ticker = transaction.ticker
+
+    db.commit()
+    db.refresh(tx)
+
+    return _db_to_response(tx)
+
+
+@router.delete("/{transaction_id}")
+async def delete_transaction(transaction_id: int, db: DbSession):
+    """Delete a transaction."""
+    tx = db.execute(select(TransactionModel).where(TransactionModel.id == transaction_id)).scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    db.delete(tx)
+    db.commit()
+
+    return {"message": "Transaction deleted"}
+
+
+@router.delete("/")
+async def delete_all_transactions(
+    db: DbSession, confirm: bool = Query(False, description="Must be true to confirm deletion")
+):
+    """Delete all transactions. Requires confirmation."""
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Must set confirm=true to delete all transactions")
+
+    count = db.execute(select(func.count(TransactionModel.id))).scalar()
+    db.execute(select(TransactionModel).delete())
+    db.commit()
+
+    return {"message": f"Deleted {count} transactions"}

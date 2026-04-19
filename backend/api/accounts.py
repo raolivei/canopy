@@ -38,6 +38,7 @@ from backend.db.models.asset import Asset, AssetType
 from backend.db.models.liability import Liability
 from backend.db.session import DbSession
 from backend.services import fx as fx_service
+from backend.services.fx import DISPLAY_FALLBACK_USDCAD
 
 router = APIRouter(prefix="/v1/accounts", tags=["accounts"])
 
@@ -143,10 +144,14 @@ def _asset_to_account(
     # importer writes cash sub-balances). Fall back to
     # ``asset.current_price`` for manually-managed assets, which is
     # the old behaviour.
-    if latest_balance is not None:
+    # Wise API assets: balance lives on ``current_price`` only; ignore snapshot history
+    # so Monarch/CSV rows cannot override with $0.
+    if latest_balance is not None and not asset.is_wise_api_asset:
         balance = float(latest_balance)
+        updated_at = latest_balance_date or asset.price_updated_at
     else:
         balance = float(asset.current_price or Decimal("0"))
+        updated_at = asset.price_updated_at
     return AccountResponse(
         id=f"asset:{asset.id}",
         name=asset.name,
@@ -156,7 +161,7 @@ def _asset_to_account(
         institution=asset.institution,
         external_account_id=asset.external_account_id,
         source=asset.sync_source,
-        updated_at=latest_balance_date or asset.price_updated_at,
+        updated_at=updated_at,
     )
 
 
@@ -247,23 +252,25 @@ def _combine_totals(
 ) -> dict[str, CombinedTotals]:
     """Convert per-currency buckets into Combined CAD and Combined USD.
 
-    When ``usd_cad_rate`` is missing, USD balances contribute zero so
-    the response is still internally consistent; the frontend surfaces
-    the ``is_stale`` banner in that case.
+    When ``usd_cad_rate`` is missing (no BoC row yet), use
+    ``DISPLAY_FALLBACK_USDCAD`` so combined totals are not all zeros; the
+    API still marks FX metadata stale when a fallback was used.
     """
     cad_bucket = per_ccy.get("CAD") or CurrencyTotals(cash=0.0, debt=0.0, net=0.0)
     usd_bucket = per_ccy.get("USD") or CurrencyTotals(cash=0.0, debt=0.0, net=0.0)
 
-    if usd_cad_rate is not None and usd_cad_rate != 0:
-        rate_f = float(usd_cad_rate)
-    else:
-        rate_f = None
+    effective = (
+        usd_cad_rate
+        if usd_cad_rate is not None and usd_cad_rate != 0
+        else DISPLAY_FALLBACK_USDCAD
+    )
+    rate_f = float(effective)
 
     # USD -> CAD multiplies; CAD -> USD divides.
-    usd_in_cad_cash = usd_bucket.cash * rate_f if rate_f else 0.0
-    usd_in_cad_debt = usd_bucket.debt * rate_f if rate_f else 0.0
-    cad_in_usd_cash = cad_bucket.cash / rate_f if rate_f else 0.0
-    cad_in_usd_debt = cad_bucket.debt / rate_f if rate_f else 0.0
+    usd_in_cad_cash = usd_bucket.cash * rate_f
+    usd_in_cad_debt = usd_bucket.debt * rate_f
+    cad_in_usd_cash = cad_bucket.cash / rate_f
+    cad_in_usd_debt = cad_bucket.debt / rate_f
 
     combined_cad_cash = cad_bucket.cash + usd_in_cad_cash
     combined_cad_debt = cad_bucket.debt + usd_in_cad_debt
@@ -331,6 +338,7 @@ async def list_accounts(db: DbSession) -> AccountsResponse:
     latest_rate = fx_service.ensure_latest_rate_cached(db)
     db.commit()
     rate_value = latest_rate.rate if latest_rate is not None else None
+    used_rate_fallback = rate_value is None
 
     totals_by_currency = _roll_up_by_currency(accounts)
     totals_combined = _combine_totals(totals_by_currency, rate_value)
@@ -342,13 +350,19 @@ async def list_accounts(db: DbSession) -> AccountsResponse:
         net_cash=cad_bucket.net,
     )
 
+    display_rate = rate_value if rate_value is not None else DISPLAY_FALLBACK_USDCAD
     fx_info = FxInfo(
-        usd_cad_rate=float(rate_value) if rate_value is not None else None,
+        usd_cad_rate=float(display_rate),
         as_of_date=(
             latest_rate.as_of_date.isoformat() if latest_rate is not None else None
         ),
-        source=latest_rate.source if latest_rate is not None else None,
-        is_stale=fx_service.is_stale(latest_rate),
+        source=(
+            "display_fallback_usdcad"
+            if used_rate_fallback
+            else (latest_rate.source if latest_rate is not None else None)
+        ),
+        is_stale=used_rate_fallback
+        or (fx_service.is_stale(latest_rate) if latest_rate is not None else True),
     )
 
     return AccountsResponse(

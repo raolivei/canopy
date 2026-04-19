@@ -94,7 +94,13 @@ class PortfolioCalculator:
 
         if is_balance_asset:
             # Prefer Monarch / Wealthsimple balance history over stale current_price.
-            if balance_map is not None and asset.id in balance_map:
+            # Wise only writes ``current_price`` on sync — never ``AccountBalanceHistory``.
+            # A matched CSV snapshot can still insert history rows; those must not zero out Wise.
+            if (
+                not asset.is_wise_api_asset
+                and balance_map is not None
+                and asset.id in balance_map
+            ):
                 market_value = balance_map[asset.id]
             else:
                 market_value = asset.current_price if asset.current_price else Decimal("0")

@@ -22,6 +22,9 @@ export type CurrencyView = "CAD" | "USD" | "COMBINED_CAD" | "COMBINED_USD";
 
 export const DEFAULT_CURRENCY_VIEW: CurrencyView = "COMBINED_CAD";
 
+/** When ``/v1/fx/usd-cad`` has no rate yet (empty DB, offline), combined views still need a cross-rate. */
+const DISPLAY_FALLBACK_USDCAD = 1.35;
+
 const STORAGE_KEY = "canopy.currencyView";
 
 /** Broadcast view changes to other components in the same tab. */
@@ -134,19 +137,19 @@ export function convertForView(
   if (view === "CAD") return from === "CAD" ? amount : 0;
   if (view === "USD") return from === "USD" ? amount : 0;
 
-  if (!usdCadRate || usdCadRate <= 0) {
-    // No FX available: fall back to filtering (so Combined CAD behaves
-    // like CAD-only and Combined USD behaves like USD-only, matching
-    // what the backend does when the cache is empty).
-    if (view === "COMBINED_CAD") return from === "CAD" ? amount : 0;
-    return from === "USD" ? amount : 0;
-  }
+  const rate =
+    usdCadRate !== null &&
+    usdCadRate !== undefined &&
+    Number.isFinite(usdCadRate) &&
+    usdCadRate > 0
+      ? usdCadRate
+      : DISPLAY_FALLBACK_USDCAD;
 
   if (view === "COMBINED_CAD") {
-    return from === "CAD" ? amount : amount * usdCadRate;
+    return from === "CAD" ? amount : amount * rate;
   }
   // COMBINED_USD
-  return from === "USD" ? amount : amount / usdCadRate;
+  return from === "USD" ? amount : amount / rate;
 }
 
 /** True when the view is currency-specific (vs. combined). */

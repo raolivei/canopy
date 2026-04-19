@@ -64,6 +64,11 @@ DEFAULT_PAIR = "USDCAD"
 # safe threshold (Fri close is readable through Monday morning).
 STALE_AFTER_DAYS = 3
 
+# When no BoC row exists yet (empty ``fx_rates``, offline dev), combined
+# CAD/USD roll-ups would otherwise treat the non-native side as zero.
+# API responses use this only as a last resort and mark FX metadata stale.
+DISPLAY_FALLBACK_USDCAD = Decimal("1.35")
+
 
 # ---------------------------------------------------------------------------
 # Lookup

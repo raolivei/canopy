@@ -76,13 +76,10 @@ def test_combine_totals_converts_usd_into_cad_and_vice_versa() -> None:
     assert combined["USD"].net == (100.0 + 1000.0 / 1.40) - 50.0
 
 
-def test_combine_totals_with_missing_rate_treats_usd_as_zero() -> None:
-    """When the FX cache is empty the backend still returns a response.
+def test_combine_totals_with_missing_rate_uses_display_fallback() -> None:
+    """When no BoC rate is cached, combined totals use ``DISPLAY_FALLBACK_USDCAD``."""
+    from backend.services.fx import DISPLAY_FALLBACK_USDCAD
 
-    USD contributions drop to zero so aggregations stay self-consistent;
-    the frontend surfaces the ``is_stale`` banner to explain why the
-    combined total disagrees with the individual CAD and USD buckets.
-    """
     accounts = [
         _acc(id="asset:1", kind="checking", balance=1000.0, currency="CAD"),
         _acc(id="asset:2", kind="cash", balance=100.0, currency="USD"),
@@ -90,11 +87,10 @@ def test_combine_totals_with_missing_rate_treats_usd_as_zero() -> None:
     per_ccy = _roll_up_by_currency(accounts)
 
     combined = _combine_totals(per_ccy, None)
+    r = float(DISPLAY_FALLBACK_USDCAD)
 
-    # CAD slice: just the CAD side (USD contribution zeroed).
-    assert combined["CAD"].cash == 1000.0
-    # USD slice: just the USD side.
-    assert combined["USD"].cash == 100.0
+    assert combined["CAD"].cash == 1000.0 + 100.0 * r
+    assert combined["USD"].cash == 100.0 + 1000.0 / r
 
 
 def test_combine_totals_is_symmetric_when_only_one_currency_is_present() -> None:
@@ -112,6 +108,34 @@ def test_combine_totals_is_symmetric_when_only_one_currency_is_present() -> None
     assert combined["CAD"].cash == per_ccy["CAD"].cash
     assert combined["CAD"].net == per_ccy["CAD"].net
     assert combined["USD"].cash == 2500.0 / 1.38
+
+
+def test_wise_balance_uses_current_price_not_csv_snapshot_history() -> None:
+    """Wise sync only sets ``current_price``. Monarch/CSV can still attach
+    ``AccountBalanceHistory`` rows to the same asset — those must not show as $0.
+    """
+    from datetime import datetime, timezone
+
+    from backend.api.accounts import _asset_to_account
+    from backend.db.models.asset import Asset, AssetType
+
+    a = Asset(
+        id=1,
+        symbol="WISE_CAD",
+        name="Wise CAD",
+        asset_type=AssetType.BANK_ACCOUNT,
+        currency="CAD",
+        sync_source="WISE",
+        current_price=Decimal("999.00"),
+        price_updated_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
+    )
+    r = _asset_to_account(
+        a,
+        latest_balance=Decimal("0"),
+        latest_balance_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+    )
+    assert r.balance == 999.0
+    assert r.updated_at == a.price_updated_at
 
 
 def test_latest_balances_pulls_from_account_balance_history() -> None:

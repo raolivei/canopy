@@ -43,6 +43,13 @@ Full support for Monarch Money CSV exports including:
 - **Columns:** Date, Description, Amount
 - **Date Format:** MM/DD/YYYY
 
+### American Express Year-End Summary (Canada)
+Export from the Amex website **Year-End Summary** (not the regular activity CSV). Canopy maps **Charges $** to expenses and **Credits $** to income (refunds), uses **Category** and **Sub-Category** (stored in notes), and **Account Number** when present (multi-card summaries).
+
+- **Columns:** Category, Card Member, Account Number, Sub-Category, Date, Month-Billed, Transaction, Charges $, Credits $
+- **Date Format:** DD/MM/YYYY
+- **Default currency:** Choose **CAD** on the Import page when previewing.
+
 ### TD Bank
 - **Columns:** Date, Description, Debit, Credit
 - **Date Format:** MM/DD/YYYY

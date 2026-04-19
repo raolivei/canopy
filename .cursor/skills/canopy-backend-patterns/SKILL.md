@@ -24,6 +24,7 @@ description: >-
 
 - **Wise** / **Questrade**: logic in `services/wise_integration.py`, `services/questrade_integration.py`; routes under **`/v1/integrations`**.
 - Respect **CAD/USD** product limits (e.g. Wise pockets in other currencies may be skipped or reported separately).
+- **Wise** sets **`Asset.current_price`** on sync and does **not** write `AccountBalanceHistory`. Holdings/accounts must not let CSV/Monarch snapshot rows override that balance with **$0**.
 
 ## Imports (high level)
 

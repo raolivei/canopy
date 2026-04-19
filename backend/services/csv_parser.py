@@ -63,6 +63,16 @@ class CSVParserService:
             date_format="%m/%d/%Y",
             amount_is_absolute=True,
         ),
+        BankFormat.AMEX_YEAR_END_SUMMARY: FieldMapping(
+            date_column="Date",
+            description_column="Transaction",
+            debit_column="Charges $",
+            credit_column="Credits $",
+            category_column="Category",
+            notes_column="Sub-Category",
+            account_column="Account Number",
+            date_format="%d/%m/%Y",
+        ),
         BankFormat.CAPITAL_ONE: FieldMapping(
             date_column="Transaction Date",
             description_column="Description",
@@ -140,6 +150,15 @@ class CSVParserService:
     def detect_bank_format(self, headers: List[str]) -> Optional[BankFormat]:
         """Attempt to detect bank format from CSV headers"""
         headers_lower = [h.lower().strip() for h in headers]
+
+        # Amex Canada Year-End Summary (Charges/Credits split, DD/MM/YYYY)
+        if (
+            any("charges $" in h for h in headers_lower)
+            and any("credits $" in h for h in headers_lower)
+            and any(h == "month-billed" for h in headers_lower)
+            and any(h == "transaction" for h in headers_lower)
+        ):
+            return BankFormat.AMEX_YEAR_END_SUMMARY
 
         # Monarch Money detection (very specific pattern)
         if (
@@ -339,6 +358,9 @@ class CSVParserService:
                     transaction_type = TransactionType.INCOME if amount < 0 else TransactionType.EXPENSE
 
                 amount = abs(amount)
+
+        if mapping.debit_column and mapping.credit_column and amount == 0:
+            raise ValueError("Empty charges and credits")
 
         # Extract ticker and investment fields
         ticker = None

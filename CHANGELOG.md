@@ -8,9 +8,13 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [0.10.3] - 2026-04-19
 
+- **CSV import:** Amex Canada **Year-End Summary** preset (`Charges $` / `Credits $`, DD/MM/YYYY); detection when using Generic CSV; Import page option **Amex Year-End Summary (CA)**; Monarch default no longer mis-maps that file when headers match.
 - README refresh; FIRE optional CAGR from snapshots; net worth chart (stacked area + debt axis); portfolio dividends + positions split; accounts grouping; nav/import/integrations polish + logos; privacy “hide amounts”; **Cursor** project agent skills under `.cursor/skills/` (repo conventions, stack map, UI/backend/import notes).
-- Wise sync writes prices; insights use balance history; holdings cash rows show display name (hide Monarch internal symbols).
+- Wise sync writes prices; insights use balance history; holdings cash rows show display name (hide Monarch internal symbols). Wise balances ignore CSV balance-history rows so snapshots never override API `current_price` with $0.
+- **FX**: If BoC/USDCAD is not cached yet, combined CAD/USD views use a **1.35 display fallback** (backend + portfolio) so balances do not all show as $0; rate is still flagged stale when approximate.
 - CI may tag `v$(VERSION)` after image push on `main`.
+- **API**: `GET /v1/transactions/annual-report` registered before `/{id}` (fixes 422); `year` query optional (defaults to current calendar year). **UI**: Privacy toggle mount-gates lucide icons (Dark Reader hydration).
+- **Dev:** `docker-compose.yml` drops obsolete Compose `version` key (silences CLI warning).
 
 ## [0.10.2] - 2026-04-18
 
