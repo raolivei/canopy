@@ -8,6 +8,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [0.10.4] - 2026-04-19
 
+- **Transactions page:** list/create/delete now call **`NEXT_PUBLIC_API_URL`** (same as Accounts / imports), so Monarch- and Wise-imported rows appear instead of failing silently when the frontend and API run on different origins.
 - **Navigation:** **Transactions** promoted to primary sidebar (after Accounts) and added to mobile bottom bar (**Txns**); removed the old collapsed **Advanced** section that hid it.
 
 ## [0.10.3] - 2026-04-19

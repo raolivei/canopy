@@ -44,6 +44,8 @@ interface Transaction {
   import_source?: string;
 }
 
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+
 const CATEGORIES = [
   "Food & Dining",
   "Shopping",
@@ -100,7 +102,7 @@ export default function Transactions() {
       if (accountFilter !== "all") params.set("account", accountFilter);
       params.set("limit", "2000");
 
-      const res = await fetch(`/v1/transactions/?${params.toString()}`);
+      const res = await fetch(`${API_URL}/v1/transactions/?${params.toString()}`);
       const data = await res.json();
       setTransactions(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -128,7 +130,7 @@ export default function Transactions() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/v1/transactions/", {
+      const res = await fetch(`${API_URL}/v1/transactions/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -149,7 +151,7 @@ export default function Transactions() {
 
   const handleDelete = async (id: number) => {
     try {
-      const res = await fetch(`/v1/transactions/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/v1/transactions/${id}`, { method: "DELETE" });
       if (res.ok) {
         await fetchTransactions();
       }
