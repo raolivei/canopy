@@ -15,7 +15,6 @@ from backend.db.models.lot import Lot
 from backend.db.models.portfolio_review import (
     PortfolioReview,
     PortfolioReviewLine,
-    ReviewRegion,
     ReviewSource,
 )
 from backend.db.models.portfolio_snapshot import PortfolioSnapshot, SnapshotHolding
@@ -55,10 +54,9 @@ __all__ = [
     # Transactions
     "Transaction",
     "TransactionType",
-    # Portfolio review (semi-annual snapshots)
+    # Portfolio review (CAD-only snapshots for holdings that don't auto-sync)
     "PortfolioReview",
     "PortfolioReviewLine",
-    "ReviewRegion",
     "ReviewSource",
     # CSV auto-import
     "ImportedEvent",

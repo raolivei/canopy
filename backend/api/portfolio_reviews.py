@@ -21,6 +21,8 @@ from backend.db.session import DbSession
 from backend.models.portfolio_review_schemas import (
     AllocationResponse,
     AllocationSlice,
+    BatchImportFileResult,
+    BatchImportResponse,
     CompareResponse,
     ImportPreviewResponse,
     PortfolioReviewDetail,
@@ -244,19 +246,16 @@ async def preview_import(file: UploadFile = File(...)):
     )
 
 
-@router.post("/import", response_model=PortfolioReviewDetail)
-async def import_review(
-    db: DbSession,
-    file: UploadFile = File(...),
-    label: Optional[str] = Query(None, max_length=64),
-    replace: bool = Query(
-        False,
-        description="If true, replace existing review with the same as_of_date",
-    ),
-):
+def _import_one(
+    db,
+    raw_bytes: bytes,
+    *,
+    label: Optional[str],
+    replace: bool,
+) -> PortfolioReview:
+    """Persist a single portfolio-review CSV. Raises HTTPException on any error."""
     try:
-        raw = await file.read()
-        text = raw.decode("utf-8")
+        text = raw_bytes.decode("utf-8")
     except UnicodeDecodeError as e:
         raise HTTPException(status_code=400, detail=f"Invalid encoding: {e}") from e
 
@@ -304,6 +303,21 @@ async def import_review(
 
     db.commit()
     db.refresh(pr)
+    return pr
+
+
+@router.post("/import", response_model=PortfolioReviewDetail)
+async def import_review(
+    db: DbSession,
+    file: UploadFile = File(...),
+    label: Optional[str] = Query(None, max_length=64),
+    replace: bool = Query(
+        False,
+        description="If true, replace existing review with the same as_of_date",
+    ),
+):
+    raw = await file.read()
+    pr = _import_one(db, raw, label=label, replace=replace)
 
     r = db.execute(
         select(PortfolioReview)
@@ -314,4 +328,68 @@ async def import_review(
     return PortfolioReviewDetail(
         **_review_to_summary(r).model_dump(),
         lines=[_line_to_response(ln) for ln in lines],
+    )
+
+
+@router.post("/import/batch", response_model=BatchImportResponse)
+async def import_reviews_batch(
+    db: DbSession,
+    files: list[UploadFile] = File(...),
+    label: Optional[str] = Query(None, max_length=64),
+    replace: bool = Query(
+        False,
+        description=(
+            "If true, replace existing reviews that share an as_of_date with any "
+            "incoming file."
+        ),
+    ),
+):
+    """Import multiple portfolio-review CSVs in one request.
+
+    Each file is processed in its own transaction so one failure (bad encoding,
+    no Canada section, duplicate as_of_date, etc.) does not kill the others.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided.")
+
+    results: list[BatchImportFileResult] = []
+    for f in files:
+        filename = f.filename or "upload.csv"
+        try:
+            raw = await f.read()
+            pr = _import_one(db, raw, label=label, replace=replace)
+            results.append(
+                BatchImportFileResult(
+                    filename=filename,
+                    success=True,
+                    review_id=pr.id,
+                    as_of_date=pr.as_of_date,
+                    line_count=len(pr.lines),
+                    total_value_cad=pr.total_value_cad,
+                )
+            )
+        except HTTPException as e:
+            db.rollback()
+            results.append(
+                BatchImportFileResult(
+                    filename=filename,
+                    success=False,
+                    error=str(e.detail),
+                )
+            )
+        except Exception as e:
+            db.rollback()
+            results.append(
+                BatchImportFileResult(
+                    filename=filename,
+                    success=False,
+                    error=f"{type(e).__name__}: {e}",
+                )
+            )
+
+    imported = sum(1 for r in results if r.success)
+    return BatchImportResponse(
+        results=results,
+        imported_count=imported,
+        failed_count=len(results) - imported,
     )

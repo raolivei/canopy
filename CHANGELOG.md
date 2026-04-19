@@ -17,6 +17,7 @@ Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Bra
 
 - **`GET /v1/accounts`** (`backend/api/accounts.py`): unified view of cash assets (checking / savings / cash) and liabilities (credit, line of credit, loan). Powers the Accounts page directly from records created by the Wealthsimple importer.
 - **Accounts page** (`pages/accounts.tsx`) rewritten to fetch from `/v1/accounts` — total cash, total debt, net position, and a per-account card grid. Empty state links straight to the Wealthsimple importer.
+- **Multi-file portfolio-snapshot import**: new `POST /v1/portfolio-reviews/import/batch` accepts a list of CSVs and processes each in an isolated transaction (one bad file doesn't kill the rest); response is a per-file success/error list. `/portfolio/import` UI now supports drag-selecting multiple files with a per-file removal list and per-file result summary.
 
 ### Changed
 
@@ -33,6 +34,10 @@ Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Bra
 - `backend/api/currency.py`, `backend/models/currency.py`, `backend/services/exchange_rate_service.py`, `backend/scripts/seed_portfolio.py`.
 - `frontend/components/CurrencySelector.tsx`; all USD / BRL / EUR dropdown options in forms.
 - "Moomoo" integration references from the settings integrations catalog.
+
+### Brand
+
+- **Five logo explorations** added under `frontend/public/brand/concepts/` (three AI-generated PNGs — wallet-leaf, tree-coin, maple-shield — and two hand-authored monoline SVGs — leaf-chart, monogram). Reviewable at [`/logos`](https://canopy.eldertree.xyz/logos). The active logo (`canopy-icon.svg`, banner) is unchanged.
 
 ---
 

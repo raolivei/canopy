@@ -356,3 +356,7 @@ Track ongoing development:
 - [#24 - Dividend Tracking](https://github.com/raolivei/canopy/issues/24)
 - [#25 - Real-time Currency Rates](https://github.com/raolivei/canopy/issues/25)
 - [#26 - Property Value Estimation](https://github.com/raolivei/canopy/issues/26)
+
+## Brand
+
+Active logo lives in [`frontend/public/brand/`](./frontend/public/brand/). Brand explorations (five logo concepts — wallet-leaf, tree-coin, maple-shield, leaf-chart, monogram) are available at [`/logos`](https://canopy.eldertree.xyz/logos) once deployed, or at `http://localhost:3000/logos` locally.

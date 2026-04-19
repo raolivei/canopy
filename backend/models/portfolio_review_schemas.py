@@ -76,3 +76,21 @@ class ImportPreviewResponse(BaseModel):
         default_factory=list,
         description="First rows for UI preview",
     )
+
+
+class BatchImportFileResult(BaseModel):
+    """Result for one file in a multi-file portfolio-review import."""
+
+    filename: str
+    success: bool
+    review_id: Optional[int] = None
+    as_of_date: Optional[date] = None
+    line_count: Optional[int] = None
+    total_value_cad: Optional[Decimal] = None
+    error: Optional[str] = None
+
+
+class BatchImportResponse(BaseModel):
+    results: list[BatchImportFileResult]
+    imported_count: int
+    failed_count: int

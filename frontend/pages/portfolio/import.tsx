@@ -1,33 +1,72 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Upload, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, X } from "lucide-react";
 import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+interface FileResult {
+  filename: string;
+  success: boolean;
+  review_id?: number;
+  as_of_date?: string;
+  line_count?: number;
+  total_value_cad?: string;
+  error?: string;
+}
+
+interface BatchResponse {
+  results: FileResult[];
+  imported_count: number;
+  failed_count: number;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export default function PortfolioImportPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [replace, setReplace] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [results, setResults] = useState<FileResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const summary = useMemo(() => {
+    if (!results) return null;
+    const ok = results.filter((r) => r.success).length;
+    return { ok, failed: results.length - ok, total: results.length };
+  }, [results]);
+
+  const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    setFiles(picked);
+    setResults(null);
+    setError(null);
+  };
+
+  const removeFile = (idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError("Choose a CSV or tab-separated file.");
+    if (files.length === 0) {
+      setError("Choose one or more CSV / tab-separated files.");
       return;
     }
     setLoading(true);
     setError(null);
-    setMessage(null);
+    setResults(null);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      for (const f of files) fd.append("files", f);
       const q = replace ? "?replace=true" : "";
-      const res = await fetch(`${API_URL}/v1/portfolio-reviews/import${q}`, {
+      const res = await fetch(`${API_URL}/v1/portfolio-reviews/import/batch${q}`, {
         method: "POST",
         body: fd,
       });
@@ -41,10 +80,11 @@ export default function PortfolioImportPage() {
         }
         return;
       }
-      const data = JSON.parse(text);
-      setMessage(
-        `Imported review as of ${data.as_of_date} with ${data.lines?.length ?? 0} lines.`
-      );
+      const data: BatchResponse = JSON.parse(text);
+      setResults(data.results);
+      if (data.imported_count > 0) {
+        setFiles([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -56,29 +96,63 @@ export default function PortfolioImportPage() {
     <PageLayout title="Import snapshot">
       <PageHeader
         title="Import portfolio snapshot"
-        description="Upload a Canadian holdings snapshot (CSV or tab-separated) for assets that don't auto-sync — e.g. private equity, real estate, DPSP. Brazil and crypto sections are ignored."
+        description="Upload one or more Canadian holdings snapshots (CSV or tab-separated) for assets that don't auto-sync \u2014 e.g. private equity, real estate, DPSP. Brazil and crypto sections are ignored. For Wealthsimple monthly statements, use the Wealthsimple importer instead."
       />
 
-      <Card className="max-w-xl">
+      <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>File</CardTitle>
+          <CardTitle>Files</CardTitle>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Uses the dedicated portfolio review parser (not bank transaction CSV).
+            Uses the dedicated portfolio review parser. One review per file, keyed
+            by as-of date.
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Spreadsheet export
+                Spreadsheet exports
               </label>
               <input
                 type="file"
+                multiple
                 accept=".csv,.txt,text/csv"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={onSelect}
                 className="block w-full text-sm text-slate-600 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-primary-50 file:text-primary-700 dark:file:bg-primary-950 dark:file:text-primary-300"
               />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
+                You can select multiple files. Each is imported independently \u2014 one bad file won't cancel the rest.
+              </p>
             </div>
+
+            {files.length > 0 && (
+              <ul className="divide-y divide-slate-200 dark:divide-slate-800 rounded-md border border-slate-200 dark:border-slate-800">
+                {files.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-slate-700 dark:text-slate-200">
+                        {f.name}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-500">
+                        {formatSize(f.size)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                      aria-label={`Remove ${f.name}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <input
                 type="checkbox"
@@ -86,23 +160,65 @@ export default function PortfolioImportPage() {
                 onChange={(e) => setReplace(e.target.checked)}
                 className="rounded border-slate-300"
               />
-              Replace existing review with the same as-of date
+              Replace existing reviews that share an as-of date
             </label>
+
             {error && (
               <div className="flex items-start gap-2 text-sm text-danger-600 dark:text-danger-400">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
-            {message && (
-              <div className="flex items-start gap-2 text-sm text-success-600 dark:text-success-400">
-                <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{message}</span>
+
+            {summary && (
+              <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-3 text-sm">
+                <div className="font-medium text-slate-700 dark:text-slate-200">
+                  {summary.ok} of {summary.total} imported
+                  {summary.failed > 0 && (
+                    <span className="text-danger-600 dark:text-danger-400">
+                      {" "}\u00b7 {summary.failed} failed
+                    </span>
+                  )}
+                </div>
+                <ul className="mt-2 space-y-1">
+                  {results?.map((r, i) => (
+                    <li
+                      key={`${r.filename}-${i}`}
+                      className="flex items-start gap-2"
+                    >
+                      {r.success ? (
+                        <CheckCircle className="w-4 h-4 shrink-0 mt-0.5 text-success-600 dark:text-success-400" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-danger-600 dark:text-danger-400" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="truncate text-slate-700 dark:text-slate-200">
+                          {r.filename}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-500">
+                          {r.success
+                            ? `Review ${r.review_id} \u00b7 ${r.as_of_date} \u00b7 ${r.line_count} lines`
+                            : r.error}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
+
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" variant="primary" disabled={loading} leftIcon={<Upload className="w-4 h-4" />}>
-                {loading ? "Importing…" : "Import"}
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={loading || files.length === 0}
+                leftIcon={<Upload className="w-4 h-4" />}
+              >
+                {loading
+                  ? "Importing\u2026"
+                  : files.length > 1
+                    ? `Import ${files.length} files`
+                    : "Import"}
               </Button>
               <Link href="/">
                 <Button type="button" variant="ghost">
