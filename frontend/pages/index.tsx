@@ -564,7 +564,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>Portfolio snapshot — total CAD</CardTitle>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Canadian holdings that don't auto-sync from Wealthsimple (private equity, real estate, DPSP)
+                Canadian holdings that don&apos;t auto-sync from Wealthsimple (private equity, real estate, DPSP)
                 {latestNum > 0 && (
                   <> — latest review {fmt(latestNum, CAD)}</>
                 )}

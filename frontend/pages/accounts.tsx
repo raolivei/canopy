@@ -277,10 +277,10 @@ export default function Accounts() {
       list.push(a);
       map.set(key, list);
     }
-    for (const list of map.values()) {
+    map.forEach((list) => {
       list.sort(sortAccountsByName);
-    }
-    return [...map.entries()].sort(([ka], [kb]) =>
+    });
+    return Array.from(map.entries()).sort(([ka], [kb]) =>
       compareInstitutionGroup(ka, kb),
     );
   }, [accounts]);

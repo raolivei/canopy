@@ -181,7 +181,7 @@ export default function PortfolioImportPage() {
                 className="block w-full text-sm text-slate-600 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-primary-50 file:text-primary-700 dark:file:bg-primary-950 dark:file:text-primary-300"
               />
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
-                You can select multiple files. Each is imported independently \u2014 one bad file won't cancel the rest.
+                You can select multiple files. Each is imported independently \u2014 one bad file won&apos;t cancel the rest.
               </p>
             </div>
 
