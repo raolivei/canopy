@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import Link from "next/link";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
 import {
   Settings as SettingsIcon,
   User,
@@ -21,6 +23,7 @@ import {
   Upload,
   AlertTriangle,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
@@ -32,9 +35,68 @@ interface RowCounts {
   total: number;
 }
 
+const RESET_CONFIRM_PHRASE = "RESET ALL DATA";
+
 export default function Settings() {
   const [displayCurrency, setDisplayCurrency] = useState("CAD");
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetReport, setResetReport] = useState<{
+    deleted: Record<string, number>;
+    total: number;
+  } | null>(null);
+  const { addToast } = useToast();
+  const queryClient = useQueryClient();
+
+  const rowCountsQuery = useQuery<RowCounts>({
+    queryKey: ["admin", "row-counts"],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/v1/admin/row-counts`);
+      if (!res.ok) throw new Error("Failed to load row counts");
+      return res.json();
+    },
+    // Counts should stay reasonably fresh as the user imports; 30s
+    // keeps the Settings page honest without hammering the API.
+    staleTime: 30_000,
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${API_URL}/v1/admin/reset-data`, {
+        method: "POST",
+        headers: { "X-Confirm-Reset": RESET_CONFIRM_PHRASE },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Reset failed (${res.status})`);
+      }
+      return res.json() as Promise<{
+        deleted: Record<string, number>;
+        total: number;
+      }>;
+    },
+    onSuccess: (report) => {
+      setResetReport(report);
+      setResetConfirmText("");
+      addToast({
+        variant: "success",
+        title: "Data cleared",
+        description: `${report.total.toLocaleString()} rows deleted across ${
+          Object.keys(report.deleted).length
+        } tables.`,
+      });
+      // Every cached list across the app now points at stale data;
+      // invalidate broadly rather than chase individual keys.
+      queryClient.invalidateQueries();
+    },
+    onError: (err: Error) => {
+      addToast({
+        variant: "danger",
+        title: "Reset failed",
+        description: err.message,
+      });
+    },
+  });
 
   React.useEffect(() => {
     setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -258,6 +320,124 @@ export default function Settings() {
                     Enable
                   </Button>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Danger Zone — Delete all imported data */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.5 }}
+        >
+          <Card className="border-danger-200 dark:border-danger-900/60">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-danger-100 dark:bg-danger-900/30 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-danger-600 dark:text-danger-400" />
+                </div>
+                <div>
+                  <CardTitle>Danger Zone</CardTitle>
+                  <CardDescription>
+                    Irreversibly delete all imported data (assets, liabilities,
+                    transactions, balance history, snapshots). FX rates and app
+                    settings are preserved.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <p className="text-sm font-medium text-slate-900 dark:text-white mb-3">
+                  Current data
+                </p>
+                {rowCountsQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading counts&hellip;
+                  </div>
+                ) : rowCountsQuery.isError ? (
+                  <p className="text-sm text-danger-600 dark:text-danger-400">
+                    Failed to load row counts.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                    {Object.entries(rowCountsQuery.data?.counts || {})
+                      .filter(([, n]) => n > 0)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([table, n]) => (
+                        <div
+                          key={table}
+                          className="flex items-center justify-between"
+                        >
+                          <span className="text-slate-600 dark:text-slate-400 truncate">
+                            {table.replace(/_/g, " ")}
+                          </span>
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {n.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    {rowCountsQuery.data?.total === 0 && (
+                      <p className="col-span-full text-slate-500 dark:text-slate-400">
+                        No imported data.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {rowCountsQuery.data && rowCountsQuery.data.total > 0 && (
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    Total: {rowCountsQuery.data.total.toLocaleString()} rows
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <label
+                  htmlFor="reset-confirm"
+                  className="block text-sm font-medium text-slate-900 dark:text-white"
+                >
+                  To confirm, type{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-danger-600 dark:text-danger-400 text-xs font-mono">
+                    {RESET_CONFIRM_PHRASE}
+                  </code>{" "}
+                  below:
+                </label>
+                <Input
+                  id="reset-confirm"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  placeholder={RESET_CONFIRM_PHRASE}
+                  disabled={resetMutation.isPending}
+                />
+                <Button
+                  variant="danger"
+                  onClick={() => resetMutation.mutate()}
+                  disabled={
+                    resetConfirmText !== RESET_CONFIRM_PHRASE ||
+                    resetMutation.isPending ||
+                    (rowCountsQuery.data?.total ?? 0) === 0
+                  }
+                >
+                  {resetMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting&hellip;
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete all imported data
+                    </>
+                  )}
+                </Button>
+                {resetReport && (
+                  <p className="text-sm text-success-600 dark:text-success-400">
+                    Deleted {resetReport.total.toLocaleString()} rows across{" "}
+                    {Object.keys(resetReport.deleted).length} tables.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

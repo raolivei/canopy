@@ -112,3 +112,84 @@ def test_combine_totals_is_symmetric_when_only_one_currency_is_present() -> None
     assert combined["CAD"].cash == per_ccy["CAD"].cash
     assert combined["CAD"].net == per_ccy["CAD"].net
     assert combined["USD"].cash == 2500.0 / 1.38
+
+
+def test_latest_balances_pulls_from_account_balance_history() -> None:
+    """Regression: the Accounts page was reading ``asset.current_price``
+    (never populated by CSV imports) and rendering every account as $0.
+    ``_latest_balances_by_asset`` must return the newest balance-history
+    row per asset, matched on the asset's own currency.
+    """
+    from datetime import date
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from backend.api.accounts import _latest_balances_by_asset
+    from backend.db.base import Base
+    from backend.db.models.account_balance_history import AccountBalanceHistory
+    from backend.db.models.asset import Asset, AssetType
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine, future=True) as db:
+        chq = Asset(
+            symbol="WS-CHQ",
+            name="Wealthsimple Chequing",
+            asset_type=AssetType.BANK_CHECKING,
+            currency="CAD",
+            institution="Wealthsimple",
+            sync_source="wealthsimple",
+        )
+        tfsa = Asset(
+            symbol="WS-TFSA",
+            name="Wealthsimple TFSA",
+            asset_type=AssetType.RETIREMENT_TFSA,
+            currency="CAD",
+            institution="Wealthsimple",
+            sync_source="wealthsimple",
+        )
+        db.add_all([chq, tfsa])
+        db.flush()
+
+        db.add_all([
+            AccountBalanceHistory(
+                asset_id=chq.id,
+                as_of_date=date(2026, 1, 31),
+                balance=Decimal("100.00"),
+                currency="CAD",
+                source="wealthsimple_csv",
+            ),
+            AccountBalanceHistory(
+                asset_id=chq.id,
+                as_of_date=date(2026, 3, 31),
+                balance=Decimal("1.61"),
+                currency="CAD",
+                source="wealthsimple_csv",
+            ),
+            # A USD sub-balance on a CAD-denominated TFSA should be
+            # ignored for the Accounts-page "native" view.
+            AccountBalanceHistory(
+                asset_id=tfsa.id,
+                as_of_date=date(2026, 3, 31),
+                balance=Decimal("42.00"),
+                currency="USD",
+                source="wealthsimple_csv",
+            ),
+            AccountBalanceHistory(
+                asset_id=tfsa.id,
+                as_of_date=date(2026, 3, 31),
+                balance=Decimal("500.00"),
+                currency="CAD",
+                source="wealthsimple_csv",
+            ),
+        ])
+        db.flush()
+
+        latest = _latest_balances_by_asset(db, [chq.id, tfsa.id])
+
+        assert latest[chq.id][0] == Decimal("1.61")
+        assert latest[chq.id][1] == date(2026, 3, 31)
+        # TFSA: CAD row wins over the USD sub-balance.
+        assert latest[tfsa.id][0] == Decimal("500.00")
+        assert isinstance(latest[tfsa.id][1], date)

@@ -163,6 +163,13 @@ _FOREIGN_PREFIXES = (
     "GBP ",
     "BRL ",
     "TRY ",
+    "COP ",
+    "MXN ",
+    "AUD ",
+    "CHF ",
+    "SGD ",
+    "HKD ",
+    "INR ",
 )
 
 
@@ -236,7 +243,18 @@ def _classify_account(label: str) -> AccountClass:
         return AccountClass.FOREIGN
     lower = label.lower()
 
-    if any(kw in lower for kw in ("credit card", "credit line", "mastercard", "visa")):
+    debt_markers = (
+        "credit card",
+        "credit_card",
+        "credit line",
+        "line of credit",
+        "line_of_credit",
+        "loan",
+        "mortgage",
+        "mastercard",
+        "visa",
+    )
+    if any(kw in lower for kw in debt_markers):
         return AccountClass.DEBT
 
     inv_markers = (
@@ -246,6 +264,7 @@ def _classify_account(label: str) -> AccountClass:
         "dpsp",
         "managed_",
         "self_directed_",
+        "direct_index",
         "crypto",
         "individual",
     )
@@ -272,16 +291,12 @@ def _classify_account(label: str) -> AccountClass:
 def _infer_currency(label: str) -> str:
     if label.startswith("USD ") or label.startswith("USA "):
         return "USD"
-    if label.startswith("EUR "):
-        return "EUR"
-    if label.startswith("JPY "):
-        return "JPY"
-    if label.startswith("GBP "):
-        return "GBP"
-    if label.startswith("BRL "):
-        return "BRL"
-    if label.startswith("TRY "):
-        return "TRY"
+    # Map any label whose prefix we flagged as foreign to its currency
+    # code. Keeps the parser's two-level logic (classify + currency tag)
+    # consistent.
+    for prefix in _FOREIGN_PREFIXES:
+        if label.startswith(prefix):
+            return prefix.strip()
     if label.startswith("Credit Card USA"):
         return "USD"
     return "CAD"

@@ -120,6 +120,14 @@ class PortfolioCalculator:
             unrealized_gain_loss = market_value - total_cost_basis
             if total_cost_basis > 0:
                 return_pct = (unrealized_gain_loss / total_cost_basis) * 100
+        elif total_cost_basis > 0:
+            # No live price yet — fall back to book value. Reporting
+            # cost basis as market value is intentionally conservative
+            # (assumes 0% return) but it beats rendering the holding
+            # as worth $0 in the portfolio summary / allocation charts.
+            market_value = total_cost_basis
+            unrealized_gain_loss = Decimal("0")
+            return_pct = Decimal("0")
 
         return HoldingSummary(
             asset_id=asset.id,

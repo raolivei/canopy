@@ -207,3 +207,48 @@ def test_timeline_is_empty_when_no_balances(db: Session) -> None:
     response = networth_timeline(db)
     assert response.points == []
     assert response.latest_cad is None
+
+
+def test_timeline_folds_lot_book_value_into_investments(db: Session) -> None:
+    """Open lots must add to ``investments`` on/after their purchase date.
+
+    Regression for the Wealthsimple gap: ``AccountBalanceHistory`` for
+    an investment account only stores the uninvested cash sub-balance;
+    the securities themselves live in ``lots``. Net-worth must include
+    both.
+    """
+    from backend.db.models.lot import Lot
+
+    _seed_portfolio(db)
+    tfsa = db.query(Asset).filter_by(symbol="WS-TFSA").one()
+
+    # Two open lots: one purchased before p1, one between p1 and p2.
+    db.add(
+        Lot(
+            asset_id=tfsa.id,
+            quantity=Decimal("10"),
+            price_per_unit=Decimal("50"),
+            fees=Decimal("0"),
+            purchase_date=date(2025, 12, 15),
+            is_sold=False,
+        )
+    )
+    db.add(
+        Lot(
+            asset_id=tfsa.id,
+            quantity=Decimal("5"),
+            price_per_unit=Decimal("20"),
+            fees=Decimal("0"),
+            purchase_date=date(2026, 2, 1),
+            is_sold=False,
+        )
+    )
+    db.flush()
+
+    response = networth_timeline(db)
+    p1, p2 = response.points
+
+    # p1 (Jan 31): only the first lot is open → +$500 CAD.
+    assert p1.cad.investments == Decimal("1500")  # 1000 cash + 500 book
+    # p2 (Feb 28): both lots are open → +$500 + $100 = $600 CAD book value.
+    assert p2.cad.investments == Decimal("1700")  # 1100 cash + 600 book

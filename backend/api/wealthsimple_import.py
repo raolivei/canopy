@@ -20,6 +20,7 @@ from sqlalchemy import select
 from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.asset import Asset, AssetType
 from backend.db.models.liability import Liability, LiabilityBalanceHistory
+from backend.db.models.lot import Lot
 from backend.db.session import DbSession
 from backend.models.wealthsimple_import_schemas import (
     NetWorthPoint,
@@ -283,8 +284,8 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
     shows up in the USD and Combined views, even when the underlying
     account is in Canada.
     """
-    from collections import defaultdict
     from bisect import bisect_right
+    from collections import defaultdict
 
     from backend.db.models.fx_rate import FxRate
 
@@ -308,6 +309,22 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
             LiabilityBalanceHistory.balance,
             Liability.currency,
         ).join(Liability, Liability.id == LiabilityBalanceHistory.liability_id)
+    ).all()
+
+    # Lots give us the book value of held positions. Without live prices,
+    # book value is the best proxy we have for the market value of an
+    # investment account — and it beats reporting only the uninvested
+    # cash sub-balance (which is what ``AccountBalanceHistory`` captures
+    # for Wealthsimple investment accounts). See CHANGELOG 0.10.1.
+    lot_rows = db.execute(
+        select(
+            Lot.quantity,
+            Lot.price_per_unit,
+            Lot.purchase_date,
+            Lot.is_sold,
+            Lot.sold_date,
+            Asset.currency,
+        ).join(Asset, Asset.id == Lot.asset_id)
     ).all()
 
     # Key = (currency, account_id). That lets the same underlying Asset
@@ -362,6 +379,36 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
             return fx_values[0]
         return fx_values[idx - 1]
 
+    # Normalise the lot list so the inner loop only touches Python
+    # primitives (avoids hitting SQLAlchemy attribute loading ~N times
+    # per date for long timelines).
+    lots_by_currency: dict[str, list[tuple[date, date | None, Decimal]]] = (
+        defaultdict(list)
+    )
+    for qty, ppu, purchase_date, is_sold, sold_date, ccy in lot_rows:
+        if qty is None or ppu is None or purchase_date is None:
+            continue
+        currency = (ccy or "CAD").upper()
+        if currency not in {"CAD", "USD"}:
+            continue
+        value = Decimal(qty) * Decimal(ppu)
+        # Only sold-with-date lots get filtered out after their sold
+        # date; if ``is_sold`` is True but we have no ``sold_date``,
+        # treat the lot as present today (conservative — a typical
+        # Wealthsimple statement populates both fields).
+        close_on = sold_date if is_sold else None
+        lots_by_currency[currency].append((purchase_date, close_on, value))
+
+    def _book_value_on(d: date, ccy: str) -> Decimal:
+        total = Decimal("0")
+        for purchase_date, close_on, value in lots_by_currency.get(ccy, ()):
+            if purchase_date > d:
+                continue
+            if close_on is not None and close_on <= d:
+                continue
+            total += value
+        return total
+
     if not events:
         return NetWorthTimelineResponse(points=[])
 
@@ -390,6 +437,13 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
         usd_inv = _sum_ccy(running_inv, "USD")
         usd_cash = _sum_ccy(running_cash, "USD")
         usd_debt = _sum_ccy(running_debt, "USD")
+
+        # Fold in the book value of positions open on this date. This
+        # stacks on top of ``inv`` because AccountBalanceHistory for a
+        # Wealthsimple investment account only holds the uninvested
+        # cash sub-balance; the securities live in ``lots``.
+        cad_inv += _book_value_on(d, "CAD")
+        usd_inv += _book_value_on(d, "USD")
 
         rate = _rate_on(d)
 

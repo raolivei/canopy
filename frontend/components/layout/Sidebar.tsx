@@ -26,7 +26,6 @@ const primaryNavigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Wealthsimple import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
   { name: "Monarch import", href: "/portfolio/monarch-import", icon: UploadCloud },
-  { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Insights", href: "/insights", icon: Target },
@@ -34,11 +33,101 @@ const primaryNavigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
+// Active-but-power-user features. Kept reachable, just out of the
+// primary vertical.
 const advancedNavigation = [
   { name: "Transactions", href: "/transactions", icon: DollarSign },
   { name: "Bank CSV import", href: "/import", icon: Upload },
   { name: "Integrations", href: "/settings/integrations", icon: Plug },
 ];
+
+// Old flows we still ship for back-compat (portfolio-review snapshots
+// are the one case we explicitly carry over from 0.7.x). Separated
+// from "Advanced" so it's clear these are not where new work happens.
+const legacyNavigation = [
+  { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
+];
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: typeof Home;
+}
+
+interface RenderSectionArgs {
+  title: string;
+  items: NavItem[];
+  open: boolean;
+  setOpen: (next: boolean) => void;
+  isCollapsed: boolean;
+  router: ReturnType<typeof useRouter>;
+}
+
+// Shared rendering for the collapsible Advanced / Legacy sections.
+// Keeps both groups visually identical while letting each own its own
+// expand/collapse state.
+function renderSection({
+  title,
+  items,
+  open,
+  setOpen,
+  isCollapsed,
+  router,
+}: RenderSectionArgs) {
+  return (
+    <>
+      {!isCollapsed && (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+        >
+          <ChevronDown
+            className={cn("w-4 h-4 transition-transform", open ? "rotate-180" : "")}
+          />
+          {title}
+        </button>
+      )}
+
+      {(open || isCollapsed) &&
+        items.map((item) => {
+          const isActive =
+            router.pathname === item.href ||
+            (item.href !== "/" && router.pathname.startsWith(item.href));
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                "group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                  : "text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-800 dark:hover:text-slate-200"
+              )}
+              title={isCollapsed ? item.name : undefined}
+            >
+              <Icon className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500" />
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: "auto" }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="truncate"
+                  >
+                    {item.name}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Link>
+          );
+        })}
+    </>
+  );
+}
 
 interface SidebarProps {
   onCommandPaletteOpen?: () => void;
@@ -50,6 +139,7 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [legacyOpen, setLegacyOpen] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -230,55 +320,23 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
             );
           })}
 
-          {!isCollapsed && (
-            <button
-              type="button"
-              onClick={() => setAdvancedOpen(!advancedOpen)}
-              className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
-            >
-              <ChevronDown
-                className={cn("w-4 h-4 transition-transform", advancedOpen ? "rotate-180" : "")}
-              />
-              Advanced / legacy
-            </button>
-          )}
+          {renderSection({
+            title: "Advanced",
+            items: advancedNavigation,
+            open: advancedOpen,
+            setOpen: setAdvancedOpen,
+            isCollapsed,
+            router,
+          })}
 
-          {(advancedOpen || isCollapsed) &&
-            advancedNavigation.map((item) => {
-              const isActive =
-                router.pathname === item.href ||
-                (item.href !== "/" && router.pathname.startsWith(item.href));
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      : "text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-800 dark:hover:text-slate-200"
-                  )}
-                  title={isCollapsed ? item.name : undefined}
-                >
-                  <Icon className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500" />
-                  <AnimatePresence mode="wait">
-                    {!isCollapsed && (
-                      <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ duration: 0.15 }}
-                        className="truncate"
-                      >
-                        {item.name}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </Link>
-              );
-            })}
+          {renderSection({
+            title: "Legacy",
+            items: legacyNavigation,
+            open: legacyOpen,
+            setOpen: setLegacyOpen,
+            isCollapsed,
+            router,
+          })}
         </nav>
 
         {/* Footer */}

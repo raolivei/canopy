@@ -19,6 +19,10 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+// ---------------------------------------------------------------------------
+// Response types (mirror backend/models/monarch_import_schemas.py)
+// ---------------------------------------------------------------------------
+
 type MonarchFileReport = {
   filename: string;
   header_ok: boolean;
@@ -37,19 +41,62 @@ type MonarchFileReport = {
   warnings: string[];
 };
 
+type BalancesFileReport = {
+  filename: string;
+  header_ok: boolean;
+  rows_seen: number;
+  inserted: number;
+  updated: number;
+  skipped_pseudo: number;
+  skipped_foreign: number;
+  skipped_unknown_account: number;
+  assets_created: string[];
+  liabilities_created: string[];
+  assets_touched: string[];
+  liabilities_touched: string[];
+  warnings: string[];
+};
+
 type PreviewResponse = {
-  files: MonarchFileReport[];
-  would_import: number;
-  assets_would_create: string[];
-  liabilities_would_create: string[];
+  transactions: {
+    files: MonarchFileReport[];
+    would_import: number;
+    assets_would_create: string[];
+    liabilities_would_create: string[];
+  };
+  balances: {
+    files: BalancesFileReport[];
+    would_insert: number;
+    would_update: number;
+    assets_would_create: string[];
+    liabilities_would_create: string[];
+  };
 };
 
 type CommitResponse = {
-  files: MonarchFileReport[];
-  transactions_added: number;
-  assets_created: string[];
-  liabilities_created: string[];
+  transactions: {
+    files: MonarchFileReport[];
+    transactions_added: number;
+    assets_created: string[];
+    liabilities_created: string[];
+  };
+  balances: {
+    files: BalancesFileReport[];
+    balances_inserted: number;
+    balances_updated: number;
+    assets_created: string[];
+    liabilities_created: string[];
+  };
 };
+
+function safeDetail(text: string, fallback: string): string {
+  try {
+    const parsed = JSON.parse(text);
+    return typeof parsed.detail === "string" ? parsed.detail : fallback;
+  } catch {
+    return text || fallback;
+  }
+}
 
 export default function MonarchImportPage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -122,21 +169,26 @@ export default function MonarchImportPage() {
     }
   };
 
-  const reports = preview?.files ?? committed?.files ?? [];
+  const txReports =
+    preview?.transactions.files ?? committed?.transactions.files ?? [];
+  const balReports =
+    preview?.balances.files ?? committed?.balances.files ?? [];
 
   return (
     <PageLayout title="Monarch import">
       <PageHeader
         title="Monarch Money CSV drop zone"
-        description="Backfill historical transactions from Monarch. Canopy auto-creates accounts, skips Monarch's Transfer/Income pseudo-accounts, drops non-CAD rows, and defers to Wealthsimple for any dates where WS already owns the account."
+        description="Backfill historical transactions AND account-balance snapshots from Monarch. Drop both the transactions CSV and the balances CSV together — Canopy auto-detects each file, routes it to the right importer, autocreates accounts, skips Monarch's Transfer/Income pseudo-accounts, drops non-CAD/USD rows, and defers to Wealthsimple for any dates where WS already owns the account."
       />
 
       <Card className="max-w-4xl">
         <CardHeader>
           <CardTitle>Files</CardTitle>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Export from Monarch via Settings &rarr; Data &rarr; Download
-            transactions. Drop the CSV here.
+            In Monarch: <b>Settings &rarr; Data</b>. Use both
+            {" "}<b>Download transactions</b> and <b>Download account balances</b>
+            {" "}— drop the two CSVs here. Balance snapshots are what fills
+            RBC / Scotia / credit card balances on the Accounts page.
           </p>
         </CardHeader>
         <CardContent>
@@ -144,24 +196,36 @@ export default function MonarchImportPage() {
             <div className="flex items-start gap-2 rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <div className="space-y-1">
-                <div className="font-medium">Dedup guarantees</div>
+                <div className="font-medium">Dedup & routing guarantees</div>
                 <ul className="list-disc pl-5 text-xs leading-relaxed">
                   <li>
-                    <span className="font-medium">Layer 1 - per-account
-                    cutover:</span> if Wealthsimple already owns an
-                    account from date <code>X</code> onward, any Monarch
-                    row for that account with date &ge; <code>X</code> is
-                    dropped.
+                    <span className="font-medium">Auto-routing:</span> files
+                    with a <code>Date,Balance,Account</code> header are
+                    treated as balance snapshots; everything else is parsed
+                    as transactions.
                   </li>
                   <li>
-                    <span className="font-medium">Layer 2 - canonical
+                    <span className="font-medium">Layer 1 — per-account
+                    cutover:</span> if Wealthsimple already owns an
+                    account from date <code>X</code> onward, any Monarch
+                    transaction row for that account with date &ge;{" "}
+                    <code>X</code> is dropped.
+                  </li>
+                  <li>
+                    <span className="font-medium">Layer 2 — canonical
                     hash:</span> a source-agnostic fingerprint of
                     (account, date, amount) catches cross-source
                     duplicates that slip through Layer 1.
                   </li>
                   <li>
-                    Re-uploading the same Monarch CSV is a no-op
-                    (source hash match).
+                    <span className="font-medium">Balances upsert:</span>{" "}
+                    re-uploading a balances CSV updates rows in place;
+                    no duplicates, no history rewriting.
+                  </li>
+                  <li>
+                    Liability balances (credit cards, LOC) are stored as
+                    positive "amount owed" — Monarch's negative sign is
+                    flipped automatically.
                   </li>
                 </ul>
               </div>
@@ -169,7 +233,7 @@ export default function MonarchImportPage() {
 
             <label className="block">
               <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Monarch transactions CSV
+                Monarch CSV files (transactions + balances)
               </span>
               <input
                 type="file"
@@ -240,30 +304,41 @@ export default function MonarchImportPage() {
             )}
 
             {committed && (
-              <div className="p-4 rounded-md bg-success-50 dark:bg-success-950/30 text-success-700 dark:text-success-300 text-sm space-y-1">
+              <div className="p-4 rounded-md bg-success-50 dark:bg-success-950/30 text-success-700 dark:text-success-300 text-sm space-y-2">
                 <div className="flex items-center gap-2 font-medium">
                   <CheckCircle className="w-4 h-4" />
                   Import complete
                 </div>
                 <div>
-                  {committed.transactions_added} transaction
-                  {committed.transactions_added === 1 ? "" : "s"} imported.{" "}
-                  {committed.assets_created.length} asset
-                  {committed.assets_created.length === 1 ? "" : "s"} +{" "}
-                  {committed.liabilities_created.length} liabilit
-                  {committed.liabilities_created.length === 1 ? "y" : "ies"}
-                  {" "}autocreated.
+                  <b>{committed.transactions.transactions_added}</b> transaction
+                  {committed.transactions.transactions_added === 1 ? "" : "s"}{" "}
+                  imported &middot;{" "}
+                  <b>{committed.balances.balances_inserted}</b> balance snapshot
+                  {committed.balances.balances_inserted === 1 ? "" : "s"}{" "}
+                  inserted &middot;{" "}
+                  <b>{committed.balances.balances_updated}</b> updated.
                 </div>
-                {(committed.assets_created.length > 0 ||
-                  committed.liabilities_created.length > 0) && (
-                  <ul className="mt-2 list-disc pl-5 text-xs opacity-90">
-                    {[
-                      ...committed.assets_created,
-                      ...committed.liabilities_created,
-                    ].map((n) => (
-                      <li key={n}>{n}</li>
-                    ))}
-                  </ul>
+                {(committed.transactions.assets_created.length > 0 ||
+                  committed.transactions.liabilities_created.length > 0 ||
+                  committed.balances.assets_created.length > 0 ||
+                  committed.balances.liabilities_created.length > 0) && (
+                  <div>
+                    <div className="text-xs font-medium mb-1">
+                      Autocreated accounts
+                    </div>
+                    <ul className="list-disc pl-5 text-xs opacity-90">
+                      {Array.from(
+                        new Set([
+                          ...committed.transactions.assets_created,
+                          ...committed.transactions.liabilities_created,
+                          ...committed.balances.assets_created,
+                          ...committed.balances.liabilities_created,
+                        ]),
+                      ).map((n) => (
+                        <li key={n}>{n}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             )}
@@ -274,20 +349,62 @@ export default function MonarchImportPage() {
                   Dry run
                 </div>
                 <div className="text-slate-600 dark:text-slate-300">
-                  Would import <b>{preview.would_import}</b> transaction
-                  {preview.would_import === 1 ? "" : "s"} and autocreate{" "}
-                  <b>{preview.assets_would_create.length}</b> asset
-                  {preview.assets_would_create.length === 1 ? "" : "s"} +{" "}
-                  <b>{preview.liabilities_would_create.length}</b> liabilit
-                  {preview.liabilities_would_create.length === 1 ? "y" : "ies"}.
+                  Would import <b>{preview.transactions.would_import}</b>{" "}
+                  transaction
+                  {preview.transactions.would_import === 1 ? "" : "s"} &middot;{" "}
+                  insert <b>{preview.balances.would_insert}</b> balance
+                  snapshot{preview.balances.would_insert === 1 ? "" : "s"}{" "}
+                  &middot; update <b>{preview.balances.would_update}</b>.
+                </div>
+                <div className="text-slate-600 dark:text-slate-300 text-xs">
+                  Would autocreate{" "}
+                  <b>
+                    {
+                      new Set([
+                        ...preview.transactions.assets_would_create,
+                        ...preview.balances.assets_would_create,
+                      ]).size
+                    }
+                  </b>{" "}
+                  asset(s) +{" "}
+                  <b>
+                    {
+                      new Set([
+                        ...preview.transactions.liabilities_would_create,
+                        ...preview.balances.liabilities_would_create,
+                      ]).size
+                    }
+                  </b>{" "}
+                  liabilit
+                  {new Set([
+                    ...preview.transactions.liabilities_would_create,
+                    ...preview.balances.liabilities_would_create,
+                  ]).size === 1
+                    ? "y"
+                    : "ies"}
+                  .
                 </div>
               </div>
             )}
 
-            {reports.length > 0 && (
+            {txReports.length > 0 && (
               <div className="space-y-3">
-                {reports.map((f) => (
-                  <FileRow key={f.filename} f={f} />
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Transaction files
+                </div>
+                {txReports.map((f) => (
+                  <TransactionFileRow key={f.filename} f={f} />
+                ))}
+              </div>
+            )}
+
+            {balReports.length > 0 && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Balance files
+                </div>
+                {balReports.map((f) => (
+                  <BalanceFileRow key={f.filename} f={f} />
                 ))}
               </div>
             )}
@@ -298,7 +415,7 @@ export default function MonarchImportPage() {
   );
 }
 
-function FileRow({ f }: { f: MonarchFileReport }) {
+function TransactionFileRow({ f }: { f: MonarchFileReport }) {
   const skippedTotal =
     f.skipped_pseudo +
     f.skipped_foreign +
@@ -326,7 +443,8 @@ function FileRow({ f }: { f: MonarchFileReport }) {
       </div>
       {!f.header_ok && (
         <div className="text-danger-700 dark:text-danger-300">
-          Header mismatch - this doesn&rsquo;t look like a Monarch export.
+          Header mismatch — doesn&rsquo;t look like a Monarch transactions
+          export.
         </div>
       )}
       {f.header_ok && (
@@ -364,12 +482,64 @@ function FileRow({ f }: { f: MonarchFileReport }) {
   );
 }
 
-function safeDetail(text: string, fallback: string): string {
-  try {
-    const j = JSON.parse(text);
-    if (typeof j?.detail === "string") return j.detail;
-  } catch {
-    // not JSON
-  }
-  return text || fallback;
+function BalanceFileRow({ f }: { f: BalancesFileReport }) {
+  const skippedTotal =
+    f.skipped_pseudo + f.skipped_foreign + f.skipped_unknown_account;
+  const written = f.inserted + f.updated;
+
+  return (
+    <div
+      className={`rounded-md border p-4 text-sm ${
+        f.header_ok
+          ? "border-slate-300 dark:border-slate-700"
+          : "border-danger-300 bg-danger-50 dark:border-danger-800 dark:bg-danger-950/30"
+      }`}
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="font-medium text-slate-800 dark:text-slate-100">
+          {f.filename}
+        </div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          {f.rows_seen} seen &middot; {written} written ({f.inserted} new,{" "}
+          {f.updated} updated) &middot; {skippedTotal} skipped
+        </div>
+      </div>
+      {!f.header_ok && (
+        <div className="text-danger-700 dark:text-danger-300">
+          Header mismatch — expected{" "}
+          <code>Date,Balance,Account</code>.
+        </div>
+      )}
+      {f.header_ok && (
+        <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 sm:grid-cols-3">
+          <li>Pseudo: {f.skipped_pseudo}</li>
+          <li>Foreign currency: {f.skipped_foreign}</li>
+          <li>Unknown account: {f.skipped_unknown_account}</li>
+          <li>Assets touched: {f.assets_touched.length}</li>
+          <li>Liabilities touched: {f.liabilities_touched.length}</li>
+        </ul>
+      )}
+      {(f.assets_created.length > 0 || f.liabilities_created.length > 0) && (
+        <div className="mt-3 text-xs text-slate-600 dark:text-slate-400">
+          <span className="font-medium">Autocreated:</span>{" "}
+          {[...f.assets_created, ...f.liabilities_created].join(", ")}
+        </div>
+      )}
+      {f.warnings.length > 0 && (
+        <details className="mt-2 text-xs">
+          <summary className="cursor-pointer text-slate-500 dark:text-slate-400">
+            {f.warnings.length} warning{f.warnings.length === 1 ? "" : "s"}
+          </summary>
+          <ul className="mt-1 list-disc pl-5 text-slate-500 dark:text-slate-400">
+            {f.warnings.slice(0, 20).map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+            {f.warnings.length > 20 && (
+              <li>\u2026 and {f.warnings.length - 20} more</li>
+            )}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
 }

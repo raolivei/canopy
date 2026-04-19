@@ -268,14 +268,28 @@ export default function Portfolio() {
                 {formatCurrency(totalValue, displayCurrency)}
               </h1>
               <div className="flex items-center gap-3">
-                <Badge variant={summary?.total_return_pct && summary.total_return_pct >= 0 ? "success" : "danger"}>
-                  {summary?.total_return_pct && summary.total_return_pct >= 0 ? (
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3 mr-1" />
-                  )}
-                  {summary?.total_return_pct?.toFixed(2) || 0}% all time
-                </Badge>
+                {(() => {
+                  // FastAPI serializes Decimal as a JSON string, so we
+                  // always coerce before doing numeric work — avoids
+                  // ``"… is not a function"`` on ``.toFixed``.
+                  const pctNum =
+                    summary?.total_return_pct === null ||
+                    summary?.total_return_pct === undefined
+                      ? null
+                      : Number(summary.total_return_pct);
+                  const pctValid = pctNum !== null && Number.isFinite(pctNum);
+                  const isPositive = pctValid && (pctNum as number) >= 0;
+                  return (
+                    <Badge variant={isPositive ? "success" : "danger"}>
+                      {isPositive ? (
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3 mr-1" />
+                      )}
+                      {pctValid ? (pctNum as number).toFixed(2) : "0.00"}% all time
+                    </Badge>
+                  );
+                })()}
                 <span className="text-sm text-slate-500 dark:text-slate-400">
                   {processedHoldings.length} holdings
                 </span>

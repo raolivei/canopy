@@ -9,6 +9,53 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [0.10.2] - 2026-04-18 — Monarch account-balance snapshots
+
+Closes the last big valuation gap for non-Wealthsimple accounts: RBC, Scotia, credit cards, and every other Monarch-connected institution now ships historical balance snapshots into Canopy, so the Accounts page and net-worth timeline stop showing `$0` for them. The Monarch CSV drop zone now auto-detects and imports Monarch's second export — **Balances** — alongside transactions in a single upload.
+
+### Added
+
+- **Monarch *Balances* CSV importer** (`backend/services/monarch/balances_parser.py`, `balances_importer.py`). Parses Monarch's `Date,Balance,Account` export, resolves each row through the same last-4 / name matcher the transactions importer uses (so WS-imported accounts and Monarch-imported accounts converge on the same Canopy entity), and upserts into `AccountBalanceHistory` (assets) or `LiabilityBalanceHistory` (liabilities). Monarch reports liability balances as negative ("you owe $21,818" → `-21818.66`); the importer flips the sign so downstream "amount owed" math stays consistent with the WS importer. End-to-end smoke run on the author's real export: 580 rows in, **486 snapshots inserted**, 57 foreign-currency (EUR/TRY/COP/MXN/…) rows skipped, 37 unclassifiable rows skipped. 13 new tests covering multi-currency coexistence, re-upload idempotency, update-in-place on changed values, and liability sign flipping.
+- **Unified drop zone** on `/portfolio/monarch-import`: a single file picker now accepts both Monarch exports at once. Each file is routed to the right importer by peeking at its header row (`Date,Balance,Account` → balances; everything else → transactions). The results pane shows separate "transaction files" and "balance files" sections with their respective counters.
+- **Broadened account classifier** (`monarch/parser.py`):
+  - Foreign-currency prefixes now include `COP`, `MXN`, `AUD`, `CHF`, `SGD`, `HKD`, `INR` on top of the existing `EUR/JPY/GBP/BRL/TRY`.
+  - Debt markers picked up `credit_card` (Wealthsimple's snake-case label), `line_of_credit`, `line of credit`, `loan`, `mortgage`. This is what rescues `PORTFOLIO_LINE_OF_CREDIT (...CYMA)`, `car loan (...7001)`, and generic `CREDIT_CARD (...SDuQ)` rows from the "unknown" bucket.
+  - Investment markers picked up `direct_index` so Wealthsimple's `DIRECT_INDEX_NON_REGISTERED` accounts land as investments (even though we don't import their WS statements anymore, Monarch still sees them).
+
+### API
+
+- `POST /v1/monarch-import/preview` and `/commit` now return a unified `{transactions, balances}` envelope. Old clients that only read `transactions_added` from the response will need to switch to `transactions.transactions_added` — the only consumer in the tree (the Monarch import page) has been migrated.
+- File-upload cap raised from 5 → 10 to accommodate Monarch exports + multiple monthly Wealthsimple files in the same request.
+
+### Why
+
+Before this change the only balance data Canopy had for non-WS accounts was whatever the transactions importer could reconstruct from transaction deltas — which, without a starting balance, is useless. RBC / Scotia / credit-card balances all landed at `$0` on the Accounts page and the net-worth timeline underreported total assets. Monarch already aggregates authoritative balances across all linked institutions, so using its CSV export is the cheapest path to correctness.
+
+---
+
+## [0.10.1] - 2026-04-18 — Net-worth valuation + Danger Zone
+
+Fixes a valuation gap where Wealthsimple investment accounts only contributed their uninvested cash sub-balance to net worth (because `AccountBalanceHistory` captures cash, not the market value of held securities). Adds a Settings "Danger Zone" that lets you wipe all imported data from one place. Also fixes a crash on the Holdings page.
+
+### Added
+
+- **Settings → Danger Zone**: delete all imported data with a typed-confirmation workflow. Lists per-table row counts, requires typing `RESET ALL DATA`, and invalidates every cached list on success. The endpoint (`POST /v1/admin/reset-data` with header `X-Confirm-Reset: RESET ALL DATA`) already existed — this surfaces it. FX-rate cache is preserved so the next session doesn't re-hit the BoC API unnecessarily.
+
+### Changed
+
+- **`GET /v1/wealthsimple-import/networth-timeline`** now folds the book value of every open lot into the `inv` bucket for each timeline point. Book value = `quantity × price_per_unit`, scoped by `Asset.currency`, and filtered to lots that were open on that date (`purchase_date <= d` and not closed before `d`). Previously the "Investments" figure for a Wealthsimple retirement account was just the uninvested CAD/USD sub-balance in that account, making net worth look wildly under-stated when securities were sitting in the account. New test: `test_timeline_folds_lot_book_value_into_investments`.
+- **`PortfolioCalculator.get_holding_summary`**: when `Asset.current_price` is `None` but the position has unsold lots, `market_value` now falls back to total cost basis (assumes 0% return) so Holdings and Allocation charts render a non-zero value. Once a price-sync service lands, this fallback becomes a no-op.
+
+### Fixed
+
+- **Holdings page crash**: `TypeError: total_return_pct.toFixed is not a function`. FastAPI serializes `Decimal` as a JSON string; the Holdings hero now coerces `summary.total_return_pct` to `Number` before formatting and guards against `NaN`.
+- **Accounts page showed every asset at $0**: `GET /v1/accounts/` was reading `Asset.current_price` (which no CSV importer populates) instead of the latest `AccountBalanceHistory` row. New helper `_latest_balances_by_asset` pulls the newest native-currency snapshot per asset and the Wealthsimple Chequing account now surfaces its real $1.61 balance. Regression test: `test_latest_balances_pulls_from_account_balance_history`.
+- **Dark Reader hydration warning on mobile**: `Extra attributes from the server: data-darkreader-inline-stroke,style` from the Dark Reader browser extension injecting attributes onto lucide SVG icons before React hydrates. `MobileNav` now mount-gates on `useEffect` (the same pattern `Sidebar` already uses) so the server-rendered markup doesn't try to match an extension-mutated DOM.
+
+### Notes
+
+The `networth-timeline` aggregation does **not** yet use live market prices. Without a price-sync service, book value is the best honest proxy we have; when live prices arrive, the aggregator will automatically prefer them (via `Asset.current_price` on the lots' asset rows).
+
 ## [0.10.0] - 2026-04-18 — Questrade-style multi-currency views
 
 Canopy now mirrors the Questrade / Wealthsimple "show me one currency or the combined total" UX. Every balance surface — dashboard hero, net-worth timeline, Accounts, and Holdings — respects a single global toggle: **CAD only**, **USD only**, **Combined CAD** (USD converted into CAD), or **Combined USD** (CAD converted into USD). Historical points use the FX rate as of that date; live totals use the latest Bank of Canada rate.

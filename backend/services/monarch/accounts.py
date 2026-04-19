@@ -222,11 +222,24 @@ def _resolve_liability(
 
 def _liability_type_for(label: str) -> LiabilityType:
     lower = label.lower()
-    if "line of credit" in lower or "loc" in lower or "credit line" in lower:
+    # Check credit-card markers *first* — otherwise substrings like "car"
+    # inside "Mastercard"/"credit card" would mis-route every CC into a
+    # car loan.
+    if any(
+        kw in lower
+        for kw in ("credit card", "credit_card", "mastercard", "visa", "amex", "american express")
+    ):
+        return LiabilityType.CREDIT_CARD
+    if (
+        "line of credit" in lower
+        or "line_of_credit" in lower
+        or "credit line" in lower
+        or "loc" in lower
+    ):
         return LiabilityType.LINE_OF_CREDIT
     if "mortgage" in lower:
         return LiabilityType.MORTGAGE
-    if "car" in lower or "auto" in lower:
+    if "car loan" in lower or "auto loan" in lower or lower.startswith(("car ", "auto ")):
         return LiabilityType.CAR_LOAN
     if "student" in lower:
         return LiabilityType.STUDENT_LOAN

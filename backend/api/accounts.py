@@ -31,8 +31,9 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import desc, select
 
+from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.asset import Asset, AssetType
 from backend.db.models.liability import Liability
 from backend.db.session import DbSession
@@ -133,8 +134,19 @@ class AccountsResponse(BaseModel):
     fx: FxInfo
 
 
-def _asset_to_account(asset: Asset) -> AccountResponse:
-    balance = float(asset.current_price or Decimal("0"))
+def _asset_to_account(
+    asset: Asset,
+    latest_balance: Optional[Decimal] = None,
+    latest_balance_date: Optional[datetime] = None,
+) -> AccountResponse:
+    # Prefer ``AccountBalanceHistory`` (that's where the Wealthsimple
+    # importer writes cash sub-balances). Fall back to
+    # ``asset.current_price`` for manually-managed assets, which is
+    # the old behaviour.
+    if latest_balance is not None:
+        balance = float(latest_balance)
+    else:
+        balance = float(asset.current_price or Decimal("0"))
     return AccountResponse(
         id=f"asset:{asset.id}",
         name=asset.name,
@@ -144,8 +156,47 @@ def _asset_to_account(asset: Asset) -> AccountResponse:
         institution=asset.institution,
         external_account_id=asset.external_account_id,
         source=asset.sync_source,
-        updated_at=asset.price_updated_at,
+        updated_at=latest_balance_date or asset.price_updated_at,
     )
+
+
+def _latest_balances_by_asset(
+    db, asset_ids: list[int]
+) -> dict[int, tuple[Decimal, datetime]]:
+    """Return ``{asset_id: (balance, as_of_date)}`` for the latest row.
+
+    We pick the most recent ``AccountBalanceHistory`` row where the row
+    currency matches the asset's own currency — that's the "native"
+    balance the Accounts page cares about. USD sub-balances on a CAD
+    retirement account feed the Holdings / Combined views, not the
+    Accounts list.
+    """
+    if not asset_ids:
+        return {}
+    rows = db.execute(
+        select(
+            AccountBalanceHistory.asset_id,
+            AccountBalanceHistory.balance,
+            AccountBalanceHistory.as_of_date,
+            AccountBalanceHistory.currency,
+            Asset.currency.label("asset_currency"),
+        )
+        .join(Asset, Asset.id == AccountBalanceHistory.asset_id)
+        .where(AccountBalanceHistory.asset_id.in_(asset_ids))
+        .order_by(
+            AccountBalanceHistory.asset_id.asc(),
+            desc(AccountBalanceHistory.as_of_date),
+        )
+    ).all()
+
+    latest: dict[int, tuple[Decimal, datetime]] = {}
+    for asset_id, balance, as_of_date, row_ccy, asset_ccy in rows:
+        if asset_id in latest:
+            continue  # Already took the most-recent row for this asset.
+        if (row_ccy or "").upper() != (asset_ccy or "").upper():
+            continue  # Skip cross-currency sub-balances for the native view.
+        latest[asset_id] = (balance, as_of_date)
+    return latest
 
 
 def _liability_to_account(liab: Liability) -> AccountResponse:
@@ -248,6 +299,13 @@ async def list_accounts(db: DbSession) -> AccountsResponse:
         .all()
     )
 
+    # Pre-fetch the latest balance per cash asset so the Accounts page
+    # reflects the real ``AccountBalanceHistory`` value rather than the
+    # (almost always empty) ``Asset.current_price`` column.
+    latest_balances = _latest_balances_by_asset(
+        db, [a.id for a in cash_assets]
+    )
+
     liabilities = (
         db.execute(select(Liability).where(Liability.status == "active"))
         .scalars()
@@ -255,7 +313,14 @@ async def list_accounts(db: DbSession) -> AccountsResponse:
     )
 
     accounts: list[AccountResponse] = [
-        *(_asset_to_account(a) for a in cash_assets),
+        *(
+            _asset_to_account(
+                a,
+                latest_balance=(lb := latest_balances.get(a.id)) and lb[0],
+                latest_balance_date=lb[1] if lb else None,
+            )
+            for a in cash_assets
+        ),
         *(_liability_to_account(liab) for liab in liabilities),
     ]
     accounts.sort(key=lambda a: (a.institution or "", a.name))
