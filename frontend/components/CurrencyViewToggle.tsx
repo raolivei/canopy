@@ -19,6 +19,7 @@ import {
 } from "@/hooks/useCurrencyView";
 import { useFxRate } from "@/hooks/useFxRate";
 import { AlertTriangle } from "lucide-react";
+import { PrivacyModeToggle } from "@/components/PrivacyModeToggle";
 
 const OPTIONS: { value: CurrencyView; label: string; description: string }[] = [
   { value: "CAD", label: "CAD", description: "Native CAD balances only" },
@@ -49,6 +50,7 @@ export function CurrencyViewToggle({
 
   return (
     <div className={cn("flex flex-col items-start gap-1.5", className)}>
+      <div className="flex flex-wrap items-center gap-2">
       <div
         role="group"
         aria-label="Currency view"
@@ -75,6 +77,8 @@ export function CurrencyViewToggle({
             </button>
           );
         })}
+      </div>
+      <PrivacyModeToggle showLabel />
       </div>
       {showFxCaption && (
         <FxCaption

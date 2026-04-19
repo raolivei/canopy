@@ -23,7 +23,7 @@ import {
   BarChart3,
   Briefcase,
 } from "lucide-react";
-import { formatCurrency } from "@/utils/currency";
+import { useMoney } from "@/hooks/useMoney";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
 import { CurrencyViewToggle } from "@/components/CurrencyViewToggle";
@@ -73,6 +73,7 @@ export default function Portfolio() {
   // replaces the 1.35 fallback the page used before the FX service
   // landed.
   const { view } = useCurrencyView();
+  const { fmt, pct } = useMoney();
   const displayCurrency = viewCurrency(view);
   const fx = useFxRate();
   const usdCadRate = fx.data?.rate ?? null;
@@ -265,7 +266,7 @@ export default function Portfolio() {
                 <CurrencyBadge currency={displayCurrency} className="ml-2" />
               </p>
               <h1 className="text-4xl lg:text-5xl font-semibold tracking-tight text-slate-900 dark:text-white mb-2">
-                {formatCurrency(totalValue, displayCurrency)}
+                {fmt(totalValue, displayCurrency)}
               </h1>
               <div className="flex items-center gap-3">
                 {(() => {
@@ -286,7 +287,7 @@ export default function Portfolio() {
                       ) : (
                         <TrendingDown className="w-3 h-3 mr-1" />
                       )}
-                      {pctValid ? (pctNum as number).toFixed(2) : "0.00"}% all time
+                      {pctValid ? pct(pctNum as number, 2) : pct(0, 2)} all time
                     </Badge>
                   );
                 })()}
@@ -334,13 +335,13 @@ export default function Portfolio() {
       >
         <MetricCard
           title="Total Value"
-          value={formatCurrency(totalValue, displayCurrency)}
+          value={fmt(totalValue, displayCurrency)}
           icon={<Briefcase className="w-5 h-5" />}
           iconBg="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400"
         />
         <MetricCard
           title="Total Gain/Loss"
-          value={summary?.total_gain_loss !== null ? formatCurrency(summary?.total_gain_loss || 0, displayCurrency) : "—"}
+          value={summary?.total_gain_loss !== null ? fmt(summary?.total_gain_loss || 0, displayCurrency) : "—"}
           subtitle={summary?.total_gain_loss !== null ? undefined : "No cost basis data"}
           icon={<TrendingUp className="w-5 h-5" />}
           iconBg={cn(
@@ -351,7 +352,7 @@ export default function Portfolio() {
         />
         <MetricCard
           title="Total Dividends"
-          value={formatCurrency(Number(summary?.total_dividends ?? 0), displayCurrency)}
+          value={fmt(Number(summary?.total_dividends ?? 0), displayCurrency)}
           icon={<DollarSign className="w-5 h-5" />}
           iconBg="bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400"
         />
@@ -442,7 +443,7 @@ export default function Portfolio() {
                               </span>
                             </div>
                             <span className="font-medium text-slate-900 dark:text-white">
-                              {formatCurrency(currencyTotal, displayCurrency)}
+                              {fmt(currencyTotal, displayCurrency)}
                             </span>
                           </div>
                           <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -452,7 +453,7 @@ export default function Portfolio() {
                             />
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {percentage.toFixed(1)}% of portfolio
+                            {pct(percentage, 1)} of portfolio
                           </p>
                         </div>
                       );

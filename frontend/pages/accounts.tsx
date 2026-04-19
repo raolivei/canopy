@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/utils/cn";
-import { formatCurrency } from "@/utils/currency";
+import { useMoney } from "@/hooks/useMoney";
 import { useRouter } from "next/router";
 import { CurrencyViewToggle } from "@/components/CurrencyViewToggle";
 import {
@@ -125,6 +125,7 @@ const isDebtKind = (kind: AccountKind) =>
 export default function Accounts() {
   const router = useRouter();
   const { view } = useCurrencyView();
+  const { fmt } = useMoney();
   const { data, isLoading, error } = useQuery<AccountsResponse>({
     queryKey: ["accounts"],
     queryFn: async () => {
@@ -211,7 +212,7 @@ export default function Accounts() {
                     Total cash
                   </p>
                   <p className="text-2xl font-bold text-success-600 dark:text-success-400">
-                    {formatCurrency(currentTotals.cash, displayCurrency)}
+                    {fmt(currentTotals.cash, displayCurrency)}
                   </p>
                 </div>
                 <div>
@@ -219,7 +220,7 @@ export default function Accounts() {
                     Total debt
                   </p>
                   <p className="text-2xl font-bold text-danger-600 dark:text-danger-400">
-                    {formatCurrency(currentTotals.debt, displayCurrency)}
+                    {fmt(currentTotals.debt, displayCurrency)}
                   </p>
                 </div>
                 <div>
@@ -234,7 +235,7 @@ export default function Accounts() {
                         : "text-danger-600 dark:text-danger-400",
                     )}
                   >
-                    {formatCurrency(currentTotals.net, displayCurrency)}
+                    {fmt(currentTotals.net, displayCurrency)}
                   </p>
                 </div>
               </div>
@@ -335,7 +336,7 @@ export default function Accounts() {
                       )}
                     >
                       {debt ? "-" : ""}
-                      {formatCurrency(account.balance, native)}
+                      {fmt(account.balance, native)}
                     </p>
                     {/* Show the converted figure below only when the
                         view isn't already the native currency — keeps
@@ -344,7 +345,7 @@ export default function Accounts() {
                       (view === "COMBINED_CAD" || view === "COMBINED_USD") &&
                       displayCurrency !== native && (
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          ≈ {formatCurrency(viewedAmount, displayCurrency)} @ FX
+                          ≈ {fmt(viewedAmount, displayCurrency)} @ FX
                         </p>
                       )}
                     {account.source && (

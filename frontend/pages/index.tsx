@@ -31,7 +31,7 @@ import {
   Legend,
 } from "recharts";
 import { format } from "date-fns";
-import { formatCurrency } from "@/utils/currency";
+import { useMoney } from "@/hooks/useMoney";
 import { motion } from "framer-motion";
 import { useRouter } from "next/router";
 import {
@@ -146,6 +146,7 @@ function pickLatestSlice(
 export default function Dashboard() {
   const router = useRouter();
   const { view } = useCurrencyView();
+  const { fmt, pct } = useMoney();
   const displayCurrency = viewCurrency(view);
   const [loading, setLoading] = useState(true);
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
@@ -339,7 +340,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <h2 className="text-5xl lg:text-6xl font-semibold tracking-tight text-slate-900 dark:text-white mb-3">
-                    {formatCurrency(nwValue, displayCurrency)}
+                    {fmt(nwValue, displayCurrency)}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3">
                     {nwDelta && (
@@ -353,8 +354,8 @@ export default function Dashboard() {
                           <TrendingDown className="w-3 h-3 mr-1" />
                         )}
                         {nwDelta.abs >= 0 ? "+" : ""}
-                        {formatCurrency(nwDelta.abs, displayCurrency)} ({nwDelta.pct >= 0 ? "+" : ""}
-                        {nwDelta.pct.toFixed(2)}%) vs last month
+                        {fmt(nwDelta.abs, displayCurrency)} ({nwDelta.pct >= 0 ? "+" : ""}
+                        {pct(nwDelta.pct, 2)}) vs last month
                       </Badge>
                     )}
                     <span className="text-sm text-slate-500 dark:text-slate-400">
@@ -374,6 +375,7 @@ export default function Dashboard() {
               icon={<PiggyBank className="w-4 h-4" />}
               accent="primary"
               currency={displayCurrency}
+              format={fmt}
             />
             <NetWorthTile
               label="Cash"
@@ -381,6 +383,7 @@ export default function Dashboard() {
               icon={<Wallet className="w-4 h-4" />}
               accent="success"
               currency={displayCurrency}
+              format={fmt}
             />
             <NetWorthTile
               label="Debt"
@@ -389,6 +392,7 @@ export default function Dashboard() {
               accent="danger"
               negative
               currency={displayCurrency}
+              format={fmt}
             />
           </div>
         </motion.div>
@@ -427,13 +431,13 @@ export default function Dashboard() {
                       <YAxis
                         {...getAxisProps(checkDarkMode())}
                         tickFormatter={(v) =>
-                          formatCurrency(v as number, displayCurrency)
+                          fmt(v as number, displayCurrency)
                         }
                       />
                       <Tooltip
                         contentStyle={getTooltipStyle(checkDarkMode())}
                         formatter={(v: number, name: string) => [
-                          formatCurrency(v, displayCurrency),
+                          fmt(v, displayCurrency),
                           name,
                         ]}
                       />
@@ -541,7 +545,7 @@ export default function Dashboard() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                 Canadian holdings that don't auto-sync from Wealthsimple (private equity, real estate, DPSP)
                 {latestNum > 0 && (
-                  <> — latest review {formatCurrency(latestNum, CAD)}</>
+                  <> — latest review {fmt(latestNum, CAD)}</>
                 )}
               </p>
             </CardHeader>
@@ -553,11 +557,11 @@ export default function Dashboard() {
                     <XAxis dataKey="date" {...getAxisProps(checkDarkMode())} />
                     <YAxis
                       {...getAxisProps(checkDarkMode())}
-                      tickFormatter={(v) => formatCurrency(v as number, CAD)}
+                      tickFormatter={(v) => fmt(v as number, CAD)}
                     />
                     <Tooltip
                       contentStyle={getTooltipStyle(checkDarkMode())}
-                      formatter={(v: number) => [formatCurrency(v, CAD), "Total CAD"]}
+                      formatter={(v: number) => [fmt(v, CAD), "Total CAD"]}
                     />
                     <Line
                       type="monotone"
@@ -585,7 +589,7 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle>By platform</CardTitle>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Latest review — {formatCurrency(parseFloat(platformAlloc.total_cad), CAD)} total
+                  Latest review — {fmt(parseFloat(platformAlloc.total_cad), CAD)} total
                 </p>
               </CardHeader>
               <CardContent>
@@ -615,7 +619,7 @@ export default function Dashboard() {
                       <Tooltip
                         contentStyle={getTooltipStyle(checkDarkMode())}
                         formatter={(v: number, name: string) => [
-                          formatCurrency(v, CAD),
+                          fmt(v, CAD),
                           name,
                         ]}
                       />
@@ -713,6 +717,7 @@ function NetWorthTile({
   emphasis = false,
   negative = false,
   currency = "CAD",
+  format,
 }: {
   label: string;
   value: number;
@@ -721,6 +726,7 @@ function NetWorthTile({
   emphasis?: boolean;
   negative?: boolean;
   currency?: string;
+  format: (amount: number, currencyCode?: string) => string;
 }) {
   const displayValue = negative ? -Math.abs(value) : value;
   const styles = ACCENT_STYLES[accent];
@@ -742,7 +748,7 @@ function NetWorthTile({
             emphasis ? "text-3xl" : "text-2xl"
           } ${negative ? styles.valueText : "text-slate-900 dark:text-white"}`}
         >
-          {formatCurrency(displayValue, currency)}
+          {format(displayValue, currency)}
         </div>
       </CardContent>
     </Card>

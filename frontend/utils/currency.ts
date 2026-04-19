@@ -18,7 +18,28 @@ export const CAD_CURRENCY: Currency = {
 
 export const CURRENCIES: Currency[] = [CAD_CURRENCY];
 
-export function formatCurrency(amount: number, currencyCode: string = "CAD"): string {
+export interface FormatCurrencyOptions {
+  /** When true, mask the numeric value with asterisks (privacy). */
+  private?: boolean;
+}
+
+/** Placeholder string roughly matching formatted currency width. */
+function privateCurrencyMask(currencyCode: string): string {
+  const c = (currencyCode || "CAD").toUpperCase();
+  const body = "*".repeat(10);
+  if (c === "USD") return `$${body}`;
+  if (c === "CAD") return `CA$${body}`;
+  return `${c} ${body}`;
+}
+
+export function formatCurrency(
+  amount: number,
+  currencyCode: string = "CAD",
+  opts?: FormatCurrencyOptions,
+): string {
+  if (opts?.private) {
+    return privateCurrencyMask(currencyCode);
+  }
   if (!Number.isFinite(amount)) amount = 0;
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
@@ -31,7 +52,15 @@ export function formatCurrency(amount: number, currencyCode: string = "CAD"): st
 export function formatCurrencyCompact(
   amount: number,
   currencyCode: string = "CAD",
+  opts?: FormatCurrencyOptions,
 ): string {
+  if (opts?.private) {
+    const c = (currencyCode || "CAD").toUpperCase();
+    const body = "*".repeat(6);
+    if (c === "USD") return `$${body}`;
+    if (c === "CAD") return `CA$${body}`;
+    return `${c} ${body}`;
+  }
   if (!Number.isFinite(amount)) amount = 0;
   return new Intl.NumberFormat("en-CA", {
     style: "currency",

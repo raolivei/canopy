@@ -18,9 +18,12 @@ import {
   Sun,
   Command,
   UploadCloud,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 
 const primaryNavigation = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -140,6 +143,7 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [legacyOpen, setLegacyOpen] = useState(false);
+  const { privacyMode, togglePrivacyMode, hydrated: privacyHydrated } = usePrivacyMode();
 
   useEffect(() => {
     setIsMounted(true);
@@ -341,6 +345,28 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
 
         {/* Footer */}
         <div className="px-3 py-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <button
+            type="button"
+            onClick={togglePrivacyMode}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium",
+              "text-slate-600 dark:text-slate-400",
+              "hover:bg-slate-100 dark:hover:bg-slate-800",
+              "transition-colors",
+              privacyHydrated && privacyMode && "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200",
+            )}
+            title={privacyHydrated && privacyMode ? "Show amounts" : "Hide amounts (privacy)"}
+          >
+            {privacyHydrated && privacyMode ? (
+              <EyeOff className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+            ) : (
+              <Eye className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+            )}
+            {!isCollapsed && (
+              <span>{privacyHydrated && privacyMode ? "Show amounts" : "Hide amounts"}</span>
+            )}
+          </button>
+
           {/* Dark Mode Toggle */}
           <button
             onClick={toggleDarkMode}

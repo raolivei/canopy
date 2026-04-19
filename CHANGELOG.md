@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [0.10.3] - 2026-04-19 — Build + git tag, privacy amounts
+
+### CI / release
+
+- **Build and tag on `main`**: `build-and-push` now requests `contents: write` and passes `create-git-tag: true` into the reusable `raolivei/github-workflows` `docker-build` workflow on pushes to `main`. After a successful image push, CI creates an annotated git tag `v$(cat VERSION)` when it does not already exist on the remote (idempotent when api and frontend jobs race). **Dependency:** `github-workflows` must expose the `create-git-tag` input and `git-version-tag` job on the ref Canopy uses (e.g. merge branch `feat/docker-build-git-version-tags` into `main`, or pin the workflow to a SHA that includes that change).
+
+### Added
+
+- **Privacy — hide amounts**: Toggle in the sidebar ("Hide amounts") and next to the currency view on Dashboard / Accounts / Holdings. Persisted in `localStorage` (`canopy.privacyMode`). `formatCurrency` / `formatCurrencyCompact` accept `{ private: true }`; `useMoney()` exposes `fmt`, `fmtCompact`, and `pct` so dashboard, accounts, and portfolio surfaces mask balances and percentages as asterisks for screenshots or shoulder surfing.
+
 ## [0.10.2] - 2026-04-18 — Monarch account-balance snapshots
 
 Closes the last big valuation gap for non-Wealthsimple accounts: RBC, Scotia, credit cards, and every other Monarch-connected institution now ships historical balance snapshots into Canopy, so the Accounts page and net-worth timeline stop showing `$0` for them. The Monarch CSV drop zone now auto-detects and imports Monarch's second export — **Balances** — alongside transactions in a single upload.
