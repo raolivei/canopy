@@ -1,7 +1,12 @@
 """Portfolio calculation service for metrics, cost basis, and performance."""
 
 from decimal import Decimal
+from typing import Optional
 
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import Session
+
+from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.asset import Asset, AssetType
 from backend.db.models.dividend import Dividend
 from backend.db.models.lot import Lot
@@ -11,8 +16,6 @@ from backend.models.portfolio_schemas import (
     PortfolioAllocation,
     PortfolioSummary,
 )
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 # Asset types where current_price represents the total balance (not a per-unit price)
 BALANCE_BASED_ASSET_TYPES = {
@@ -34,7 +37,51 @@ class PortfolioCalculator:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_holding_summary(self, asset: Asset) -> HoldingSummary:
+    @staticmethod
+    def _asset_currency(asset: Asset) -> str:
+        raw = (asset.currency or "").strip()
+        return raw if raw else "CAD"
+
+    def native_balances_from_history(self, asset_ids: list[int]) -> dict[int, Decimal]:
+        """Latest ``AccountBalanceHistory`` balance per asset (native row currency only).
+
+        Matches the Accounts API: one row per asset, most recent ``as_of_date``,
+        where the history row currency matches the asset's currency (skips USD
+        legs on CAD retirement shells, etc.).
+        """
+        if not asset_ids:
+            return {}
+        rows = self.db.execute(
+            select(
+                AccountBalanceHistory.asset_id,
+                AccountBalanceHistory.balance,
+                AccountBalanceHistory.as_of_date,
+                AccountBalanceHistory.currency,
+                Asset.currency.label("asset_currency"),
+            )
+            .join(Asset, Asset.id == AccountBalanceHistory.asset_id)
+            .where(AccountBalanceHistory.asset_id.in_(asset_ids))
+            .order_by(
+                AccountBalanceHistory.asset_id.asc(),
+                desc(AccountBalanceHistory.as_of_date),
+            )
+        ).all()
+
+        latest: dict[int, Decimal] = {}
+        for asset_id, balance, _as_of, row_ccy, asset_ccy in rows:
+            if asset_id in latest:
+                continue
+            if (row_ccy or "").upper() != (asset_ccy or "").upper():
+                continue
+            latest[asset_id] = balance
+        return latest
+
+    def get_holding_summary(
+        self,
+        asset: Asset,
+        *,
+        balance_map: Optional[dict[int, Decimal]] = None,
+    ) -> HoldingSummary:
         """Calculate summary metrics for a single holding.
 
         For balance-based assets (bank accounts, retirement accounts, etc.),
@@ -46,13 +93,17 @@ class PortfolioCalculator:
         is_balance_asset = asset.asset_type in BALANCE_BASED_ASSET_TYPES
 
         if is_balance_asset:
-            # For balance-based assets, current_price IS the total value
-            market_value = asset.current_price if asset.current_price else Decimal("0")
+            # Prefer Monarch / Wealthsimple balance history over stale current_price.
+            if balance_map is not None and asset.id in balance_map:
+                market_value = balance_map[asset.id]
+            else:
+                market_value = asset.current_price if asset.current_price else Decimal("0")
             return HoldingSummary(
                 asset_id=asset.id,
                 symbol=asset.symbol,
                 name=asset.name,
                 asset_type=asset.asset_type,
+                currency=self._asset_currency(asset),
                 total_shares=Decimal("1"),  # Treat as 1 unit
                 average_cost=Decimal("0"),  # No cost basis tracking for accounts
                 current_price=market_value,
@@ -82,6 +133,7 @@ class PortfolioCalculator:
                     symbol=asset.symbol,
                     name=asset.name,
                     asset_type=asset.asset_type,
+                    currency=self._asset_currency(asset),
                     total_shares=Decimal("1"),
                     average_cost=Decimal("0"),
                     current_price=asset.current_price,
@@ -97,6 +149,7 @@ class PortfolioCalculator:
                 symbol=asset.symbol,
                 name=asset.name,
                 asset_type=asset.asset_type,
+                currency=self._asset_currency(asset),
                 total_shares=Decimal("0"),
                 average_cost=Decimal("0"),
                 current_price=asset.current_price,
@@ -134,6 +187,7 @@ class PortfolioCalculator:
             symbol=asset.symbol,
             name=asset.name,
             asset_type=asset.asset_type,
+            currency=self._asset_currency(asset),
             total_shares=total_shares,
             average_cost=average_cost,
             current_price=asset.current_price,
@@ -148,6 +202,13 @@ class PortfolioCalculator:
         """Calculate complete portfolio summary with all holdings."""
         assets = self.db.execute(select(Asset)).scalars().all()
 
+        balance_ids = [
+            a.id
+            for a in assets
+            if not a.is_liability and a.asset_type in BALANCE_BASED_ASSET_TYPES
+        ]
+        balance_map = self.native_balances_from_history(balance_ids)
+
         holdings = []
         total_value = Decimal("0")
         total_cost_basis = Decimal("0")
@@ -158,7 +219,7 @@ class PortfolioCalculator:
             if asset.is_liability:
                 continue
 
-            summary = self.get_holding_summary(asset)
+            summary = self.get_holding_summary(asset, balance_map=balance_map)
             # Include if has shares OR has market value (for balance-based assets)
             if summary.total_shares > 0 or (summary.market_value and summary.market_value > 0):
                 holdings.append(summary)

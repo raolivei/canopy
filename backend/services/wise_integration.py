@@ -18,6 +18,9 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+# Canopy only models CAD and USD for balances and FX; other Wise pockets are ignored on sync.
+WISE_SYNC_CURRENCIES = frozenset({"CAD", "USD"})
+
 
 class WiseBalance(BaseModel):
     """Balance for a single currency in Wise."""
@@ -223,27 +226,35 @@ class WiseIntegrationService:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         profile_id: Optional[int] = None,
+        currencies: Optional[set[str]] = None,
     ) -> list[WiseTransaction]:
-        """Get transactions across all currencies.
+        """Get transactions across currencies.
 
         Fetches balances first, then gets transactions for each currency.
+
+        Args:
+            currencies: If set (e.g. ``{"CAD", "USD"}``), only those balance
+                pockets are queried. If ``None``, every Wise balance currency
+                is included (legacy behaviour for exploratory API calls).
         """
         profile_id = profile_id or self.get_personal_profile_id()
         balances = self.get_balances(profile_id)
+        if currencies is not None:
+            allowed = {c.upper() for c in currencies}
+            balances = [b for b in balances if b.currency.upper() in allowed]
 
         all_transactions = []
         for balance in balances:
-            if balance.amount != 0 or True:  # Get transactions even for zero balances
-                try:
-                    txs = self.get_transactions(
-                        currency=balance.currency,
-                        start_date=start_date,
-                        end_date=end_date,
-                        profile_id=profile_id,
-                    )
-                    all_transactions.extend(txs)
-                except Exception as e:
-                    logger.error(f"Error fetching {balance.currency} transactions: {e}")
+            try:
+                txs = self.get_transactions(
+                    currency=balance.currency,
+                    start_date=start_date,
+                    end_date=end_date,
+                    profile_id=profile_id,
+                )
+                all_transactions.extend(txs)
+            except Exception as e:
+                logger.error(f"Error fetching {balance.currency} transactions: {e}")
 
         # Sort by date descending
         all_transactions.sort(key=lambda x: x.date, reverse=True)

@@ -27,34 +27,37 @@ import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 
 const primaryNavigation = [
   { name: "Dashboard", href: "/", icon: Home },
-  { name: "Wealthsimple import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
-  { name: "Monarch import", href: "/portfolio/monarch-import", icon: UploadCloud },
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Insights", href: "/insights", icon: Target },
   { name: "Annual Report", href: "/report", icon: BarChart2 },
+  { name: "Integrations", href: "/settings/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-// Active-but-power-user features. Kept reachable, just out of the
-// primary vertical.
-const advancedNavigation = [
-  { name: "Transactions", href: "/transactions", icon: DollarSign },
+const importNavigation = [
+  { name: "Wealthsimple import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
+  { name: "Monarch import", href: "/portfolio/monarch-import", icon: UploadCloud },
   { name: "Bank CSV import", href: "/import", icon: Upload },
-  { name: "Integrations", href: "/settings/integrations", icon: Plug },
-];
-
-// Old flows we still ship for back-compat (portfolio-review snapshots
-// are the one case we explicitly carry over from 0.7.x). Separated
-// from "Advanced" so it's clear these are not where new work happens.
-const legacyNavigation = [
   { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
 ];
+
+const advancedNavigation = [{ name: "Transactions", href: "/transactions", icon: DollarSign }];
 
 interface NavItem {
   name: string;
   href: string;
   icon: typeof Home;
+}
+
+function navItemIsActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (href === "/") return false;
+  if (href === "/settings") {
+    return pathname === "/settings";
+  }
+  const prefix = href.endsWith("/") ? href : `${href}/`;
+  return pathname.startsWith(prefix);
 }
 
 interface RenderSectionArgs {
@@ -94,9 +97,7 @@ function renderSection({
 
       {(open || isCollapsed) &&
         items.map((item) => {
-          const isActive =
-            router.pathname === item.href ||
-            (item.href !== "/" && router.pathname.startsWith(item.href));
+          const isActive = navItemIsActive(router.pathname, item.href);
           const Icon = item.icon;
 
           return (
@@ -141,8 +142,8 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [importOpen, setImportOpen] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [legacyOpen, setLegacyOpen] = useState(false);
   const { privacyMode, togglePrivacyMode, hydrated: privacyHydrated } = usePrivacyMode();
 
   useEffect(() => {
@@ -282,9 +283,7 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {primaryNavigation.map((item) => {
-            const isActive =
-              router.pathname === item.href ||
-              (item.href !== "/" && router.pathname.startsWith(item.href));
+            const isActive = navItemIsActive(router.pathname, item.href);
             const Icon = item.icon;
 
             return (
@@ -325,19 +324,19 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
           })}
 
           {renderSection({
-            title: "Advanced",
-            items: advancedNavigation,
-            open: advancedOpen,
-            setOpen: setAdvancedOpen,
+            title: "Import",
+            items: importNavigation,
+            open: importOpen,
+            setOpen: setImportOpen,
             isCollapsed,
             router,
           })}
 
           {renderSection({
-            title: "Legacy",
-            items: legacyNavigation,
-            open: legacyOpen,
-            setOpen: setLegacyOpen,
+            title: "Advanced",
+            items: advancedNavigation,
+            open: advancedOpen,
+            setOpen: setAdvancedOpen,
             isCollapsed,
             router,
           })}

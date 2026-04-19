@@ -90,6 +90,9 @@ class FIREMetricsResponse(BaseModel):
     annual_expenses: float
     safe_withdrawal_rate: float
     expected_return: float
+    return_assumption_source: str = "default"
+    historical_annual_return_pct: Optional[float] = None
+    historical_data_span_days: Optional[int] = None
 
 
 class ProjectionPointResponse(BaseModel):
@@ -220,6 +223,10 @@ def get_historical_data(
 def get_fire_metrics(
     monthly_expenses: float = Query(default=5000),
     monthly_savings: float = Query(default=2000),
+    use_historical_return: bool = Query(
+        default=False,
+        description="If true, use CAGR from portfolio_snapshots (≥60d span) as expected return when available.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Get FIRE calculation summary (CAD)."""
@@ -227,6 +234,7 @@ def get_fire_metrics(
         db,
         monthly_expenses=Decimal(str(monthly_expenses)),
         monthly_savings=Decimal(str(monthly_savings)),
+        use_historical_return=use_historical_return,
     )
     return FIRESummaryResponse(
         metrics=FIREMetricsResponse(**summary["metrics"]),
@@ -258,10 +266,12 @@ def calculate_fire(request: FIRECalculationRequest, db: Session = Depends(get_db
         safe_withdrawal_rate=Decimal(str(request.safe_withdrawal_rate)),
     )
 
+    exp_ret = Decimal(str(request.expected_return))
     scenarios = fire_calc.run_what_if_scenarios(
         current_net_worth=net_worth.net_worth_cad,
         monthly_expenses=Decimal(str(request.monthly_expenses)),
         monthly_savings=Decimal(str(request.monthly_savings)),
+        baseline_annual_return=exp_ret,
     )
 
     return FIRESummaryResponse(
@@ -277,6 +287,7 @@ def calculate_fire(request: FIRECalculationRequest, db: Session = Depends(get_db
             annual_expenses=float(metrics.annual_expenses),
             safe_withdrawal_rate=float(metrics.safe_withdrawal_rate),
             expected_return=float(metrics.expected_return),
+            return_assumption_source="custom",
         ),
         projections=[
             ProjectionPointResponse(

@@ -1,10 +1,13 @@
 """Questrade API integration service.
 
-Questrade uses OAuth 2.0 refresh token flow. User obtains a refresh token from
-https://my.questrade.com/APIAccess and passes it here. We exchange it for an
-access token (valid 30 min) and use the returned api_server URL for all API calls.
+Questrade uses OAuth 2.0 refresh token flow. Users create a **personal app** in
+**API Centre** (account menu on questrade.com), then **Manual authorization** to
+generate a token. That token is exchanged at ``login.questrade.com/oauth2/token``
+for a short-lived access token and the per-user ``api_server`` base URL.
 
-API Documentation: https://www.questrade.com/api/documentation
+The legacy ``my.questrade.com/APIAccess`` portal is retired; follow:
+
+https://www.questrade.com/api/documentation/getting-started
 """
 
 import logging
@@ -61,8 +64,8 @@ class QuestradeIntegrationService:
     """Service for integrating with Questrade API.
 
     Usage:
-        1. User registers at https://my.questrade.com/APIAccess
-        2. User copies the refresh token (and optionally client ID)
+        1. User generates a manual-auth token in Questrade API Centre (see official getting-started doc)
+        2. User pastes that token here as ``refresh_token`` (Questrade's docs refer to the same exchange URL)
         3. Pass refresh_token to constructor; call get_access_token() then API methods
     """
 

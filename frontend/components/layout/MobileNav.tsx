@@ -40,9 +40,21 @@ export default function MobileNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-area-pb">
       <div className="flex items-center justify-around h-16">
         {mobileNavItems.map((item) => {
+          const path = router.pathname;
           const isActive =
-            router.pathname === item.href ||
-            (item.href !== "/" && item.href !== "/settings" && router.pathname.startsWith(item.href));
+            item.name === "Import"
+              ? (
+                  path === "/portfolio/wealthsimple-import" ||
+                  path === "/portfolio/monarch-import" ||
+                  path === "/portfolio/import" ||
+                  path.startsWith("/portfolio/import/") ||
+                  path === "/import" ||
+                  path.startsWith("/import/")
+                )
+              : item.href === "/settings"
+                ? path === "/settings" || path.startsWith("/settings/")
+                : path === item.href ||
+                  (item.href !== "/" && path.startsWith(`${item.href}/`));
           const Icon = item.icon;
 
           return (

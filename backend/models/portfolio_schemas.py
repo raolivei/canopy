@@ -136,6 +136,7 @@ class HoldingSummary(BaseModel):
     symbol: str
     name: str
     asset_type: AssetType
+    currency: str = "CAD"
     total_shares: Decimal
     average_cost: Decimal
     current_price: Optional[Decimal] = None

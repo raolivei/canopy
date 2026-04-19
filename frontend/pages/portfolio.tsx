@@ -377,7 +377,7 @@ export default function Portfolio() {
       >
         <Tabs defaultValue="holdings" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
-            <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            <TabsTrigger value="holdings">Positions & accounts</TabsTrigger>
             <TabsTrigger value="allocation">Allocation</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="dividends">Dividends</TabsTrigger>
@@ -479,7 +479,10 @@ export default function Portfolio() {
           <TabsContent value="dividends">
             <Card>
               <CardContent className="p-0">
-                <DividendHistory dividends={dividends || []} />
+                <DividendHistory
+                  dividends={dividends || []}
+                  currency={displayCurrency}
+                />
               </CardContent>
             </Card>
           </TabsContent>

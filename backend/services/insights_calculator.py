@@ -20,6 +20,11 @@ from backend.db.models import (
     PortfolioSnapshot,
     RealEstateProperty,
 )
+from backend.services.fx import convert, get_latest_rate
+from backend.services.portfolio_calculator import (
+    BALANCE_BASED_ASSET_TYPES,
+    PortfolioCalculator,
+)
 from sqlalchemy.orm import Session
 
 
@@ -74,18 +79,45 @@ class InsightsCalculator:
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def _holding_value_cad(
+        amount: Decimal,
+        currency: str,
+        usd_cad: Decimal,
+    ) -> Decimal:
+        """Convert a holding amount to CAD for roll-ups (CAD/USD only)."""
+        ccy = (currency or "CAD").strip().upper() or "CAD"
+        if ccy == "CAD":
+            return amount
+        if ccy == "USD":
+            return convert(amount, from_ccy="USD", to_ccy="CAD", usd_cad_rate=usd_cad)
+        return amount
+
     def calculate_net_worth(self) -> NetWorthSummary:
         """Calculate total CAD net worth across all assets and liabilities."""
         summary = NetWorthSummary()
 
         assets = self.db.query(Asset).filter(Asset.is_liability.is_(False)).all()
+        calc = PortfolioCalculator(self.db)
+        balance_ids = [a.id for a in assets if a.asset_type in BALANCE_BASED_ASSET_TYPES]
+        balance_map = calc.native_balances_from_history(balance_ids)
+
+        rate_row = get_latest_rate(self.db)
+        usd_cad = (
+            Decimal(str(rate_row.rate))
+            if rate_row is not None and rate_row.rate and rate_row.rate > 0
+            else Decimal("1.35")
+        )
 
         for asset in assets:
-            if asset.current_price is None:
+            h = calc.get_holding_summary(asset, balance_map=balance_map)
+            if h.total_shares <= 0 and (h.market_value is None or h.market_value <= 0):
+                continue
+            if h.market_value is None:
                 continue
 
-            # Apply ownership percentage. Values are treated as CAD.
-            value = Decimal(asset.current_price) * asset.ownership_percentage
+            mv_native = h.market_value * asset.ownership_percentage
+            value = self._holding_value_cad(mv_native, h.currency, usd_cad)
             summary.total_assets_cad += value
 
             if asset.is_bank_account or asset.asset_type == AssetType.CASH:
@@ -155,6 +187,16 @@ class InsightsCalculator:
         """Calculate asset allocation breakdown (CAD-based percentages)."""
         allocation = AllocationBreakdown()
         assets = self.db.query(Asset).filter(Asset.is_liability.is_(False)).all()
+        calc = PortfolioCalculator(self.db)
+        balance_ids = [a.id for a in assets if a.asset_type in BALANCE_BASED_ASSET_TYPES]
+        balance_map = calc.native_balances_from_history(balance_ids)
+
+        rate_row = get_latest_rate(self.db)
+        usd_cad = (
+            Decimal(str(rate_row.rate))
+            if rate_row is not None and rate_row.rate and rate_row.rate > 0
+            else Decimal("1.35")
+        )
 
         total_cad = Decimal("0")
         type_totals: dict[str, Decimal] = {}
@@ -162,10 +204,14 @@ class InsightsCalculator:
         institution_totals: dict[str, Decimal] = {}
 
         for asset in assets:
-            if asset.current_price is None:
+            h = calc.get_holding_summary(asset, balance_map=balance_map)
+            if h.total_shares <= 0 and (h.market_value is None or h.market_value <= 0):
+                continue
+            if h.market_value is None:
                 continue
 
-            value = Decimal(asset.current_price) * asset.ownership_percentage
+            mv_native = h.market_value * asset.ownership_percentage
+            value = self._holding_value_cad(mv_native, h.currency, usd_cad)
             total_cad += value
 
             asset_type = asset.asset_type.value
