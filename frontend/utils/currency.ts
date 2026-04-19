@@ -1,24 +1,49 @@
+// Canopy is a CAD-only Canadian investments app. This helper exists purely
+// to keep the existing `formatCurrency(amount, "CAD")` call sites happy while
+// we standardise the codebase on CAD.
+
+export const CAD = "CAD" as const;
+
 export interface Currency {
-  code: string;
-  symbol: string;
-  name: string;
+  code: "CAD";
+  symbol: "C$";
+  name: "Canadian Dollar";
 }
 
-export const CURRENCIES: Currency[] = [
-  { code: "USD", symbol: "$", name: "US Dollar" },
-  { code: "CAD", symbol: "C$", name: "Canadian Dollar" },
-  { code: "BRL", symbol: "R$", name: "Brazilian Real" },
-  { code: "EUR", symbol: "€", name: "Euro" },
-  { code: "GBP", symbol: "£", name: "British Pound" },
-];
+export const CAD_CURRENCY: Currency = {
+  code: "CAD",
+  symbol: "C$",
+  name: "Canadian Dollar",
+};
 
-export function formatCurrency(amount: number, currencyCode: string): string {
-  const currency =
-    CURRENCIES.find((c) => c.code === currencyCode) || CURRENCIES[0];
+export const CURRENCIES: Currency[] = [CAD_CURRENCY];
 
-  return new Intl.NumberFormat("en-US", {
+export interface FormatCurrencyOptions {
+  /** When true, mask the numeric value with asterisks (privacy). */
+  private?: boolean;
+}
+
+/** Placeholder string roughly matching formatted currency width. */
+function privateCurrencyMask(currencyCode: string): string {
+  const c = (currencyCode || "CAD").toUpperCase();
+  const body = "*".repeat(10);
+  if (c === "USD") return `$${body}`;
+  if (c === "CAD") return `CA$${body}`;
+  return `${c} ${body}`;
+}
+
+export function formatCurrency(
+  amount: number,
+  currencyCode: string = "CAD",
+  opts?: FormatCurrencyOptions,
+): string {
+  if (opts?.private) {
+    return privateCurrencyMask(currencyCode);
+  }
+  if (!Number.isFinite(amount)) amount = 0;
+  return new Intl.NumberFormat("en-CA", {
     style: "currency",
-    currency: currencyCode,
+    currency: currencyCode || "CAD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
@@ -26,41 +51,26 @@ export function formatCurrency(amount: number, currencyCode: string): string {
 
 export function formatCurrencyCompact(
   amount: number,
-  currencyCode: string,
+  currencyCode: string = "CAD",
+  opts?: FormatCurrencyOptions,
 ): string {
-  const currency =
-    CURRENCIES.find((c) => c.code === currencyCode) || CURRENCIES[0];
-
-  return new Intl.NumberFormat("en-US", {
+  if (opts?.private) {
+    const c = (currencyCode || "CAD").toUpperCase();
+    const body = "*".repeat(6);
+    if (c === "USD") return `$${body}`;
+    if (c === "CAD") return `CA$${body}`;
+    return `${c} ${body}`;
+  }
+  if (!Number.isFinite(amount)) amount = 0;
+  return new Intl.NumberFormat("en-CA", {
     style: "currency",
-    currency: currencyCode,
+    currency: currencyCode || "CAD",
     notation: "compact",
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(amount);
 }
 
-export function getCurrencySymbol(currencyCode: string): string {
-  const currency =
-    CURRENCIES.find((c) => c.code === currencyCode) || CURRENCIES[0];
-  return currency.symbol;
-}
-
-export async function convertCurrency(
-  amount: number,
-  fromCurrency: string,
-  toCurrency: string,
-): Promise<number> {
-  if (fromCurrency === toCurrency) return amount;
-
-  try {
-    const response = await fetch(
-      `/v1/currency/convert?amount=${amount}&from_currency=${fromCurrency}&to_currency=${toCurrency}`,
-    );
-    const data = await response.json();
-    return data.converted_amount;
-  } catch (error) {
-    console.error("Currency conversion failed:", error);
-    return amount;
-  }
+export function getCurrencySymbol(_currencyCode: string = "CAD"): string {
+  return "C$";
 }

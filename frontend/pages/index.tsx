@@ -1,32 +1,27 @@
-import { useEffect, useState, Suspense, useMemo, useCallback } from "react";
-import Head from "next/head";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Sidebar from "@/components/Sidebar";
-import StatCard from "@/components/StatCard";
-import CurrencySelector from "@/components/CurrencySelector";
-import DarkModeToggle from "@/components/DarkModeToggle";
-import AnimatedCard from "@/components/AnimatedCard";
+import PageLayout from "@/components/layout/PageLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { SkeletonChart, SkeletonMetricCard } from "@/components/ui/Skeleton";
 import {
-  StatCardSkeleton,
-  ChartSkeleton,
-  TransactionSkeleton,
-} from "@/components/SkeletonLoader";
-import LoadingSpinner from "@/components/LoadingSpinner";
-import {
-  DollarSign,
   TrendingUp,
   TrendingDown,
-  ArrowUpRight,
-  Calendar,
-  Clock,
-  Target,
-  BarChart3,
+  Upload,
+  ArrowRight,
+  RefreshCw,
+  UploadCloud,
+  Wallet,
+  PiggyBank,
+  CreditCard,
+  Sparkles,
 } from "lucide-react";
 import {
-  LineChart,
-  Line,
-  AreaChart,
+  ComposedChart,
   Area,
+  Line,
+  LineChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -35,1278 +30,748 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
   Legend,
 } from "recharts";
+import { format } from "date-fns";
+import { useMoney } from "@/hooks/useMoney";
+import { motion } from "framer-motion";
+import { useRouter } from "next/router";
 import {
-  format,
-  subDays,
-  subMonths,
-  startOfMonth,
-  endOfMonth,
-  isSameMonth,
-  isSameYear,
-  startOfYear,
-} from "date-fns";
+  CHART_COLORS,
+  CHART_PALETTE,
+  getTooltipStyle,
+  getGridProps,
+  getAxisProps,
+  isDarkMode as checkDarkMode,
+} from "@/utils/chartTheme";
+import { CurrencyViewToggle } from "@/components/CurrencyViewToggle";
 import {
-  formatCurrency,
-  convertCurrency,
-  formatCurrencyCompact,
-} from "@/utils/currency";
+  CurrencyView,
+  useCurrencyView,
+  viewCurrency,
+} from "@/hooks/useCurrencyView";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const CAD = "CAD";
 
-interface Transaction {
+interface TimelinePoint {
   id: number;
-  description: string;
-  amount: number;
-  currency: string;
-  type: "income" | "expense" | "transfer";
-  category?: string;
-  date: string;
+  as_of_date: string;
+  total_value_cad: string | null;
 }
 
-type TimeRange = "7d" | "30d" | "90d" | "1y" | "all";
+interface AllocationSlice {
+  key: string;
+  value_cad: string;
+  pct: number;
+}
 
-export default function Home() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+interface AllocationResponse {
+  review_id: number;
+  group_by: string;
+  total_cad: string;
+  slices: AllocationSlice[];
+}
+
+interface CompareResponse {
+  total_cad_delta: string | null;
+  pct_change: number | null;
+}
+
+interface NetWorthSlice {
+  investments: string;
+  cash: string;
+  debt: string;
+  net_worth: string;
+  currency: string;
+}
+
+interface NetWorthPoint {
+  date: string;
+  // Legacy CAD-native fields (kept for back-compat; equal to ``cad``).
+  investments: string;
+  cash: string;
+  debt: string;
+  net_worth: string;
+  cad: NetWorthSlice;
+  usd: NetWorthSlice;
+  combined_cad: NetWorthSlice;
+  combined_usd: NetWorthSlice;
+  fx_rate: string | null;
+}
+
+interface NetWorthResponse {
+  points: NetWorthPoint[];
+  latest_investments: string;
+  latest_cash: string;
+  latest_debt: string;
+  latest_net_worth: string;
+  latest_cad: NetWorthSlice | null;
+  latest_usd: NetWorthSlice | null;
+  latest_combined_cad: NetWorthSlice | null;
+  latest_combined_usd: NetWorthSlice | null;
+  fx_rate: string | null;
+  fx_as_of_date: string | null;
+  fx_is_stale: boolean;
+}
+
+/** Pick the slice of a net-worth point that matches the selected view. */
+function pickSlice(point: NetWorthPoint, view: CurrencyView): NetWorthSlice {
+  switch (view) {
+    case "CAD":
+      return point.cad;
+    case "USD":
+      return point.usd;
+    case "COMBINED_CAD":
+      return point.combined_cad;
+    case "COMBINED_USD":
+      return point.combined_usd;
+  }
+}
+
+function pickLatestSlice(
+  response: NetWorthResponse,
+  view: CurrencyView,
+): NetWorthSlice | null {
+  switch (view) {
+    case "CAD":
+      return response.latest_cad;
+    case "USD":
+      return response.latest_usd;
+    case "COMBINED_CAD":
+      return response.latest_combined_cad;
+    case "COMBINED_USD":
+      return response.latest_combined_usd;
+  }
+}
+
+export default function Dashboard() {
+  const router = useRouter();
+  const { view } = useCurrencyView();
+  const { fmt, pct } = useMoney();
+  const displayCurrency = viewCurrency(view);
   const [loading, setLoading] = useState(true);
-  const [displayCurrency, setDisplayCurrency] = useState("USD");
-  const [showConverted, setShowConverted] = useState(true);
-  const [convertedAmounts, setConvertedAmounts] = useState<
-    Record<number, number>
-  >({});
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [cashFlowRange, setCashFlowRange] = useState<TimeRange>("30d");
-  const [spendingRange, setSpendingRange] = useState<TimeRange>("30d");
+  const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
+  const [platformAlloc, setPlatformAlloc] = useState<AllocationResponse | null>(null);
+  const [compare, setCompare] = useState<CompareResponse | null>(null);
+  const [netWorth, setNetWorth] = useState<NetWorthResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Fetch with default currency (server-side conversion)
-    fetchTransactions(showConverted ? displayCurrency : undefined);
-    // Check dark mode status
-    const checkDarkMode = () => {
-      if (typeof window !== "undefined") {
-        setIsDarkMode(document.documentElement.classList.contains("dark"));
+  const latestId = timeline.length ? timeline[timeline.length - 1].id : null;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tlRes = await fetch(`${API_URL}/v1/portfolio-reviews/timeline`);
+      if (!tlRes.ok) throw new Error("Could not load portfolio reviews");
+      const tl: TimelinePoint[] = await tlRes.json();
+      setTimeline(tl);
+
+      const last = tl.length ? tl[tl.length - 1] : null;
+      if (last) {
+        const pRes = await fetch(
+          `${API_URL}/v1/portfolio-reviews/${last.id}/allocation?group_by=platform`,
+        );
+        if (pRes.ok) setPlatformAlloc(await pRes.json());
+      } else {
+        setPlatformAlloc(null);
       }
-    };
-    checkDarkMode();
-    // Watch for dark mode changes
-    const observer = new MutationObserver(checkDarkMode);
-    if (typeof window !== "undefined") {
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
+
+      if (tl.length >= 2) {
+        const a = tl[tl.length - 2].id;
+        const b = tl[tl.length - 1].id;
+        const cRes = await fetch(
+          `${API_URL}/v1/portfolio-reviews/compare?from_id=${a}&to_id=${b}`
+        );
+        if (cRes.ok) setCompare(await cRes.json());
+        else setCompare(null);
+      } else {
+        setCompare(null);
+      }
+
+      try {
+        const nwRes = await fetch(
+          `${API_URL}/v1/wealthsimple-import/networth-timeline`
+        );
+        if (nwRes.ok) {
+          const data: NetWorthResponse = await nwRes.json();
+          setNetWorth(data.points.length > 0 ? data : null);
+        } else {
+          setNetWorth(null);
+        }
+      } catch {
+        setNetWorth(null);
+      }
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to load data");
+    } finally {
+      setLoading(false);
     }
-    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
-    if (transactions.length > 0 && showConverted) {
-      convertAllAmounts();
-    }
-  }, [transactions, displayCurrency, showConverted]);
+    load();
+  }, [load]);
 
-  const fetchTransactions = async (currency?: string) => {
-    try {
-      // Use server-side currency conversion for efficiency
-      const url = currency
-        ? `${API_URL}/v1/transactions/?currency=${currency}`
-        : `${API_URL}/v1/transactions/`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setTransactions(data);
-      setLoading(false);
-    } catch (err) {
-      console.error("Failed to fetch transactions:", err);
-      setLoading(false);
-    }
-  };
-
-  // Re-fetch transactions when currency changes
-  useEffect(() => {
-    if (showConverted) {
-      fetchTransactions(displayCurrency);
-    }
-  }, [displayCurrency, showConverted]);
-
-  const convertAllAmounts = async () => {
-    // Server-side conversion is now used, so just map transaction amounts
-    const converted: Record<number, number> = {};
-    transactions.forEach((tx) => {
-      converted[tx.id] = tx.amount;
-    });
-    setConvertedAmounts(converted);
-  };
-
-  const getConvertedAmount = useCallback(
-    (tx: Transaction): number | null => {
-      if (!showConverted || tx.currency === displayCurrency) return null;
-      return convertedAmounts[tx.id] || null;
-    },
-    [showConverted, displayCurrency, convertedAmounts],
+  const lineData = useMemo(
+    () =>
+      timeline.map((p) => ({
+        date: format(new Date(p.as_of_date), "MMM yyyy"),
+        total: p.total_value_cad ? parseFloat(p.total_value_cad) : 0,
+      })),
+    [timeline]
   );
 
-  // Calculate totals - convert all to display currency for summary (memoized)
-  const { totalIncome, totalExpenses, net } = useMemo(() => {
-    const income = transactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    const expenses = transactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    return {
-      totalIncome: income,
-      totalExpenses: expenses,
-      net: income - expenses,
-    };
-  }, [transactions, displayCurrency, convertedAmounts]);
-
-  // Calculate month-over-month and year-over-year comparisons (memoized)
-  const now = useMemo(() => new Date(), []);
-  const currentMonthStart = useMemo(() => startOfMonth(now), [now]);
-  const lastMonthStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
-  const lastMonthEnd = useMemo(() => endOfMonth(subMonths(now, 1)), [now]);
-
-  const {
-    currentMonthTransactions,
-    lastMonthTransactions,
-    lastYearMonthTransactions,
-  } = useMemo(() => {
-    const current = transactions.filter((t) => {
-      const txDate = new Date(t.date);
-      return txDate >= currentMonthStart;
-    });
-
-    const last = transactions.filter((t) => {
-      const txDate = new Date(t.date);
-      return txDate >= lastMonthStart && txDate <= lastMonthEnd;
-    });
-
-    const lastYear = transactions.filter((t) => {
-      const txDate = new Date(t.date);
-      return (
-        isSameMonth(txDate, subMonths(now, 12)) &&
-        isSameYear(txDate, subMonths(now, 12))
-      );
-    });
-
-    return {
-      currentMonthTransactions: current,
-      lastMonthTransactions: last,
-      lastYearMonthTransactions: lastYear,
-    };
-  }, [transactions, currentMonthStart, lastMonthStart, lastMonthEnd, now]);
-
-  const {
-    currentMonthIncome,
-    currentMonthExpenses,
-    lastMonthIncome,
-    lastMonthExpenses,
-    lastYearMonthIncome,
-    lastYearMonthExpenses,
-  } = useMemo(() => {
-    const currentIncome = currentMonthTransactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    const currentExpenses = currentMonthTransactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    const lastIncome = lastMonthTransactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    const lastExpenses = lastMonthTransactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    const lastYearIncome = lastYearMonthTransactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    const lastYearExpenses = lastYearMonthTransactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => {
-        const amount =
-          t.currency === displayCurrency
-            ? t.amount
-            : convertedAmounts[t.id] || 0;
-        return sum + amount;
-      }, 0);
-
-    return {
-      currentMonthIncome: currentIncome,
-      currentMonthExpenses: currentExpenses,
-      lastMonthIncome: lastIncome,
-      lastMonthExpenses: lastExpenses,
-      lastYearMonthIncome: lastYearIncome,
-      lastYearMonthExpenses: lastYearExpenses,
-    };
-  }, [
-    currentMonthTransactions,
-    lastMonthTransactions,
-    lastYearMonthTransactions,
-    displayCurrency,
-    convertedAmounts,
-  ]);
-
-  const incomeChangeMoM =
-    lastMonthIncome > 0
-      ? ((currentMonthIncome - lastMonthIncome) / lastMonthIncome) * 100
-      : 0;
-  const expensesChangeMoM =
-    lastMonthExpenses > 0
-      ? ((currentMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
-      : 0;
-  const netChangeMoM =
-    currentMonthIncome -
-    currentMonthExpenses -
-    (lastMonthIncome - lastMonthExpenses);
-
-  // Generate chart data based on selected range
-  const getDaysForRange = (range: TimeRange): number => {
-    switch (range) {
-      case "7d":
-        return 7;
-      case "30d":
-        return 30;
-      case "90d":
-        return 90;
-      case "1y":
-        return 365;
-      case "all":
-        if (transactions.length === 0) return 30;
-        const oldestTx = Math.min(
-          ...transactions.map((t) => new Date(t.date).getTime()),
-        );
-        const daysDiff = Math.ceil(
-          (now.getTime() - oldestTx) / (1000 * 60 * 60 * 24),
-        );
-        return Math.min(365, daysDiff);
-      default:
-        return 30;
-    }
-  };
-
-  const getChartData = useCallback(
-    (range: TimeRange) => {
-      const days = getDaysForRange(range);
-      const isDaily = days <= 30;
-      const interval = isDaily ? 1 : Math.ceil(days / 30);
-
-      return Array.from({ length: Math.ceil(days / interval) }, (_, i) => {
-        const date = subDays(now, days - i * interval - 1);
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
-
-        const dayTransactions = transactions.filter((t) => {
-          const txDate = new Date(t.date);
-          return txDate >= dayStart && txDate <= dayEnd;
-        });
-
-        const income = dayTransactions
-          .filter((t) => t.type === "income")
-          .reduce((sum, t) => {
-            const amount =
-              t.currency === displayCurrency
-                ? t.amount
-                : convertedAmounts[t.id] || 0;
-            return sum + amount;
-          }, 0);
-        const expenses = dayTransactions
-          .filter((t) => t.type === "expense")
-          .reduce((sum, t) => {
-            const amount =
-              t.currency === displayCurrency
-                ? t.amount
-                : convertedAmounts[t.id] || 0;
-            return sum + amount;
-          }, 0);
-
+  const networthData = useMemo(
+    () =>
+      (netWorth?.points ?? []).map((p) => {
+        const slice = pickSlice(p, view);
         return {
-          date: isDaily ? format(date, "MMM dd") : format(date, "MMM dd"),
-          fullDate: date,
-          income,
-          expenses,
-          net: income - expenses,
+          date: format(new Date(p.date), "MMM yyyy"),
+          investments: parseFloat(slice.investments),
+          cash: parseFloat(slice.cash),
+          /** Debt magnitude (positive) — shown on its own axis vs. asset stack. */
+          debt_abs: Math.abs(parseFloat(slice.debt)),
+          net_worth: parseFloat(slice.net_worth),
         };
-      }).filter((d) => d.fullDate <= now);
-    },
-    [transactions, displayCurrency, convertedAmounts, now],
+      }),
+    [netWorth, view]
   );
 
-  const cashFlowData = useMemo(
-    () => getChartData(cashFlowRange),
-    [getChartData, cashFlowRange],
-  );
+  const latestTotal = latestId
+    ? timeline.find((t) => t.id === latestId)?.total_value_cad
+    : null;
+  const latestNum = latestTotal ? parseFloat(latestTotal) : 0;
 
-  // Category breakdown (using converted amounts) - memoized
-  const { categoryData, totalExpensesForChart, pieData } = useMemo(() => {
-    const catData = transactions
-      .filter((t) => t.type === "expense" && t.category)
-      .reduce(
-        (acc, t) => {
-          const amount =
-            t.currency === displayCurrency
-              ? t.amount
-              : convertedAmounts[t.id] || 0;
-          acc[t.category!] = (acc[t.category!] || 0) + amount;
-          return acc;
-        },
-        {} as Record<string, number>,
-      );
+  const pieColors = CHART_PALETTE.length ? CHART_PALETTE : [CHART_COLORS.primary, CHART_COLORS.success, CHART_COLORS.accent];
 
-    const total = Object.values(catData).reduce((sum, val) => sum + val, 0);
-    const threshold = total * 0.05; // 5% threshold
-
-    const pie = Object.entries(catData)
-      .sort(([, a], [, b]) => b - a) // Sort by value descending
-      .reduce(
-        (acc, [name, value]) => {
-          if (value >= threshold) {
-            acc.push({ name, value });
-          } else {
-            // Add to "Others" category
-            const othersIndex = acc.findIndex((item) => item.name === "Others");
-            if (othersIndex >= 0) {
-              acc[othersIndex].value += value;
-            } else {
-              acc.push({ name: "Others", value });
-            }
-          }
-          return acc;
-        },
-        [] as Array<{ name: string; value: number }>,
-      );
-
-    return {
-      categoryData: catData,
-      totalExpensesForChart: total,
-      pieData: pie,
-    };
-  }, [transactions, displayCurrency, convertedAmounts]);
-
-  // Warm golden color palette for charts
-  const COLORS = [
-    "#D4AF37", // Primary gold
-    "#F4D03F", // Light gold
-    "#C9A961", // Muted gold
-    "#B8941F", // Dark gold
-    "#f59e0b", // Amber
-    "#10b981", // Green
-    "#ef4444", // Red
-    "#9C9580", // Warm gray
-  ];
-
-  // Calculate net worth change percentage
-  const netWorthChangePercent =
-    lastMonthIncome + lastMonthExpenses > 0
-      ? ((net - (lastMonthIncome - lastMonthExpenses)) /
-          Math.abs(lastMonthIncome - lastMonthExpenses)) *
-        100
-      : 0;
-
-  // Get recurring-like transactions (same merchant, similar amount, regular intervals) - memoized
-  const recurringTransactions = useMemo(() => {
-    const merchantGroups = transactions.reduce(
-      (acc, tx) => {
-        if (!tx.category) return acc;
-        const key = `${tx.description.toLowerCase().substring(0, 20)}`;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(tx);
-        return acc;
-      },
-      {} as Record<string, Transaction[]>,
+  if (loading) {
+    return (
+      <PageLayout title="Dashboard">
+        <BrandHeader />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <SkeletonMetricCard />
+          <SkeletonMetricCard />
+          <SkeletonMetricCard />
+          <SkeletonMetricCard />
+        </div>
+        <SkeletonChart />
+      </PageLayout>
     );
+  }
 
-    return Object.entries(merchantGroups)
-      .filter(([_, txs]) => txs.length >= 2)
-      .map(([_, txs]) => {
-        const sorted = txs.sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-        );
-        return sorted[0];
-      })
-      .slice(0, 3);
-  }, [transactions]);
+  // Net-worth numbers (primary hero when available) — pick the slice
+  // that matches the currently-selected Questrade-style currency view.
+  const hasNetWorth = !!netWorth;
+  const latestSlice = hasNetWorth ? pickLatestSlice(netWorth!, view) : null;
+  const nwValue = latestSlice ? parseFloat(latestSlice.net_worth) : 0;
+  const nwInvestments = latestSlice ? parseFloat(latestSlice.investments) : 0;
+  const nwCash = latestSlice ? parseFloat(latestSlice.cash) : 0;
+  const nwDebt = latestSlice ? parseFloat(latestSlice.debt) : 0;
 
-  // Budget simulation (based on average spending) - memoized
-  const budgetCategories = useMemo(() => {
-    return Object.entries(categoryData)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([name, spent]) => ({
-        name,
-        spent,
-        budget: Math.max(spent * 1.2, spent + 100), // Simulated budget (20% buffer)
-      }));
-  }, [categoryData]);
+  // Month-over-month delta for net worth, computed in the selected
+  // view so a CAD-only switch shows a CAD-only delta.
+  const nwDelta = (() => {
+    const pts = netWorth?.points ?? [];
+    if (pts.length < 2) return null;
+    const prev = parseFloat(pickSlice(pts[pts.length - 2], view).net_worth);
+    const now = parseFloat(pickSlice(pts[pts.length - 1], view).net_worth);
+    if (!isFinite(prev) || prev === 0) return null;
+    const absDelta = now - prev;
+    const pctDelta = (absDelta / Math.abs(prev)) * 100;
+    return { abs: absDelta, pct: pctDelta };
+  })();
 
   return (
-    <>
-      <Head>
-        <title>Dashboard - Canopy</title>
-        <meta
-          name="description"
-          content="Privacy-first personal finance dashboard"
-        />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Head>
-      <div className="flex min-h-screen bg-warm-gray-50 dark:bg-warm-gray-900">
-        <Sidebar />
-        <main className="flex-1 ml-64 p-8">
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <AnimatedCard delay={0}>
-              <div className="mb-8 flex items-center justify-between">
+    <PageLayout
+      title="Dashboard"
+      description="Continuous net-worth tracking across Wealthsimple statements and portfolio snapshots"
+    >
+      <BrandHeader
+        actions={
+          <>
+            <CurrencyViewToggle />
+            <Button
+              variant="primary"
+              leftIcon={<UploadCloud className="w-4 h-4" />}
+              onClick={() => router.push("/portfolio/wealthsimple-import")}
+            >
+              Wealthsimple
+            </Button>
+            <Button
+              variant="secondary"
+              leftIcon={<UploadCloud className="w-4 h-4" />}
+              onClick={() => router.push("/portfolio/monarch-import")}
+            >
+              Monarch
+            </Button>
+            <Button
+              variant="ghost"
+              leftIcon={<Upload className="w-4 h-4" />}
+              onClick={() => router.push("/portfolio/import")}
+            >
+              Snapshot
+            </Button>
+            <Button
+              variant="ghost"
+              leftIcon={<RefreshCw className="w-4 h-4" />}
+              onClick={() => load()}
+              aria-label="Refresh"
+            >
+              <span className="sr-only">Refresh</span>
+            </Button>
+          </>
+        }
+      />
+
+      {hasNetWorth && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Card variant="highlight" className="overflow-hidden">
+            <div className="p-8 bg-gradient-to-br from-primary-50 via-white to-emerald-50 dark:from-primary-950/40 dark:via-slate-900 dark:to-emerald-950/30">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                 <div>
-                  <h1 className="text-4xl font-bold text-warm-gray-900 dark:text-warm-gray-50 mb-2">
-                    Dashboard
-                  </h1>
-                  <p className="text-warm-gray-600 dark:text-warm-gray-400">
-                    Welcome back! Here's your financial overview.
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <DarkModeToggle />
-                  <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2">
-                    <input
-                      type="checkbox"
-                      id="showConvertedDashboard"
-                      checked={showConverted}
-                      onChange={(e) => setShowConverted(e.target.checked)}
-                      className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
-                    />
-                    <label
-                      htmlFor="showConvertedDashboard"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
-                    >
-                      Show converted
-                    </label>
-                  </div>
-                  {showConverted && (
-                    <CurrencySelector
-                      selectedCurrency={displayCurrency}
-                      onCurrencyChange={setDisplayCurrency}
-                      showLabel={false}
-                    />
-                  )}
-                </div>
-              </div>
-            </AnimatedCard>
-
-            {/* Stats Grid - Enhanced with trends */}
-            <Suspense
-              fallback={
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  {[0, 1, 2].map((i) => (
-                    <StatCardSkeleton key={i} />
-                  ))}
-                </div>
-              }
-            >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <StatCard
-                  title="Net Worth"
-                  value={formatCurrency(net, displayCurrency)}
-                  change={
-                    netChangeMoM !== 0
-                      ? `${netChangeMoM >= 0 ? "+" : ""}${formatCurrency(
-                          netChangeMoM,
-                          displayCurrency,
-                        )} (${
-                          netWorthChangePercent >= 0 ? "+" : ""
-                        }${netWorthChangePercent.toFixed(1)}%)`
-                      : undefined
-                  }
-                  changeType={netChangeMoM >= 0 ? "positive" : "negative"}
-                  icon={TrendingUp}
-                  gradient="bg-gradient-to-br from-green-400 to-emerald-500"
-                />
-                <StatCard
-                  title="Total Income"
-                  value={formatCurrency(currentMonthIncome, displayCurrency)}
-                  change={
-                    incomeChangeMoM !== 0
-                      ? `${
-                          incomeChangeMoM >= 0 ? "+" : ""
-                        }${incomeChangeMoM.toFixed(1)}% vs last month`
-                      : undefined
-                  }
-                  changeType={incomeChangeMoM >= 0 ? "positive" : "negative"}
-                  icon={DollarSign}
-                  gradient="bg-gradient-to-br from-blue-400 to-cyan-500"
-                />
-                <StatCard
-                  title="Total Expenses"
-                  value={formatCurrency(currentMonthExpenses, displayCurrency)}
-                  change={
-                    expensesChangeMoM !== 0
-                      ? `${
-                          expensesChangeMoM >= 0 ? "+" : ""
-                        }${expensesChangeMoM.toFixed(1)}% vs last month`
-                      : undefined
-                  }
-                  changeType={expensesChangeMoM <= 0 ? "positive" : "negative"}
-                  icon={TrendingDown}
-                  gradient="bg-gradient-to-br from-red-400 to-rose-500"
-                />
-              </div>
-            </Suspense>
-
-            {/* Budget Overview Section */}
-            {budgetCategories.length > 0 && (
-              <AnimatedCard delay={0.1}>
-                <div className="card p-6 mb-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
-                        Budget {format(now, "MMMM yyyy")}
-                      </h2>
-                      <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
-                        Track your spending by category
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    {budgetCategories.map((category) => {
-                      const percentage =
-                        (category.spent / category.budget) * 100;
-                      const isOverBudget = percentage > 100;
-                      return (
-                        <div key={category.name} className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-warm-gray-700 dark:text-warm-gray-300">
-                              {category.name}
-                            </span>
-                            <div className="flex items-center gap-3">
-                              <span
-                                className={`font-semibold ${
-                                  isOverBudget
-                                    ? "text-red-600 dark:text-red-400"
-                                    : "text-warm-gray-700 dark:text-warm-gray-300"
-                                }`}
-                              >
-                                {formatCurrency(
-                                  category.spent,
-                                  displayCurrency,
-                                )}
-                              </span>
-                              <span className="text-warm-gray-400 dark:text-warm-gray-500">
-                                of
-                              </span>
-                              <span className="text-warm-gray-600 dark:text-warm-gray-400">
-                                {formatCurrency(
-                                  category.budget,
-                                  displayCurrency,
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="relative h-2 bg-warm-gray-200 dark:bg-warm-gray-700 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                isOverBudget
-                                  ? "bg-red-500"
-                                  : percentage > 80
-                                    ? "bg-yellow-500"
-                                    : "bg-green-500"
-                              }`}
-                              style={{ width: `${Math.min(percentage, 100)}%` }}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-warm-gray-500 dark:text-warm-gray-400">
-                            <span>{percentage.toFixed(0)}% used</span>
-                            <span>
-                              {isOverBudget
-                                ? `${formatCurrency(
-                                    category.spent - category.budget,
-                                    displayCurrency,
-                                  )} over budget`
-                                : `${formatCurrency(
-                                    category.budget - category.spent,
-                                    displayCurrency,
-                                  )} remaining`}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </AnimatedCard>
-            )}
-
-            {/* Charts Grid - Enhanced */}
-            <Suspense
-              fallback={
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                  <ChartSkeleton />
-                  <ChartSkeleton />
-                </div>
-              }
-            >
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Cash Flow Chart with Time Range Selector */}
-                <AnimatedCard delay={0.15}>
-                  <div className="card p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
-                          Cash Flow
-                        </h2>
-                        <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
-                          {formatCurrency(
-                            currentMonthIncome - currentMonthExpenses,
-                            displayCurrency,
-                          )}{" "}
-                          this month
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                        {(["7d", "30d", "90d", "1y"] as TimeRange[]).map(
-                          (range) => (
-                            <button
-                              key={range}
-                              onClick={() => setCashFlowRange(range)}
-                              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                                cashFlowRange === range
-                                  ? "bg-white dark:bg-warm-gray-700 text-warm-gray-900 dark:text-warm-gray-50 shadow-sm"
-                                  : "text-warm-gray-600 dark:text-warm-gray-400 hover:text-warm-gray-900 dark:hover:text-warm-gray-50"
-                              }`}
-                            >
-                              {range === "7d"
-                                ? "7D"
-                                : range === "30d"
-                                  ? "30D"
-                                  : range === "90d"
-                                    ? "90D"
-                                    : "1Y"}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={cashFlowData}>
-                        <defs>
-                          <linearGradient
-                            id="colorIncome"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#10b981"
-                              stopOpacity={0.4}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#10b981"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="colorExpenses"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#ef4444"
-                              stopOpacity={0.4}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#ef4444"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="colorNet"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#D4AF37"
-                              stopOpacity={0.4}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#D4AF37"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#E8E4D8"
-                          className="dark:stroke-warm-gray-700"
-                        />
-                        <XAxis
-                          dataKey="date"
-                          stroke="#9C9580"
-                          className="dark:stroke-warm-gray-400"
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis
-                          stroke="#9C9580"
-                          className="dark:stroke-warm-gray-400"
-                          tick={{ fontSize: 12 }}
-                          tickFormatter={(value) =>
-                            formatCurrencyCompact(value, displayCurrency)
-                          }
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: isDarkMode ? "#1C1810" : "#FAF9F6",
-                            border: `1px solid ${
-                              isDarkMode ? "#3E3A30" : "#E8E4D8"
-                            }`,
-                            borderRadius: "12px",
-                            boxShadow: "0 4px 6px -1px rgba(212, 175, 55, 0.1)",
-                            color: isDarkMode ? "#F5F3ED" : "#1C1810",
-                          }}
-                          formatter={(value: number, name: string) => [
-                            formatCurrency(value, displayCurrency),
-                            name === "income"
-                              ? "Income"
-                              : name === "expenses"
-                                ? "Expenses"
-                                : "Net",
-                          ]}
-                        />
-                        <Legend
-                          wrapperStyle={{ paddingTop: "20px" }}
-                          iconType="circle"
-                          formatter={(value) =>
-                            value === "income"
-                              ? "Income"
-                              : value === "expenses"
-                                ? "Expenses"
-                                : "Net"
-                          }
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="income"
-                          stroke="#10b981"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#colorIncome)"
-                          name="income"
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="expenses"
-                          stroke="#ef4444"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#colorExpenses)"
-                          name="expenses"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="net"
-                          stroke="#D4AF37"
-                          strokeWidth={2}
-                          dot={false}
-                          name="net"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </AnimatedCard>
-
-                {/* Spending by Category - Enhanced */}
-                <AnimatedCard delay={0.2}>
-                  <div className="card p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
-                          Spending by Category
-                        </h2>
-                        <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
-                          {formatCurrency(
-                            currentMonthExpenses,
-                            displayCurrency,
-                          )}{" "}
-                          this month
-                        </p>
-                      </div>
-                    </div>
-                    {pieData.length > 0 ? (
-                      <div className="flex flex-col lg:flex-row gap-6">
-                        <div className="flex-1">
-                          <ResponsiveContainer width="100%" height={250}>
-                            <PieChart>
-                              <Pie
-                                data={pieData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="value"
-                              >
-                                {pieData.map((entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={
-                                      entry.name === "Others"
-                                        ? "#6b7280"
-                                        : COLORS[index % (COLORS.length - 1)]
-                                    }
-                                  />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                formatter={(value: number) =>
-                                  formatCurrency(value, displayCurrency)
-                                }
-                                contentStyle={{
-                                  backgroundColor: isDarkMode
-                                    ? "#1f2937"
-                                    : "white",
-                                  border: `1px solid ${
-                                    isDarkMode ? "#374151" : "#e5e7eb"
-                                  }`,
-                                  borderRadius: "12px",
-                                  color: isDarkMode ? "#f3f4f6" : "#111827",
-                                }}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="flex-1 space-y-3">
-                          {pieData.slice(0, 5).map((entry, index) => {
-                            const percentage =
-                              (entry.value / totalExpensesForChart) * 100;
-                            return (
-                              <div
-                                key={entry.name}
-                                className="flex items-center justify-between"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className="w-3 h-3 rounded-full"
-                                    style={{
-                                      backgroundColor:
-                                        entry.name === "Others"
-                                          ? "#6b7280"
-                                          : COLORS[index % (COLORS.length - 1)],
-                                    }}
-                                  />
-                                  <span className="text-sm font-medium text-warm-gray-700 dark:text-warm-gray-300">
-                                    {entry.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                  <div className="w-24 h-2 bg-warm-gray-200 dark:bg-warm-gray-700 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full"
-                                      style={{
-                                        width: `${percentage}%`,
-                                        backgroundColor:
-                                          entry.name === "Others"
-                                            ? "#6b7280"
-                                            : COLORS[
-                                                index % (COLORS.length - 1)
-                                              ],
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="text-right min-w-[100px]">
-                                    <div className="text-sm font-semibold text-warm-gray-900 dark:text-warm-gray-50">
-                                      {formatCurrency(
-                                        entry.value,
-                                        displayCurrency,
-                                      )}
-                                    </div>
-                                    <div className="text-xs text-warm-gray-500 dark:text-warm-gray-400">
-                                      {percentage.toFixed(1)}%
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="h-[300px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-                        No category data yet
-                      </div>
-                    )}
-                  </div>
-                </AnimatedCard>
-              </div>
-
-              {/* Additional Sections Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Spending Comparison Chart */}
-                <AnimatedCard delay={0.25}>
-                  <div className="card p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
-                          Spending Comparison
-                        </h2>
-                        <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
-                          This month vs last month
-                        </p>
-                      </div>
-                    </div>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart
-                        data={[
-                          {
-                            name: "This Month",
-                            income: currentMonthIncome,
-                            expenses: currentMonthExpenses,
-                          },
-                          {
-                            name: "Last Month",
-                            income: lastMonthIncome,
-                            expenses: lastMonthExpenses,
-                          },
-                        ]}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#E8E4D8"
-                          className="dark:stroke-warm-gray-700"
-                        />
-                        <XAxis
-                          dataKey="name"
-                          stroke="#9C9580"
-                          className="dark:stroke-warm-gray-400"
-                        />
-                        <YAxis
-                          stroke="#9C9580"
-                          className="dark:stroke-warm-gray-400"
-                          tickFormatter={(value) =>
-                            formatCurrencyCompact(value, displayCurrency)
-                          }
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: isDarkMode ? "#1C1810" : "#FAF9F6",
-                            border: `1px solid ${
-                              isDarkMode ? "#3E3A30" : "#E8E4D8"
-                            }`,
-                            borderRadius: "12px",
-                            color: isDarkMode ? "#F5F3ED" : "#1C1810",
-                          }}
-                          formatter={(value: number) =>
-                            formatCurrency(value, displayCurrency)
-                          }
-                        />
-                        <Legend />
-                        <Bar
-                          dataKey="income"
-                          fill="#10b981"
-                          name="Income"
-                          radius={[8, 8, 0, 0]}
-                        />
-                        <Bar
-                          dataKey="expenses"
-                          fill="#ef4444"
-                          name="Expenses"
-                          radius={[8, 8, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </AnimatedCard>
-
-                {/* Recurring Transactions Preview */}
-                <AnimatedCard delay={0.3}>
-                  <div className="card p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
-                          Recurring Transactions
-                        </h2>
-                        <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400 mt-1">
-                          Upcoming recurring payments
-                        </p>
-                      </div>
-                      <Clock className="w-5 h-5 text-warm-gray-400 dark:text-warm-gray-500" />
-                    </div>
-                    {recurringTransactions.length > 0 ? (
-                      <div className="space-y-4">
-                        {recurringTransactions.map((tx) => {
-                          const convertedAmount = getConvertedAmount(tx);
-                          return (
-                            <div
-                              key={tx.id}
-                              className="flex items-center justify-between p-3 bg-warm-gray-50 dark:bg-warm-gray-800/50 rounded-lg"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                    tx.type === "expense"
-                                      ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                                      : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                                  }`}
-                                >
-                                  {tx.type === "expense" ? (
-                                    <TrendingDown size={18} />
-                                  ) : (
-                                    <TrendingUp size={18} />
-                                  )}
-                                </div>
-                                <div>
-                                  <p className="font-medium text-warm-gray-900 dark:text-warm-gray-50 text-sm">
-                                    {tx.description.length > 30
-                                      ? `${tx.description.substring(0, 30)}...`
-                                      : tx.description}
-                                  </p>
-                                  <p className="text-xs text-warm-gray-500 dark:text-warm-gray-400">
-                                    {tx.category || "Uncategorized"} • Monthly
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p
-                                  className={`font-semibold text-sm ${
-                                    tx.type === "expense"
-                                      ? "text-red-600 dark:text-red-400"
-                                      : "text-green-600 dark:text-green-400"
-                                  }`}
-                                >
-                                  {tx.type === "expense" ? "-" : "+"}
-                                  {formatCurrency(
-                                    Math.abs(tx.amount),
-                                    tx.currency,
-                                  )}
-                                </p>
-                                {showConverted &&
-                                  convertedAmount &&
-                                  tx.currency !== displayCurrency && (
-                                    <p className="text-xs text-warm-gray-500 dark:text-warm-gray-400">
-                                      ≈{" "}
-                                      {formatCurrency(
-                                        Math.abs(convertedAmount),
-                                        displayCurrency,
-                                      )}
-                                    </p>
-                                  )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-                        <div className="text-center">
-                          <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">
-                            No recurring transactions detected
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </AnimatedCard>
-              </div>
-            </Suspense>
-
-            {/* Recent Transactions */}
-            <AnimatedCard delay={0.35}>
-              <div className="card">
-                <div className="p-6 border-b border-warm-gray-100 dark:border-warm-gray-700 flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-warm-gray-900 dark:text-warm-gray-50">
-                    Recent Transactions
-                  </h2>
-                  <Link
-                    href="/transactions"
-                    className="btn-secondary text-sm flex items-center gap-2"
-                  >
-                    View All
-                    <ArrowUpRight size={16} />
-                  </Link>
-                </div>
-                {loading ? (
-                  <Suspense fallback={<TransactionSkeleton />}>
-                    <div className="p-12 text-center text-warm-gray-400 dark:text-warm-gray-500">
-                      <LoadingSpinner size="lg" className="mx-auto mb-4" />
-                      <p>Loading transactions...</p>
-                    </div>
-                  </Suspense>
-                ) : transactions.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <p className="text-warm-gray-400 dark:text-warm-gray-500 mb-4">
-                      No transactions yet
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                    <p className="text-sm font-medium text-primary-700 dark:text-primary-300 uppercase tracking-wide">
+                      Net worth
                     </p>
-                    <Link
-                      href="/transactions"
-                      className="btn-primary inline-block"
-                    >
-                      Add Your First Transaction
-                    </Link>
                   </div>
-                ) : (
-                  <div className="divide-y divide-warm-gray-100 dark:divide-warm-gray-700">
-                    {transactions
-                      .sort(
-                        (a, b) =>
-                          new Date(b.date).getTime() -
-                          new Date(a.date).getTime(),
-                      )
-                      .slice(0, 5)
-                      .map((tx) => {
-                        const convertedAmount = getConvertedAmount(tx);
-                        return (
-                          <div
-                            key={tx.id}
-                            className="p-6 hover:bg-warm-gray-50 dark:hover:bg-warm-gray-700/50 transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                    tx.type === "income"
-                                      ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                                      : tx.type === "expense"
-                                        ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                                        : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                  }`}
-                                >
-                                  {tx.type === "income" ? (
-                                    <TrendingUp size={20} />
-                                  ) : tx.type === "expense" ? (
-                                    <TrendingDown size={20} />
-                                  ) : (
-                                    <DollarSign size={20} />
-                                  )}
-                                </div>
-                                <div>
-                                  <h3 className="font-semibold text-warm-gray-900 dark:text-warm-gray-50">
-                                    {tx.description}
-                                  </h3>
-                                  <p className="text-sm text-warm-gray-500 dark:text-warm-gray-400">
-                                    {format(new Date(tx.date), "MMM dd, yyyy")}
-                                    {tx.category && ` • ${tx.category}`}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="flex items-baseline gap-2">
-                                  <p
-                                    className={`text-lg font-bold ${
-                                      tx.type === "income"
-                                        ? "text-green-600 dark:text-green-400"
-                                        : "text-red-600 dark:text-red-400"
-                                    }`}
-                                  >
-                                    {tx.type === "expense" ? "-" : "+"}
-                                    {formatCurrency(
-                                      Math.abs(tx.amount),
-                                      tx.currency,
-                                    )}
-                                  </p>
-                                  {showConverted &&
-                                    convertedAmount &&
-                                    tx.currency !== displayCurrency && (
-                                      <>
-                                        <span className="text-warm-gray-400 dark:text-warm-gray-500">
-                                          ≈
-                                        </span>
-                                        <p
-                                          className={`text-base font-semibold text-warm-gray-600 dark:text-warm-gray-300 ${
-                                            tx.type === "income"
-                                              ? "text-green-600 dark:text-green-400"
-                                              : "text-red-600 dark:text-red-400"
-                                          }`}
-                                        >
-                                          {formatCurrency(
-                                            Math.abs(convertedAmount),
-                                            displayCurrency,
-                                          )}
-                                        </p>
-                                      </>
-                                    )}
-                                </div>
-                                <p className="text-xs text-warm-gray-400 dark:text-warm-gray-500 mt-1">
-                                  {tx.currency}
-                                  {showConverted &&
-                                    convertedAmount &&
-                                    tx.currency !== displayCurrency && (
-                                      <span className="ml-1">
-                                        → {displayCurrency}
-                                      </span>
-                                    )}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                  <h2 className="text-5xl lg:text-6xl font-semibold tracking-tight text-slate-900 dark:text-white mb-3">
+                    {fmt(nwValue, displayCurrency)}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {nwDelta && (
+                      <Badge
+                        variant={nwDelta.abs >= 0 ? "success" : "danger"}
+                        className="text-sm"
+                      >
+                        {nwDelta.abs >= 0 ? (
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                        ) : (
+                          <TrendingDown className="w-3 h-3 mr-1" />
+                        )}
+                        {nwDelta.abs >= 0 ? "+" : ""}
+                        {fmt(nwDelta.abs, displayCurrency)} ({nwDelta.pct >= 0 ? "+" : ""}
+                        {pct(nwDelta.pct, 2)}) vs last month
+                      </Badge>
+                    )}
+                    <span className="text-sm text-slate-500 dark:text-slate-400">
+                      {(netWorth!.points?.length ?? 0)} month
+                      {(netWorth!.points?.length ?? 0) === 1 ? "" : "s"} of data
+                    </span>
                   </div>
-                )}
+                </div>
               </div>
-            </AnimatedCard>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <NetWorthTile
+              label="Investments"
+              value={nwInvestments}
+              icon={<PiggyBank className="w-4 h-4" />}
+              accent="primary"
+              currency={displayCurrency}
+              format={fmt}
+            />
+            <NetWorthTile
+              label="Cash"
+              value={nwCash}
+              icon={<Wallet className="w-4 h-4" />}
+              accent="success"
+              currency={displayCurrency}
+              format={fmt}
+            />
+            <NetWorthTile
+              label="Debt"
+              value={nwDebt}
+              icon={<CreditCard className="w-4 h-4" />}
+              accent="danger"
+              negative
+              currency={displayCurrency}
+              format={fmt}
+            />
           </div>
-        </main>
+        </motion.div>
+      )}
+
+      {error && (
+        <p className="text-sm text-danger-600 dark:text-danger-400 mb-4">{error}</p>
+      )}
+
+      {hasNetWorth && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.03 }}
+          className="mb-8"
+        >
+
+          {networthData.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Net worth over time</CardTitle>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Stacked areas = assets you own (investments + cash). Red line =
+                  total debt (separate scale). Bold line = net worth. Data from
+                  Wealthsimple uploads — {displayCurrency}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={networthData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid {...getGridProps(checkDarkMode())} />
+                      <XAxis
+                        dataKey="date"
+                        {...getAxisProps(checkDarkMode())}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        {...getAxisProps(checkDarkMode())}
+                        tickFormatter={(v) => fmt(v as number, displayCurrency)}
+                        width={56}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        {...getAxisProps(checkDarkMode())}
+                        tickFormatter={(v) => fmt(v as number, displayCurrency)}
+                        width={56}
+                      />
+                      <Tooltip
+                        contentStyle={getTooltipStyle(checkDarkMode())}
+                        formatter={(v: number, name: string) => [
+                          fmt(v, displayCurrency),
+                          name,
+                        ]}
+                      />
+                      <Legend />
+                      <Area
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="investments"
+                        name="Investments (assets)"
+                        stackId="assets"
+                        stroke={CHART_COLORS.primary}
+                        fill={CHART_COLORS.primary}
+                        fillOpacity={0.55}
+                      />
+                      <Area
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="cash"
+                        name="Cash (assets)"
+                        stackId="assets"
+                        stroke={CHART_COLORS.success}
+                        fill={CHART_COLORS.success}
+                        fillOpacity={0.5}
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="debt_abs"
+                        name="Debt (owed)"
+                        stroke={CHART_COLORS.danger}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="net_worth"
+                        name="Net worth"
+                        stroke={CHART_COLORS.accent}
+                        strokeWidth={2.5}
+                        dot={{ r: 3 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      )}
+
+      {!hasNetWorth && !latestId && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Card className="overflow-hidden">
+            <div className="p-10 lg:p-14 text-center bg-gradient-to-br from-primary-50/60 via-white to-emerald-50/40 dark:from-primary-950/30 dark:via-slate-900 dark:to-emerald-950/20">
+              <img
+                src="/brand/canopy-icon.svg"
+                alt="Canopy"
+                className="w-24 h-24 mx-auto mb-6 rounded-2xl shadow-lg ring-1 ring-slate-200/50 dark:ring-slate-800/50"
+              />
+              <h2 className="text-2xl lg:text-3xl font-semibold text-slate-900 dark:text-white mb-2">
+                Welcome to Canopy
+              </h2>
+              <p className="text-slate-600 dark:text-slate-400 max-w-lg mx-auto mb-8">
+                One number for your net worth, built from every account you own.
+                Start with Wealthsimple monthly statements, backfill history
+                from Monarch Money, or import a dated portfolio snapshot for
+                holdings that don&rsquo;t auto-sync.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  leftIcon={<UploadCloud className="w-4 h-4" />}
+                  onClick={() => router.push("/portfolio/wealthsimple-import")}
+                >
+                  Drop Wealthsimple CSVs
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  leftIcon={<UploadCloud className="w-4 h-4" />}
+                  onClick={() => router.push("/portfolio/monarch-import")}
+                >
+                  Import from Monarch
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  leftIcon={<Upload className="w-4 h-4" />}
+                  onClick={() => router.push("/portfolio/import")}
+                >
+                  Portfolio snapshot
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
+      {latestId && lineData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-8"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Portfolio snapshot — total CAD</CardTitle>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Canadian holdings that don't auto-sync from Wealthsimple (private equity, real estate, DPSP)
+                {latestNum > 0 && (
+                  <> — latest review {fmt(latestNum, CAD)}</>
+                )}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={lineData}>
+                    <CartesianGrid {...getGridProps(checkDarkMode())} />
+                    <XAxis dataKey="date" {...getAxisProps(checkDarkMode())} />
+                    <YAxis
+                      {...getAxisProps(checkDarkMode())}
+                      tickFormatter={(v) => fmt(v as number, CAD)}
+                    />
+                    <Tooltip
+                      contentStyle={getTooltipStyle(checkDarkMode())}
+                      formatter={(v: number) => [fmt(v, CAD), "Total CAD"]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="total"
+                      stroke={CHART_COLORS.primary}
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {latestId && platformAlloc && platformAlloc.slices.length > 0 && (
+        <div className="grid grid-cols-1 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>By platform</CardTitle>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Latest review — {fmt(parseFloat(platformAlloc.total_cad), CAD)} total
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={platformAlloc.slices.map((s) => ({
+                          name: s.key,
+                          value: parseFloat(s.value_cad),
+                        }))}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                      >
+                        {platformAlloc.slices.map((slice, i) => (
+                          <Cell
+                            key={slice.key}
+                            fill={pieColors[i % pieColors.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={getTooltipStyle(checkDarkMode())}
+                        formatter={(v: number, name: string) => [
+                          fmt(v, CAD),
+                          name,
+                        ]}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      )}
+
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Budget & transactions</CardTitle>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Cash flow and bank CSV tools (optional)
+              </p>
+            </div>
+            <Link href="/transactions">
+              <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="w-4 h-4" />}>
+                Open
+              </Button>
+            </Link>
+          </CardHeader>
+        </Card>
+      </motion.div>
+    </PageLayout>
+  );
+}
+
+function BrandHeader({ actions }: { actions?: React.ReactNode } = {}) {
+  return (
+    <div className="mb-6 lg:mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <img
+            src="/brand/canopy-icon.svg"
+            alt="Canopy"
+            className="w-14 h-14 rounded-xl shadow-md ring-1 ring-slate-200/60 dark:ring-slate-700/60"
+          />
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white leading-none">
+              Canopy
+            </h1>
+            <p className="mt-1.5 text-sm text-primary-700 dark:text-primary-300">
+              Continuous net-worth tracking
+            </p>
+          </div>
+        </div>
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        )}
       </div>
-    </>
+    </div>
+  );
+}
+
+type TileAccent = "primary" | "success" | "danger" | "neutral";
+
+const ACCENT_STYLES: Record<
+  TileAccent,
+  { iconBg: string; iconFg: string; valueText: string }
+> = {
+  primary: {
+    iconBg: "bg-primary-100 dark:bg-primary-950/50",
+    iconFg: "text-primary-600 dark:text-primary-400",
+    valueText: "text-slate-900 dark:text-white",
+  },
+  success: {
+    iconBg: "bg-success-100 dark:bg-success-950/50",
+    iconFg: "text-success-600 dark:text-success-400",
+    valueText: "text-slate-900 dark:text-white",
+  },
+  danger: {
+    iconBg: "bg-danger-100 dark:bg-danger-950/50",
+    iconFg: "text-danger-600 dark:text-danger-400",
+    valueText: "text-danger-700 dark:text-danger-400",
+  },
+  neutral: {
+    iconBg: "bg-slate-100 dark:bg-slate-800",
+    iconFg: "text-slate-600 dark:text-slate-400",
+    valueText: "text-slate-900 dark:text-white",
+  },
+};
+
+function NetWorthTile({
+  label,
+  value,
+  icon,
+  accent = "neutral",
+  emphasis = false,
+  negative = false,
+  currency = "CAD",
+  format,
+}: {
+  label: string;
+  value: number;
+  icon?: React.ReactNode;
+  accent?: TileAccent;
+  emphasis?: boolean;
+  negative?: boolean;
+  currency?: string;
+  format: (amount: number, currencyCode?: string) => string;
+}) {
+  const displayValue = negative ? -Math.abs(value) : value;
+  const styles = ACCENT_STYLES[accent];
+  return (
+    <Card variant={emphasis ? "highlight" : "default"} className="group transition-shadow hover:shadow-md">
+      <CardContent className="py-5">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {icon && (
+            <span
+              className={`inline-flex items-center justify-center w-6 h-6 rounded-md ${styles.iconBg} ${styles.iconFg}`}
+            >
+              {icon}
+            </span>
+          )}
+          <span>{label}</span>
+        </div>
+        <div
+          className={`mt-2 font-semibold tracking-tight ${
+            emphasis ? "text-3xl" : "text-2xl"
+          } ${negative ? styles.valueText : "text-slate-900 dark:text-white"}`}
+        >
+          {format(displayValue, currency)}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

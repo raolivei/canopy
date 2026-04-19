@@ -1,151 +1,489 @@
-import React, { useState } from 'react'
-import Head from 'next/head'
-import Sidebar from '../components/Sidebar'
-import DarkModeToggle from '../components/DarkModeToggle'
-import CurrencySelector from '../components/CurrencySelector'
-import { Settings as SettingsIcon, User, Bell, Shield, Globe } from 'lucide-react'
+import React, { useState } from "react";
+import Link from "next/link";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
+import {
+  Settings as SettingsIcon,
+  User,
+  Bell,
+  Shield,
+  Globe,
+  Moon,
+  Sun,
+  Plug,
+  ChevronRight,
+  Check,
+  UploadCloud,
+  Upload,
+  AlertTriangle,
+  Loader2,
+  Trash2,
+} from "lucide-react";
+import { cn } from "@/utils/cn";
+import { motion } from "framer-motion";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+interface RowCounts {
+  counts: Record<string, number>;
+  total: number;
+}
+
+const RESET_CONFIRM_PHRASE = "RESET ALL DATA";
 
 export default function Settings() {
-  const [displayCurrency, setDisplayCurrency] = useState('USD')
+  const [displayCurrency, setDisplayCurrency] = useState("CAD");
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetReport, setResetReport] = useState<{
+    deleted: Record<string, number>;
+    total: number;
+  } | null>(null);
+  const { addToast } = useToast();
+  const queryClient = useQueryClient();
+
+  const rowCountsQuery = useQuery<RowCounts>({
+    queryKey: ["admin", "row-counts"],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/v1/admin/row-counts`);
+      if (!res.ok) throw new Error("Failed to load row counts");
+      return res.json();
+    },
+    // Counts should stay reasonably fresh as the user imports; 30s
+    // keeps the Settings page honest without hammering the API.
+    staleTime: 30_000,
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${API_URL}/v1/admin/reset-data`, {
+        method: "POST",
+        headers: { "X-Confirm-Reset": RESET_CONFIRM_PHRASE },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Reset failed (${res.status})`);
+      }
+      return res.json() as Promise<{
+        deleted: Record<string, number>;
+        total: number;
+      }>;
+    },
+    onSuccess: (report) => {
+      setResetReport(report);
+      setResetConfirmText("");
+      addToast({
+        variant: "success",
+        title: "Data cleared",
+        description: `${report.total.toLocaleString()} rows deleted across ${
+          Object.keys(report.deleted).length
+        } tables.`,
+      });
+      // Every cached list across the app now points at stale data;
+      // invalidate broadly rather than chase individual keys.
+      queryClient.invalidateQueries();
+    },
+    onError: (err: Error) => {
+      addToast({
+        variant: "danger",
+        title: "Reset failed",
+        description: err.message,
+      });
+    },
+  });
+
+  React.useEffect(() => {
+    setIsDarkMode(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newValue = !isDarkMode;
+    setIsDarkMode(newValue);
+    if (newValue) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("darkMode", "true");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("darkMode", "false");
+    }
+  };
+
+  const currencyOptions = [{ value: "CAD", label: "CAD - Canadian Dollar" }];
 
   return (
-    <>
-      <Head>
-        <title>Settings - Canopy</title>
-      </Head>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      <Sidebar />
-      <div className="ml-64 flex-1 p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
-              <p className="text-gray-500 dark:text-gray-400 mt-2">Manage your preferences</p>
-            </div>
-            <DarkModeToggle />
-          </div>
+    <PageLayout title="Settings" description="Manage your preferences">
+      <PageHeader title="Settings" description="Customize your Canopy experience" />
 
-          <div className="space-y-6">
-            {/* General Settings */}
-            <div className="card p-6">
-              <div className="flex items-center gap-3 mb-6">
+      <div className="max-w-3xl space-y-6">
+        {/* General Settings */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
                   <SettingsIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">General</h2>
+                <div>
+                  <CardTitle>General</CardTitle>
+                  <CardDescription>Basic app preferences</CardDescription>
+                </div>
               </div>
-              
-              <div className="space-y-4">
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-white">Display Currency</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Choose your preferred currency for displaying values
+                  </p>
+                </div>
+                <Select
+                  options={currencyOptions}
+                  value={displayCurrency}
+                  onChange={setDisplayCurrency}
+                  className="w-48"
+                />
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Display Currency</label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Choose your preferred currency</p>
+                    <p className="font-medium text-slate-900 dark:text-white">Dark Mode</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Toggle dark theme</p>
                   </div>
-                  <CurrencySelector 
-                    selectedCurrency={displayCurrency} 
-                    onCurrencyChange={setDisplayCurrency}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div>
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Toggle dark theme</p>
-                  </div>
-                  <DarkModeToggle />
+                  <button
+                    onClick={toggleDarkMode}
+                    className={cn(
+                      "relative w-14 h-8 rounded-full transition-colors",
+                      isDarkMode ? "bg-primary-600" : "bg-slate-200 dark:bg-slate-700"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-sm transition-transform flex items-center justify-center",
+                        isDarkMode && "translate-x-6"
+                      )}
+                    >
+                      {isDarkMode ? (
+                        <Moon className="w-3.5 h-3.5 text-primary-600" />
+                      ) : (
+                        <Sun className="w-3.5 h-3.5 text-amber-500" />
+                      )}
+                    </span>
+                  </button>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            {/* Profile Settings */}
-            <div className="card p-6">
-              <div className="flex items-center gap-3 mb-6">
+        {/* Integrations Link */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <Link href="/settings/integrations">
+            <Card variant="interactive" className="group">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-accent-100 dark:bg-accent-900/30 rounded-lg">
+                      <Plug className="w-5 h-5 text-accent-600 dark:text-accent-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-white">Integrations</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Connect your accounts and services
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </motion.div>
+
+        {/* Profile Settings */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                   <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profile</h2>
-              </div>
-              
-              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Name</label>
-                  <input 
-                    type="text" 
-                    className="input-modern"
-                    placeholder="Your name"
-                    disabled
-                  />
+                  <CardTitle>Profile</CardTitle>
+                  <CardDescription>Your account information</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input label="Name" placeholder="Your name" disabled />
+              <Input label="Email" type="email" placeholder="your@email.com" disabled />
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Notifications */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-warning-100 dark:bg-warning-900/30 rounded-lg">
+                  <Bell className="w-5 h-5 text-warning-600 dark:text-warning-400" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Email</label>
-                  <input 
-                    type="email" 
-                    className="input-modern"
-                    placeholder="your@email.com"
-                    disabled
-                  />
+                  <CardTitle>Notifications</CardTitle>
+                  <CardDescription>Manage your notification preferences</CardDescription>
                 </div>
               </div>
-            </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <SettingToggle
+                title="Email Notifications"
+                description="Receive email updates"
+                disabled
+              />
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
+                <SettingToggle
+                  title="Transaction Alerts"
+                  description="Get notified of large transactions"
+                  disabled
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            {/* Notifications */}
-            <div className="card p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                  <Bell className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+        {/* Privacy & Security */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.4 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-success-100 dark:bg-success-900/30 rounded-lg">
+                  <Shield className="w-5 h-5 text-success-600 dark:text-success-400" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Notifications</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Email Notifications</label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Receive email updates</p>
-                  </div>
-                  <input type="checkbox" className="w-4 h-4" disabled />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Transaction Alerts</label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Get notified of large transactions</p>
-                  </div>
-                  <input type="checkbox" className="w-4 h-4" disabled />
+                <div>
+                  <CardTitle>Privacy & Security</CardTitle>
+                  <CardDescription>Keep your data safe</CardDescription>
                 </div>
               </div>
-            </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-white">Data Encryption</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    All data is encrypted at rest
+                  </p>
+                </div>
+                <Badge variant="success">
+                  <Check className="w-3 h-3 mr-1" />
+                  Enabled
+                </Badge>
+              </div>
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      Two-Factor Authentication
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Add an extra layer of security
+                    </p>
+                  </div>
+                  <Button variant="secondary" size="sm" disabled>
+                    Enable
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            {/* Privacy & Security */}
-            <div className="card p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                  <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
+        {/* Danger Zone — Delete all imported data */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.5 }}
+        >
+          <Card className="border-danger-200 dark:border-danger-900/60">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-danger-100 dark:bg-danger-900/30 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-danger-600 dark:text-danger-400" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Privacy & Security</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Data Encryption</label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">All data is encrypted at rest</p>
-                  </div>
-                  <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enabled</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">Two-Factor Authentication</label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add an extra layer of security</p>
-                  </div>
-                  <button className="btn-secondary text-sm" disabled>Enable</button>
+                <div>
+                  <CardTitle>Danger Zone</CardTitle>
+                  <CardDescription>
+                    Irreversibly delete all imported data (assets, liabilities,
+                    transactions, balance history, snapshots). FX rates and app
+                    settings are preserved.
+                  </CardDescription>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <p className="text-sm font-medium text-slate-900 dark:text-white mb-3">
+                  Current data
+                </p>
+                {rowCountsQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading counts&hellip;
+                  </div>
+                ) : rowCountsQuery.isError ? (
+                  <p className="text-sm text-danger-600 dark:text-danger-400">
+                    Failed to load row counts.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                    {Object.entries(rowCountsQuery.data?.counts || {})
+                      .filter(([, n]) => n > 0)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([table, n]) => (
+                        <div
+                          key={table}
+                          className="flex items-center justify-between"
+                        >
+                          <span className="text-slate-600 dark:text-slate-400 truncate">
+                            {table.replace(/_/g, " ")}
+                          </span>
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {n.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    {rowCountsQuery.data?.total === 0 && (
+                      <p className="col-span-full text-slate-500 dark:text-slate-400">
+                        No imported data.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {rowCountsQuery.data && rowCountsQuery.data.total > 0 && (
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    Total: {rowCountsQuery.data.total.toLocaleString()} rows
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <label
+                  htmlFor="reset-confirm"
+                  className="block text-sm font-medium text-slate-900 dark:text-white"
+                >
+                  To confirm, type{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-danger-600 dark:text-danger-400 text-xs font-mono">
+                    {RESET_CONFIRM_PHRASE}
+                  </code>{" "}
+                  below:
+                </label>
+                <Input
+                  id="reset-confirm"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  placeholder={RESET_CONFIRM_PHRASE}
+                  disabled={resetMutation.isPending}
+                />
+                <Button
+                  variant="danger"
+                  onClick={() => resetMutation.mutate()}
+                  disabled={
+                    resetConfirmText !== RESET_CONFIRM_PHRASE ||
+                    resetMutation.isPending ||
+                    (rowCountsQuery.data?.total ?? 0) === 0
+                  }
+                >
+                  {resetMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting&hellip;
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete all imported data
+                    </>
+                  )}
+                </Button>
+                {resetReport && (
+                  <p className="text-sm text-success-600 dark:text-success-400">
+                    Deleted {resetReport.total.toLocaleString()} rows across{" "}
+                    {Object.keys(resetReport.deleted).length} tables.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
-      </div>
-    </>
-  )
+    </PageLayout>
+  );
 }
 
+interface SettingToggleProps {
+  title: string;
+  description: string;
+  enabled?: boolean;
+  onChange?: (enabled: boolean) => void;
+  disabled?: boolean;
+}
+
+function SettingToggle({
+  title,
+  description,
+  enabled = false,
+  onChange,
+  disabled = false,
+}: SettingToggleProps) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="font-medium text-slate-900 dark:text-white">{title}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+      </div>
+      <button
+        onClick={() => onChange?.(!enabled)}
+        disabled={disabled}
+        className={cn(
+          "relative w-11 h-6 rounded-full transition-colors",
+          enabled ? "bg-primary-600" : "bg-slate-200 dark:bg-slate-700",
+          disabled && "opacity-50 cursor-not-allowed"
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform",
+            enabled && "translate-x-5"
+          )}
+        />
+      </button>
+    </div>
+  );
+}

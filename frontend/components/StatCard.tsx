@@ -38,7 +38,7 @@ export default function StatCard({
             whileHover={{ scale: 1.1, rotate: 5 }}
             className={`p-3 rounded-xl ${gradient} bg-opacity-10 dark:bg-opacity-20 transition-transform`}
           >
-            <Icon className="w-6 h-6 text-warm-gray-700 dark:text-warm-gray-300" />
+            <Icon className="w-6 h-6 text-slate-700 dark:text-slate-300" />
           </motion.div>
           {change && (
             <motion.div
@@ -46,10 +46,10 @@ export default function StatCard({
               animate={{ opacity: 1, scale: 1 }}
               className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
                 isPositive
-                  ? "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30"
+                  ? "text-success-700 dark:text-success-400 bg-success-50 dark:bg-success-900/30"
                   : isNegative
-                  ? "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30"
-                  : "text-warm-gray-700 dark:text-warm-gray-300 bg-warm-gray-50 dark:bg-warm-gray-700"
+                    ? "text-danger-700 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30"
+                    : "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700"
               }`}
             >
               {isPositive && <TrendingUp className="w-3.5 h-3.5" />}
@@ -58,20 +58,20 @@ export default function StatCard({
             </motion.div>
           )}
         </div>
-        <h3 className="text-sm font-medium text-warm-gray-500 dark:text-warm-gray-400 mb-2">
+        <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
           {title}
         </h3>
-        <p className="text-3xl font-bold text-warm-gray-900 dark:text-warm-gray-50 tracking-tight">
+        <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
           {value}
         </p>
         {change && (
           <p
             className={`text-xs font-medium mt-2 ${
               isPositive
-                ? "text-green-600 dark:text-green-400"
+                ? "text-success-600 dark:text-success-400"
                 : isNegative
-                ? "text-red-600 dark:text-red-400"
-                : "text-warm-gray-500 dark:text-warm-gray-400"
+                  ? "text-danger-600 dark:text-danger-400"
+                  : "text-slate-500 dark:text-slate-400"
             }`}
           >
             {isPositive ? "Increased" : isNegative ? "Decreased" : "No change"}{" "}

@@ -1,39 +1,299 @@
 """API endpoints for third-party integrations (Wise, Questrade, etc.)."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from backend.db.session import DbSession
+from backend.app.config import get_settings
 from backend.db.models.asset import Asset, AssetType, SyncSource
 from backend.db.models.lot import Lot
+from backend.db.models.transaction import Transaction as TransactionModel
+from backend.db.session import DbSession
+from backend.services.wise_integration import WISE_SYNC_CURRENCIES
 
 router = APIRouter(prefix="/v1/integrations", tags=["integrations"])
 
 
+# ==================== Wise Integration ====================
+
+
+class WiseConnectRequest(BaseModel):
+    """Request to connect Wise account."""
+
+    api_token: str
+    sandbox: bool = False
+
+
+class WiseBalanceResponse(BaseModel):
+    """Balance response from Wise."""
+
+    currency: str
+    amount: float
+    reserved: float = 0
+
+
+class WiseTransactionResponse(BaseModel):
+    """Transaction response from Wise."""
+
+    id: str
+    date: datetime
+    description: str
+    amount: float
+    currency: str
+    transaction_type: str
+    reference: Optional[str] = None
+    merchant: Optional[str] = None
+
+
+@router.get("/wise/status")
+async def get_wise_status():
+    """Return whether Wise is configured (token set via WISE_API_TOKEN env)."""
+    settings = get_settings()
+    return {"connected": bool(settings.wise_api_token)}
+
+
+@router.post("/wise/test-connection")
+async def test_wise_connection(request: WiseConnectRequest):
+    """Test Wise API connection with provided token.
+
+    Returns profile info if successful.
+    """
+    try:
+        from backend.services.wise_integration import WiseIntegrationService
+
+        with WiseIntegrationService(request.api_token, sandbox=request.sandbox) as wise:
+            profiles = wise.get_profiles()
+            personal = next((p for p in profiles if p.type == "personal"), None)
+
+            if not personal:
+                raise HTTPException(status_code=400, detail="No personal profile found")
+
+            return {
+                "status": "connected",
+                "profile_id": personal.id,
+                "name": f"{personal.first_name} {personal.last_name}".strip() or "Unknown",
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        msg = str(e)
+        if "401" in msg or "Unauthorized" in msg:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired API token. Generate a new Personal Token in Wise Settings → API tokens.",
+            )
+        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}")
+
+
+@router.post("/wise/balances", response_model=list[WiseBalanceResponse])
+async def get_wise_balances(request: WiseConnectRequest):
+    """Get all currency balances from Wise."""
+    try:
+        from backend.services.wise_integration import WiseIntegrationService
+
+        with WiseIntegrationService(request.api_token, sandbox=request.sandbox) as wise:
+            balances = wise.get_balances()
+            return [
+                WiseBalanceResponse(
+                    currency=b.currency,
+                    amount=float(b.amount),
+                    reserved=float(b.reserved),
+                )
+                for b in balances
+            ]
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch balances: {str(e)}")
+
+
+class WiseTransactionsRequest(BaseModel):
+    """Request for Wise transactions."""
+
+    api_token: str
+    sandbox: bool = False
+    currency: Optional[str] = None
+    days: int = 90
+
+
+@router.post("/wise/transactions", response_model=list[WiseTransactionResponse])
+async def get_wise_transactions(request: WiseTransactionsRequest):
+    """Get transactions from Wise.
+
+    Optionally filter by currency. If no currency specified, returns all.
+    """
+    try:
+        from backend.services.wise_integration import WiseIntegrationService
+
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=request.days)
+
+        with WiseIntegrationService(request.api_token, sandbox=request.sandbox) as wise:
+            if request.currency:
+                transactions = wise.get_transactions(
+                    currency=request.currency,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            else:
+                transactions = wise.get_all_transactions(
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+
+            return [
+                WiseTransactionResponse(
+                    id=tx.id,
+                    date=tx.date,
+                    description=tx.description,
+                    amount=float(tx.amount),
+                    currency=tx.currency,
+                    transaction_type=tx.transaction_type,
+                    reference=tx.reference,
+                    merchant=tx.merchant,
+                )
+                for tx in transactions
+            ]
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch transactions: {str(e)}")
+
+
+class WiseSyncRequest(BaseModel):
+    """Request to sync Wise data into Canopy (assets + transactions)."""
+
+    api_token: Optional[str] = None  # If omitted, uses WISE_API_TOKEN from env
+    sandbox: bool = False
+    days: int = 90
+
+
+class WiseSyncResponse(BaseModel):
+    """Response after syncing Wise data."""
+
+    assets_created: int
+    assets_updated: int
+    transactions_imported: int
+    currencies: list[str]
+    skipped_currencies: list[str] = Field(default_factory=list)
+
+
+@router.post("/wise/sync", response_model=WiseSyncResponse)
+async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
+    """Fetch Wise balances and transactions, then upsert Canopy assets and import transactions.
+
+    Only **CAD** and **USD** Wise balances are synced into Canopy (the product scope).
+    Other pockets (e.g. JPY, EUR) are skipped until multi-currency FX is modeled end-to-end.
+    """
+    from backend.services.wise_integration import WiseIntegrationService
+
+    token = request.api_token or get_settings().wise_api_token
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No Wise token. Provide api_token in the request or set WISE_API_TOKEN.",
+        )
+
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=request.days)
+    assets_created = 0
+    assets_updated = 0
+    transactions_imported = 0
+    currencies: list[str] = []
+    skipped_currencies: list[str] = []
+    now = datetime.now(timezone.utc)
+
+    with WiseIntegrationService(token, sandbox=request.sandbox) as wise:
+        all_balances = wise.get_balances()
+        for b in all_balances:
+            ccy = b.currency.upper()
+            if ccy not in WISE_SYNC_CURRENCIES:
+                skipped_currencies.append(b.currency)
+                continue
+            currencies.append(b.currency)
+            symbol = f"WISE_{b.currency}"
+            existing = db.execute(select(Asset).where(Asset.symbol == symbol)).scalar_one_or_none()
+            balance_value = Decimal(str(b.amount))
+            if existing:
+                existing.current_price = balance_value
+                existing.price_updated_at = now
+                assets_updated += 1
+            else:
+                asset = Asset(
+                    symbol=symbol,
+                    name=f"Wise {b.currency}",
+                    asset_type=AssetType.BANK_ACCOUNT,
+                    currency=b.currency,
+                    institution="Wise",
+                    sync_source="WISE",
+                    current_price=balance_value,
+                    price_updated_at=now,
+                )
+                db.add(asset)
+                assets_created += 1
+
+        transactions = wise.get_all_transactions(
+            start_date=start_date,
+            end_date=end_date,
+            currencies=set(WISE_SYNC_CURRENCIES),
+        )
+        existing_ids = {
+            row[0]
+            for row in db.execute(
+                select(TransactionModel.import_id).where(TransactionModel.import_source == "wise")
+            ).all()
+        }
+        for tx in transactions:
+            if (tx.currency or "").upper() not in WISE_SYNC_CURRENCIES:
+                continue
+            if tx.id in existing_ids:
+                continue
+            db.add(
+                TransactionModel(
+                    description=tx.description or "Wise transaction",
+                    amount=Decimal(str(tx.amount)),
+                    currency=tx.currency,
+                    type="income" if tx.amount > 0 else "expense",
+                    date=tx.date,
+                    merchant=tx.merchant,
+                    import_id=tx.id,
+                    import_source="wise",
+                )
+            )
+            transactions_imported += 1
+
+    db.commit()
+    return WiseSyncResponse(
+        assets_created=assets_created,
+        assets_updated=assets_updated,
+        transactions_imported=transactions_imported,
+        currencies=currencies,
+        skipped_currencies=sorted(set(skipped_currencies)),
+    )
+
+
 # ==================== Questrade Integration ====================
 
+
 class QuestradeConnectRequest(BaseModel):
-    """Request to connect or test Questrade (refresh token from my.questrade.com/APIAccess)."""
+    """Request to connect Questrade (manual authorization token from API Centre)."""
+
     refresh_token: str
 
 
 class QuestradeAccountResponse(BaseModel):
-    """Questrade account summary."""
     number: str
     type: str
     status: str
-    is_primary: bool
-    is_billing: bool
-    client_account_type: str
+    is_primary: bool = False
+    is_billing: bool = False
+    client_account_type: str = ""
 
 
 class QuestradePositionResponse(BaseModel):
-    """Questrade position (holding)."""
     symbol_id: int
     symbol: str
     open_quantity: Decimal
@@ -44,14 +304,15 @@ class QuestradePositionResponse(BaseModel):
     closed_pnl: Optional[Decimal] = None
 
 
-class QuestradeBalanceResponse(BaseModel):
-    """Questrade balance per currency."""
-    currency: str
-    cash: Decimal
-    market_value: Decimal
-    total_equity: Decimal
-    buying_power: Optional[Decimal] = None
-    maintenance_excess: Optional[Decimal] = None
+class QuestradeSyncResponse(BaseModel):
+    """Summary after syncing Questrade into assets and lots."""
+
+    accounts_synced: int
+    assets_created: int
+    assets_updated: int
+    positions_synced: int
+    created_lots: int = 0
+    updated_lots: int = 0
 
 
 @router.post("/questrade/test-connection")
@@ -67,19 +328,37 @@ async def test_questrade_connection(request: QuestradeConnectRequest):
             primary = next((a for a in accounts if a.is_primary), accounts[0])
             return {
                 "status": "connected",
+                "accounts": [
+                    QuestradeAccountResponse(
+                        number=a.number,
+                        type=a.type,
+                        status=a.status,
+                        is_primary=a.is_primary,
+                        is_billing=a.is_billing,
+                        client_account_type=a.client_account_type,
+                    )
+                    for a in accounts
+                ],
                 "accounts_count": len(accounts),
                 "primary_account": primary.number,
                 "primary_type": primary.type,
+                "new_refresh_token": qt.refresh_token,
             }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+        msg = str(e)
+        if "401" in msg or "Unauthorized" in msg or "invalid_grant" in msg:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired refresh token. In Questrade: API Centre → your personal app → New manual authorization → copy the token (see questrade.com/api/documentation/getting-started).",
+            )
+        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}")
 
 
 @router.post("/questrade/accounts", response_model=list[QuestradeAccountResponse])
 async def get_questrade_accounts(request: QuestradeConnectRequest):
-    """Get all Questrade accounts for the authenticated user."""
+    """Fetch Questrade accounts."""
     try:
         from backend.services.questrade_integration import QuestradeIntegrationService
 
@@ -97,23 +376,20 @@ async def get_questrade_accounts(request: QuestradeConnectRequest):
                 for a in accounts
             ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch accounts: {str(e)}")
-
-
-class QuestradePositionsRequest(BaseModel):
-    """Request for positions (refresh token + account number)."""
-    refresh_token: str
-    account_number: str
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/questrade/positions", response_model=list[QuestradePositionResponse])
-async def get_questrade_positions(request: QuestradePositionsRequest):
-    """Get positions for a single Questrade account."""
+async def get_questrade_positions(
+    request: QuestradeConnectRequest,
+    account_number: str = Query(..., description="Questrade account number"),
+):
+    """Fetch positions for a Questrade account (account number as query param)."""
     try:
         from backend.services.questrade_integration import QuestradeIntegrationService
 
         with QuestradeIntegrationService(request.refresh_token) as qt:
-            positions = qt.get_positions(request.account_number)
+            positions = qt.get_positions(account_number)
             return [
                 QuestradePositionResponse(
                     symbol_id=p.symbol_id,
@@ -128,67 +404,61 @@ async def get_questrade_positions(request: QuestradePositionsRequest):
                 for p in positions
             ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch positions: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-class QuestradeSyncRequest(BaseModel):
-    """Request to sync Questrade positions into Canopy database."""
-    refresh_token: str
+@router.post("/questrade/sync", response_model=QuestradeSyncResponse)
+async def sync_questrade(request: QuestradeConnectRequest, db: DbSession):
+    """Sync Questrade accounts and positions into Canopy assets and lots (per-account lots)."""
+    from backend.services.questrade_integration import QuestradeIntegrationService
 
+    created_assets = 0
+    created_lots = 0
+    updated_lots = 0
 
-@router.post("/questrade/sync")
-async def sync_questrade_to_canopy(request: QuestradeSyncRequest, db: DbSession):
-    """Sync all Questrade accounts and positions into Canopy assets and lots."""
-    try:
-        from backend.services.questrade_integration import QuestradeIntegrationService
+    with QuestradeIntegrationService(request.refresh_token) as qt:
+        accounts = qt.get_accounts()
 
-        with QuestradeIntegrationService(request.refresh_token) as qt:
-            accounts = qt.get_accounts()
-            created_assets = 0
-            created_lots = 0
-            updated_lots = 0
+        for acc in accounts:
+            positions = qt.get_positions(acc.number)
+            for pos in positions:
+                symbol = (pos.symbol or "").strip().upper()
+                if not symbol:
+                    continue
+                price = pos.average_entry_price or pos.current_price or Decimal("0")
+                if price <= 0:
+                    price = Decimal("0.01")
 
-            for acc in accounts:
-                positions = qt.get_positions(acc.number)
-                for pos in positions:
-                    symbol = (pos.symbol or "").strip().upper()
-                    if not symbol:
-                        continue
-                    price = pos.average_entry_price or pos.current_price or Decimal("0")
-                    if price <= 0:
-                        price = Decimal("0.01")
+                asset = db.execute(select(Asset).where(Asset.symbol == symbol)).scalar_one_or_none()
+                if not asset:
+                    asset = Asset(
+                        symbol=symbol,
+                        name=symbol,
+                        asset_type=AssetType.STOCK,
+                        currency="CAD",
+                        institution="Questrade",
+                        country="CA",
+                        sync_source=SyncSource.QUESTRADE.value,
+                        external_account_id=acc.number,
+                    )
+                    db.add(asset)
+                    db.flush()
+                    created_assets += 1
 
-                    asset = db.execute(
-                        select(Asset).where(Asset.symbol == symbol)
-                    ).scalar_one_or_none()
-                    if not asset:
-                        asset = Asset(
-                            symbol=symbol,
-                            name=symbol,
-                            asset_type=AssetType.STOCK,
-                            currency="CAD",
-                            institution="Questrade",
-                            country="CA",
-                            sync_source=SyncSource.QUESTRADE.value,
-                            external_account_id=acc.number,
-                        )
-                        db.add(asset)
-                        db.flush()
-                        created_assets += 1
+                account_label = f"Questrade-{acc.number}"
+                lot = db.execute(
+                    select(Lot)
+                    .where(Lot.asset_id == asset.id)
+                    .where(Lot.account == account_label)
+                ).scalar_one_or_none()
 
-                    account_label = f"Questrade-{acc.number}"
-                    lot = db.execute(
-                        select(Lot)
-                        .where(Lot.asset_id == asset.id)
-                        .where(Lot.account == account_label)
-                    ).scalar_one_or_none()
-
-                    if lot:
-                        lot.quantity = pos.open_quantity
-                        lot.price_per_unit = price
-                        updated_lots += 1
-                    else:
-                        lot = Lot(
+                if lot:
+                    lot.quantity = pos.open_quantity
+                    lot.price_per_unit = price
+                    updated_lots += 1
+                else:
+                    db.add(
+                        Lot(
                             asset_id=asset.id,
                             quantity=pos.open_quantity,
                             price_per_unit=price,
@@ -197,166 +467,29 @@ async def sync_questrade_to_canopy(request: QuestradeSyncRequest, db: DbSession)
                             account=account_label,
                             notes=f"Synced from Questrade {acc.type}",
                         )
-                        db.add(lot)
-                        created_lots += 1
+                    )
+                    created_lots += 1
 
-            db.commit()
-            return {
-                "status": "synced",
-                "accounts": len(accounts),
-                "created_assets": created_assets,
-                "created_lots": created_lots,
-                "updated_lots": updated_lots,
-            }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Sync failed: {str(e)}")
+        db.commit()
 
-
-# ==================== Wise Integration ====================
-
-class WiseConnectRequest(BaseModel):
-    """Request to connect Wise account."""
-    api_token: str
-    sandbox: bool = False
-
-
-class WiseBalanceResponse(BaseModel):
-    """Balance response from Wise."""
-    currency: str
-    amount: float
-    reserved: float = 0
-
-
-class WiseTransactionResponse(BaseModel):
-    """Transaction response from Wise."""
-    id: str
-    date: datetime
-    description: str
-    amount: float
-    currency: str
-    transaction_type: str
-    reference: Optional[str] = None
-    merchant: Optional[str] = None
-
-
-@router.post("/wise/test-connection")
-async def test_wise_connection(request: WiseConnectRequest):
-    """Test Wise API connection with provided token.
-    
-    Returns profile info if successful.
-    """
-    try:
-        from backend.services.wise_integration import WiseIntegrationService
-        
-        with WiseIntegrationService(request.api_token, sandbox=request.sandbox) as wise:
-            profiles = wise.get_profiles()
-            personal = next((p for p in profiles if p.type == "personal"), None)
-            
-            if not personal:
-                raise HTTPException(status_code=400, detail="No personal profile found")
-            
-            return {
-                "status": "connected",
-                "profile_id": personal.id,
-                "name": f"{personal.first_name} {personal.last_name}".strip() or "Unknown",
-            }
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
-
-
-@router.post("/wise/balances", response_model=list[WiseBalanceResponse])
-async def get_wise_balances(request: WiseConnectRequest):
-    """Get all currency balances from Wise."""
-    try:
-        from backend.services.wise_integration import WiseIntegrationService
-        
-        with WiseIntegrationService(request.api_token, sandbox=request.sandbox) as wise:
-            balances = wise.get_balances()
-            return [
-                WiseBalanceResponse(
-                    currency=b.currency,
-                    amount=float(b.amount),
-                    reserved=float(b.reserved),
-                )
-                for b in balances
-            ]
-            
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch balances: {str(e)}")
-
-
-class WiseTransactionsRequest(BaseModel):
-    """Request for Wise transactions."""
-    api_token: str
-    sandbox: bool = False
-    currency: Optional[str] = None
-    days: int = 90
-
-
-@router.post("/wise/transactions", response_model=list[WiseTransactionResponse])
-async def get_wise_transactions(request: WiseTransactionsRequest):
-    """Get transactions from Wise.
-    
-    Optionally filter by currency. If no currency specified, returns all.
-    """
-    try:
-        from backend.services.wise_integration import WiseIntegrationService
-        
-        end_date = datetime.utcnow()
-        start_date = end_date - timedelta(days=request.days)
-        
-        with WiseIntegrationService(request.api_token, sandbox=request.sandbox) as wise:
-            if request.currency:
-                transactions = wise.get_transactions(
-                    currency=request.currency,
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-            else:
-                transactions = wise.get_all_transactions(
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-            
-            return [
-                WiseTransactionResponse(
-                    id=tx.id,
-                    date=tx.date,
-                    description=tx.description,
-                    amount=float(tx.amount),
-                    currency=tx.currency,
-                    transaction_type=tx.transaction_type,
-                    reference=tx.reference,
-                    merchant=tx.merchant,
-                )
-                for tx in transactions
-            ]
-            
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch transactions: {str(e)}")
+    return QuestradeSyncResponse(
+        accounts_synced=len(accounts),
+        assets_created=created_assets,
+        assets_updated=updated_lots,
+        positions_synced=created_lots + updated_lots,
+        created_lots=created_lots,
+        updated_lots=updated_lots,
+    )
 
 
 # ==================== Integration Status ====================
+
 
 @router.get("/status")
 async def get_integration_status():
     """Get status of all available integrations."""
     return {
         "integrations": [
-            {
-                "id": "questrade",
-                "name": "Questrade",
-                "type": "api",
-                "status": "available",
-                "description": "Canadian discount brokerage. TFSA, RRSP, Margin accounts.",
-                "requires_refresh_token": True,
-                "supported_features": ["accounts", "positions", "balances", "sync"],
-            },
             {
                 "id": "wise",
                 "name": "Wise (TransferWise)",
@@ -367,15 +500,32 @@ async def get_integration_status():
                 "supported_features": ["balances", "transactions"],
             },
             {
+                "id": "questrade",
+                "name": "Questrade",
+                "type": "api",
+                "status": "available",
+                "description": "Canadian discount brokerage (TFSA, RRSP, trading)",
+                "requires_token": True,
+                "supported_features": ["accounts", "positions", "balances"],
+            },
+            {
                 "id": "csv_import",
                 "name": "CSV Import",
                 "type": "file",
                 "status": "available",
                 "description": "Import transactions from CSV exports",
                 "supported_formats": [
-                    "Nubank", "Clear Investimentos", "XP Investimentos",
-                    "RBC Canada", "Wealthsimple", "Schwab", "Wise",
-                    "Chase", "Bank of America", "Capital One", "Amex"
+                    "Nubank",
+                    "Clear Investimentos",
+                    "XP Investimentos",
+                    "RBC Canada",
+                    "Wealthsimple",
+                    "Schwab",
+                    "Wise",
+                    "Chase",
+                    "Bank of America",
+                    "Capital One",
+                    "Amex",
                 ],
             },
         ],
@@ -385,63 +535,18 @@ async def get_integration_status():
                 "name": "Plaid",
                 "description": "Automatic bank connections for US/Canada",
             },
-            {
-                "id": "pluggy",
-                "name": "Pluggy",
-                "description": "Brazilian Open Finance integration",
-            },
         ],
     }
 
 
 # ==================== CSV Format Info ====================
 
+
 @router.get("/csv-formats")
 async def get_csv_formats():
     """Get information about supported CSV formats."""
     return {
         "formats": [
-            {
-                "id": "nubank",
-                "name": "Nubank",
-                "country": "Brazil",
-                "type": "bank",
-                "export_instructions": "App > Conta > Extrato > Exportar CSV",
-                "sample_headers": ["date", "title", "amount", "category"],
-            },
-            {
-                "id": "nubank_investments",
-                "name": "Nubank Investimentos",
-                "country": "Brazil",
-                "type": "brokerage",
-                "export_instructions": "App > Investimentos > Extrato > Exportar",
-                "sample_headers": ["Data", "Descrição", "Valor", "Tipo", "Ativo"],
-            },
-            {
-                "id": "clear",
-                "name": "Clear Investimentos",
-                "country": "Brazil",
-                "type": "brokerage",
-                "export_instructions": "Portal > Relatórios > Notas de Corretagem > Exportar CSV",
-                "sample_headers": ["Data Negócio", "C/V", "Código", "Especificação do Título", "Quantidade", "Preço", "Valor Total"],
-            },
-            {
-                "id": "xp",
-                "name": "XP Investimentos",
-                "country": "Brazil",
-                "type": "brokerage",
-                "export_instructions": "Portal > Meus Investimentos > Posição > Exportar",
-                "sample_headers": ["Data do Negócio", "Código do Ativo", "Tipo de Movimentação", "Quantidade", "Preço Unitário", "Valor Líquido"],
-            },
-            {
-                "id": "b3_cei",
-                "name": "B3 CEI (Canal Eletrônico do Investidor)",
-                "country": "Brazil",
-                "type": "consolidated",
-                "export_instructions": "cei.b3.com.br > Extratos e Informativos > Negociação > Exportar",
-                "sample_headers": ["Data do Negócio", "Código de Negociação", "Tipo de Movimentação", "Instituição", "Quantidade", "Preço", "Valor"],
-                "notes": "Consolidates all Brazilian brokerages in one export",
-            },
             {
                 "id": "rbc",
                 "name": "RBC Royal Bank",
@@ -464,7 +569,15 @@ async def get_csv_formats():
                 "country": "Canada",
                 "type": "brokerage",
                 "export_instructions": "App > Activity > Export (request via support)",
-                "sample_headers": ["Date", "Transaction Type", "Symbol", "Quantity", "Price", "Market Value", "Currency"],
+                "sample_headers": [
+                    "Date",
+                    "Transaction Type",
+                    "Symbol",
+                    "Quantity",
+                    "Price",
+                    "Market Value",
+                    "Currency",
+                ],
             },
             {
                 "id": "schwab",
@@ -472,7 +585,16 @@ async def get_csv_formats():
                 "country": "USA",
                 "type": "brokerage",
                 "export_instructions": "Accounts > History > Export",
-                "sample_headers": ["Date", "Action", "Symbol", "Description", "Quantity", "Price", "Fees & Comm", "Amount"],
+                "sample_headers": [
+                    "Date",
+                    "Action",
+                    "Symbol",
+                    "Description",
+                    "Quantity",
+                    "Price",
+                    "Fees & Comm",
+                    "Amount",
+                ],
             },
             {
                 "id": "wise",
@@ -480,7 +602,14 @@ async def get_csv_formats():
                 "country": "Global",
                 "type": "bank",
                 "export_instructions": "Account > Statement > Download CSV",
-                "sample_headers": ["Date", "Description", "Amount", "Currency", "Running Balance", "TransferWise ID"],
+                "sample_headers": [
+                    "Date",
+                    "Description",
+                    "Amount",
+                    "Currency",
+                    "Running Balance",
+                    "TransferWise ID",
+                ],
                 "notes": "Also supports direct API integration",
             },
         ],

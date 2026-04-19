@@ -1,26 +1,23 @@
 # Canopy Brand Assets
 
-Brand visuals for Canopy. SVGs scale at any size.
+Brand visuals for Canopy.
 
 ## Files
 
-- `canopy-icon.svg` – Main icon
-- `canopy-icon-{32,64,180,192,256,512,1024}.png` – Raster exports for favicons/PWA
-- `canopy-logo-dark.svg` – Logo for dark backgrounds
-- `canopy-logo-light.svg` – Logo for light backgrounds
-- `canopy-banner-dark.svg/.png` – 1600×900 hero banner (dark)
-- `canopy-banner-light.svg/.png` – 1600×900 hero banner (light)
-- `canopy-banner-{dark,light}-og.png` – 1200×630 for Open Graph/social
-- `canopy-cover-dark.svg` – 1800×1200 presentation cover
+- `canopy-icon.svg` – Vector mark (rounded-square canopy tile). Used as the favicon, sidebar logo, and anywhere the app needs a scalable mark.
+- `canopy-icon-1024.png` – Raster export at 1024×1024 for Apple touch icon and any platform that doesn't accept SVG.
+- `canopy-logo-dark.svg` – Horizontal lockup (mark + "Canopy" wordmark) for dark backgrounds.
+- `canopy-logo-light.svg` – Horizontal lockup for light backgrounds.
+- `canopy-banner-dark-og.png` – 1200×630 social-sharing banner (Open Graph / Twitter).
 
 ## Design
 
-Tree canopy forming the letter "C" in warm golden tones. Represents shelter, growth, and unified financial oversight.
+Three overlapping tree-crown lobes arranged as a subtle "C" opening to the right, atop a short trunk, with a small warm-gold sun accent — an emerald→pine gradient on a deep forest-green rounded-square ground. Evokes shelter, growth, and a unified overview of your financial life.
 
 ## Usage
 
-- Favicon: `canopy-icon-32.png`
-- Touch icon: `canopy-icon-180.png`
-- PWA manifest: `canopy-icon-512.png`
-- Store artwork: `canopy-icon-1024.png`
-- OG image: `canopy-banner-dark-og.png`
+- Favicon: `canopy-icon.svg` (all modern browsers).
+- Apple touch icon: `canopy-icon-1024.png`.
+- Open Graph / social cards: `canopy-banner-dark-og.png`.
+- Sidebar / in-app mark: `canopy-icon.svg`.
+- Marketing / README header: `canopy-logo-dark.svg` (or light variant on white backgrounds).

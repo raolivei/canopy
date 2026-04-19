@@ -21,4 +21,3 @@ class PortfolioSnapshot(BaseModel):
 
     as_of: datetime
     holdings: list[Holding] = []
-

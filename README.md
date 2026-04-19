@@ -1,332 +1,85 @@
 # Canopy
 
-**Your financial life. Under one canopy.**
+**Canadian net worth and investments — self-hosted.**
 
-Canopy is a self-hosted personal finance, investment, and budgeting dashboard inspired by Monarch Money, Ghostfolio, and Firefly III. It runs fully local on Raspberry Pi k3s clusters with a lean footprint, storing all data locally without cloud dependencies.
+Canopy is a personal finance app for **CAD + USD**: Wealthsimple and Monarch CSV imports, optional **Wise** (CAD/USD balances) and **Questrade** integrations, portfolio holdings, cash/credit accounts, insights, and a **FIRE calculator**. Data stays on your infrastructure (e.g. k3s at home, Tailscale access).
 
-## Project Objectives
+## What it does
 
-- Combine portfolio, budgeting, and net-worth views into a single dashboard.
-- Store all data locally — no cloud dependencies.
-- Support multi-currency (CAD, USD, BRL, EUR, GBP) assets.
-- Allow easy CSV/OFX imports for banks and brokerages.
-- Run lean — optimized for Raspberry Pi hardware.
-- Be modular so other developers can fork and extend.
+| Area | Description |
+|------|-------------|
+| **Dashboard** | Net worth from Wealthsimple timeline + Monarch balances; currency toggle (CAD / USD / combined). |
+| **Import** | Wealthsimple statements, Monarch transactions + balances, legacy portfolio snapshots, bank CSV. |
+| **Portfolio** | Positions & accounts (securities vs cash/registered balances), allocation, performance, dividends. |
+| **Accounts** | Chequing, savings, credit, LOC — grouped optionally by institution or debit vs credit. |
+| **Insights** | Net worth, allocation, growth from snapshots; **FIRE** with default 7% or **CAGR from portfolio snapshots** (≥60 days of history). |
+| **Integrations** | Wise sync (CAD/USD only), Questrade (OAuth refresh token). |
 
-### Design Rationale
+## Stack
 
-**Why Single Dashboard?**
-Financial health requires seeing the big picture. Combining portfolio, budgeting, and transactions in one view helps users understand their complete financial situation without switching between tools.
+- **Backend:** FastAPI, SQLAlchemy, PostgreSQL, Alembic  
+- **Frontend:** Next.js, React Query, Tailwind, Recharts  
+- **FX:** Bank of Canada USDCAD cache (`fx_rates`) for combined views  
 
-**Why Local Storage?**
+Default local ports (see `docker-compose` / workspace config): **frontend `3001`**, **API `8001`**.
 
-- **Privacy:** Financial data never leaves your control
-- **Security:** No cloud breaches can expose your data
-- **Control:** You decide when and how to back up
-- **Compliance:** Meets data residency requirements
-
-**Why Multi-Currency?**
-Modern users often have assets across currencies. Proper currency support enables accurate net worth calculation and meaningful spending analysis regardless of transaction currency.
-
-**Why CSV/OFX Import?**
-Most banks don't offer APIs. CSV/OFX files are universal formats that allow users to import transaction history from any financial institution, making the tool truly platform-agnostic.
-
-**Why Raspberry Pi Optimized?**
-Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.
-
-## Core Features
-
-### Transaction Management (✅ Implemented)
-
-- ✅ Transaction tracking with categories and types (income, expense, transfer, buy, sell)
-- ✅ Multi-currency FX conversions with display currency toggle
-- ✅ Modern Monarch Money-inspired UI with dark mode support
-- ✅ Dashboard with charts and statistics (cash flow, spending by category)
-- ✅ Transaction CRUD API endpoints
-- ✅ Currency conversion API endpoints
-- ✅ CSV import with smart format detection (Monarch Money, Chase, Bank of America, etc.)
-- ✅ Duplicate detection and validation
-- ✅ Investment transaction tracking with ticker symbols
-- ✅ Rich transaction data (merchant, notes, tags, original statement)
-
-### Portfolio & Insights (✅ Implemented)
-
-- ✅ Investment portfolio tracking (stocks, ETFs, crypto, retirement accounts)
-- ✅ Net worth dashboard with multi-currency support (USD/CAD/BRL/EUR base)
-- ✅ Asset allocation by type, currency, country, and institution
-- ✅ Currency exposure analysis with risk assessment
-- ✅ Growth metrics (monthly/yearly rates, best/worst months)
-- ✅ Historical portfolio snapshots and trends
-- ✅ Real estate tracking with payment schedules (50% partnership support)
-- ✅ Liability tracking (credit cards, loans, mortgages)
-
-### FIRE Planning (✅ Implemented)
-
-- ✅ FIRE number calculation (based on expenses and safe withdrawal rate)
-- ✅ Years-to-FIRE projection with compound growth
-- ✅ 30-year net worth projections
-- ✅ What-if scenarios (save more, different returns, reduce expenses)
-- ✅ Passive income projections at FIRE
-
-### Integrations (🔄 In Progress)
-
-- 🔄 Questrade API (OAuth 2.0) - UI ready, API pending
-- 🔄 Moomoo/Futu OpenAPI - UI ready, API pending
-- 🔄 Wise API - UI ready, API pending
-- ✅ CSV import for all major institutions
-
-### Planned Features
-
-- 💰 Budgeting with categories and goals
-- 🧾 OFX import
-- 📤 Local backup to S3-compatible storage (MinIO/B2)
-- 🔒 Encrypted secrets (no external vault)
-- 📊 Dividend calendar and income streams
-
-## Current Version
-
-**v0.4.0** - Insights & FIRE Planning release with portfolio analytics.
-
-See [CHANGELOG.md](./CHANGELOG.md) for detailed release notes.
-
-## Quick Start
-
-### Prerequisites
-
-- Docker and Docker Compose (recommended)
-- Python 3.11+ with venv (for local development fallback)
-- Node.js 18+ and npm (for local development fallback)
-- k3s cluster (optional, for production deployment)
-
-### Recommended: Docker Compose (Primary Method)
+## Quick start
 
 ```bash
-# Load port assignments from workspace-config
-source ../workspace-config/ports/.env.ports
-
-# Start all services with hot reload
+# From repo root, with workspace port env if you use it:
+source ../workspace-config/ports/.env.ports   # optional
 docker-compose up
-
-# Or start in detached mode
-docker-compose up -d
 ```
 
-**Access:**
+- App: http://localhost:3001  
+- API docs: http://localhost:8001/docs  
 
-- Frontend: http://localhost:3001
-- API: http://localhost:8001
-- API Docs: http://localhost:8001/docs
+Set **`NEXT_PUBLIC_API_URL`** (e.g. `http://localhost:8001`) so the browser can reach the API from the Next dev server.
 
-**Benefits:**
+Local fallback without Docker: `backend` → uvicorn on 8001; `frontend` → `npm run dev` (port from `package.json` / env).
 
-- Consistent environment (matches production)
-- Hot reload enabled via volume mounts
-- No local Python/Node version conflicts
-- Single command to start everything
-
-See `../workspace-config/docs/DOCKER_COMPOSE_GUIDE.md` for complete guide.
-
-### Alternative: Local Development (Fallback)
-
-#### Backend Setup
-
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8001
-```
-
-**Why PYTHONPATH?**
-Python needs to find the `backend` module for absolute imports (`from backend.api import ...`). Setting PYTHONPATH to project root allows imports to work regardless of current directory.
-
-**Why `--reload`?**
-Enables auto-reload on code changes during development, speeding up iteration. Remove in production for better performance.
-
-**Why `0.0.0.0`?**
-Binds to all network interfaces, allowing access from other devices on your network (e.g., testing on mobile). Use `127.0.0.1` for localhost-only access.
-
-#### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-**Why Separate Processes?**
-Backend and frontend are independent services. Separating them allows:
-
-- Independent scaling
-- Different deployment strategies
-- Team members to work on one without affecting the other
-- Technology choices (Python backend, Node.js frontend)
-
-### Testing
-
-Run the test script to verify all functionality:
-
-```bash
-./test_app.sh
-```
-
-### Access
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-
-## Repo Structure
+## Repo layout
 
 ```
 canopy/
- ├── backend/
- │   ├── api/              # API endpoints
- │   │   ├── portfolio.py      # Portfolio CRUD
- │   │   ├── insights.py       # Insights & FIRE calculations
- │   │   ├── integrations.py   # External API integrations
- │   │   ├── transactions.py   # Transaction management
- │   │   └── currency.py       # Currency conversion
- │   ├── db/               # Database layer
- │   │   ├── models/           # SQLAlchemy ORM models
- │   │   │   ├── asset.py          # Assets (20+ types)
- │   │   │   ├── real_estate.py    # Real estate & payments
- │   │   │   ├── liability.py      # Liabilities & tracking
- │   │   │   └── ...
- │   │   ├── base.py           # SQLAlchemy base
- │   │   └── session.py        # Session management
- │   ├── services/         # Business logic
- │   │   ├── insights_calculator.py  # Net worth, allocation
- │   │   ├── fire_calculator.py      # FIRE planning
- │   │   ├── price_fetcher.py        # Yahoo Finance
- │   │   └── portfolio_calculator.py # Portfolio metrics
- │   ├── scripts/          # Utility scripts
- │   │   └── seed_portfolio.py   # Database seeding
- │   ├── alembic/          # Database migrations
- │   ├── models/           # Pydantic schemas
- │   ├── app/              # FastAPI application
- │   └── ingest/           # CSV import + Celery tasks
- ├── frontend/
- │   ├── components/       # React components
- │   │   ├── AllocationChart.tsx
- │   │   ├── PerformanceChart.tsx
- │   │   ├── PortfolioHoldingsTable.tsx
- │   │   └── ...
- │   ├── pages/            # Next.js pages
- │   │   ├── insights.tsx      # Insights dashboard
- │   │   ├── portfolio.tsx     # Portfolio management
- │   │   ├── settings/
- │   │   │   └── integrations.tsx  # API integrations
- │   │   └── ...
- │   └── utils/            # Utility functions
- ├── k8s/                  # Kubernetes manifests
- ├── .github/workflows/    # CI/CD
- ├── CHANGELOG.md          # Version history
- ├── ARCHITECTURE.md       # Architecture decisions
- └── README.md
+├── backend/           # FastAPI — api/, services/, db/models/, alembic/
+├── frontend/        # Next.js — pages/, components/
+├── k8s/               # Kubernetes manifests (eldertree / GHCR)
+├── CHANGELOG.md
+└── README.md
 ```
 
-## CSV Import
+Deeper docs: [CHANGELOG.md](./CHANGELOG.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md).
 
-Canopy now supports importing transactions from CSV files with smart format detection:
+## GitHub issues — triage (manual)
 
-### Supported Formats
+Close or narrow when you merge work:
 
-- **Monarch Money** - Full support including merchant names, categories, tags, and investment transactions
-- **Chase Bank** - Standard CSV export format
-- **Bank of America** - Checking and credit card statements
-- **Wells Fargo** - Transaction history exports
-- **Capital One** - With debit/credit columns
-- **American Express** - Card statements
-- **TD Bank, RBC, Nubank** - And many more
-- **Generic CSV** - Custom field mapping for any format
+| Issue | Suggested action |
+|-------|------------------|
+| [#23 Wise API](https://github.com/raolivei/canopy/issues/23) | **Close or narrow** — Wise sync exists (CAD/USD balances + transactions). Open follow-ups only for extra currencies/FX. |
+| [#21 Questrade](https://github.com/raolivei/canopy/issues/21) | **Keep open** until OAuth + sync are stable in prod; UI exists. |
+| [#24 Dividends](https://github.com/raolivei/canopy/issues/24) | **Open** — tracking UI exists; “income streams” scope may still apply. |
+| [#26 Property](https://github.com/raolivei/canopy/issues/26) | **Open**. |
+| [#27 API docs](https://github.com/raolivei/canopy/issues/27) | **Open**. |
+| [#29 / #30 “suites”](https://github.com/raolivei/canopy/issues) | **Open** — roadmap. |
 
-### Key Features
+## Branches
 
-- 🎯 Automatic format detection
-- 🔍 Duplicate transaction detection
-- 💰 Multi-currency support
-- 📊 Import preview before committing
-- 🏷️ Rich data support (merchant, tags, notes, original statement)
-- 📈 Investment transaction tracking (Buy/Sell with ticker symbols)
-- 📝 Import history tracking
-
-See **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** for detailed instructions and examples.
-
-## Insights & FIRE Planning
-
-The Insights page (`/insights`) provides comprehensive financial analytics:
-
-### Net Worth Dashboard
-
-- Total net worth with multi-currency support
-- Assets vs liabilities breakdown
-- Currency exposure analysis
-- Growth metrics (monthly, yearly, YTD)
-
-### FIRE Calculator
-
-Calculate your path to Financial Independence:
-
-- **FIRE Number**: Target net worth based on your expenses
-- **Years to FIRE**: How long until you reach financial independence
-- **Progress**: Visual progress bar showing % complete
-- **Projections**: 30-year net worth projections
-
-Default assumptions (customizable):
-
-- Monthly expenses: $5,000 CAD (~$3,600 USD)
-- Safe Withdrawal Rate: 4%
-- Expected Return: 7%
-
-### What-If Scenarios
-
-Compare different scenarios:
-
-- Save $500 more per month
-- Save $1000 more per month
-- Reduce expenses by 10%
-- 8% vs 7% vs 5% annual returns
-
-## Database Seeding
-
-To populate the database with sample data:
+After merging feature work to `main`, delete stale locals:
 
 ```bash
-cd backend
-
-# Seed the database
-python -m backend.scripts.seed_portfolio
-
-# Clear and reseed
-python -m backend.scripts.seed_portfolio --clear
+git checkout main && git pull
+git branch --merged main   # safe candidates
+git branch -d <branch-name>
 ```
 
-The seed script includes:
+Remote deletes: `git push origin --delete <branch>` only when the branch is merged and obsolete.
 
-- 40+ accounts across Canada, USA, and Brazil
-- Historical snapshots from Sep 2024 to present
-- Real estate (apartment with 50% ownership)
-- Liabilities (credit cards, car loan)
-- Crypto holdings (by platform and aggregated by coin)
+## Brand
 
-## Documentation
+Logo: [`frontend/public/brand/`](./frontend/public/brand/).
 
-- **[CHANGELOG.md](./CHANGELOG.md)** - Version history and release notes
-- **[MASTER_PROMPT.md](./MASTER_PROMPT.md)** - Complete application recreation guide
-- **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** - CSV import documentation and format guide
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture decisions and rationale
-- **[test_app.sh](./test_app.sh)** - Test script for verifying functionality
-- **[examples/](./examples/)** - Sample CSV files for different formats
+## Security
 
-## GitHub Issues
-
-Track ongoing development:
-
-- [#21 - Questrade API Integration](https://github.com/raolivei/canopy/issues/21)
-- [#22 - Moomoo API Integration](https://github.com/raolivei/canopy/issues/22)
-- [#23 - Wise API Integration](https://github.com/raolivei/canopy/issues/23)
-- [#24 - Dividend Tracking](https://github.com/raolivei/canopy/issues/24)
-- [#25 - Real-time Currency Rates](https://github.com/raolivei/canopy/issues/25)
-- [#26 - Property Value Estimation](https://github.com/raolivei/canopy/issues/26)
+Treat as **sensitive financial data**. Prefer private network / Tailscale; do not expose the app broadly without strong auth. Secrets via your cluster’s secret store (e.g. Vault), not in Git.

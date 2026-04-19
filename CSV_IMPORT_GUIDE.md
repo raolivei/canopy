@@ -51,10 +51,6 @@ Full support for Monarch Money CSV exports including:
 - **Columns:** Transaction Date, Description, Debit, Credit, Account Number
 - **Date Format:** MM/DD/YYYY
 
-### Nubank
-- **Columns:** date, title, amount, category
-- **Date Format:** YYYY-MM-DD
-
 ### Generic CSV
 Use this option for any CSV file and manually map columns using the custom mapping feature.
 
@@ -71,13 +67,10 @@ The system checks for duplicate transactions based on:
 
 Duplicates are flagged in the preview and can be skipped during import.
 
-### 💰 Multi-Currency Support
-Import transactions in any of these currencies:
-- USD (US Dollar)
-- CAD (Canadian Dollar)
-- BRL (Brazilian Real)
-- EUR (Euro)
-- GBP (British Pound)
+### 💰 Supported Currencies
+Canopy is CAD + USD only. Rows in other currencies are skipped at ingest:
+- CAD (Canadian Dollar) — primary
+- USD (US Dollar) — first-class (WS USD accounts, US credit cards, etc.)
 
 ### 📊 Import Preview
 Before importing, you'll see:

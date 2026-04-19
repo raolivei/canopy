@@ -9,11 +9,12 @@ from pydantic import BaseModel, Field
 from backend.db.models.asset import AssetType
 from backend.db.models.dividend import DividendType
 
-
 # ============== Asset Schemas ==============
+
 
 class AssetCreate(BaseModel):
     """Schema for creating a new asset."""
+
     symbol: str = Field(..., min_length=1, max_length=20, description="Ticker symbol")
     name: str = Field(..., min_length=1, max_length=255, description="Asset name")
     asset_type: AssetType = Field(default=AssetType.STOCK, description="Type of asset")
@@ -22,6 +23,7 @@ class AssetCreate(BaseModel):
 
 class AssetResponse(BaseModel):
     """Schema for asset response."""
+
     id: int
     symbol: str
     name: str
@@ -36,6 +38,7 @@ class AssetResponse(BaseModel):
 
 class AssetWithHoldings(AssetResponse):
     """Asset with calculated holdings data."""
+
     total_shares: Decimal = Field(default=Decimal("0"))
     average_cost: Optional[Decimal] = None
     total_cost_basis: Decimal = Field(default=Decimal("0"))
@@ -46,8 +49,10 @@ class AssetWithHoldings(AssetResponse):
 
 # ============== Lot Schemas ==============
 
+
 class LotCreate(BaseModel):
     """Schema for creating a new lot (purchase)."""
+
     asset_id: int = Field(..., description="ID of the asset being purchased")
     quantity: Decimal = Field(..., gt=0, description="Number of shares/units")
     price_per_unit: Decimal = Field(..., gt=0, description="Price per share/unit")
@@ -59,6 +64,7 @@ class LotCreate(BaseModel):
 
 class LotSell(BaseModel):
     """Schema for selling a lot."""
+
     sold_date: date = Field(..., description="Date of sale")
     sold_price_per_unit: Decimal = Field(..., gt=0, description="Sale price per share")
     sold_fees: Decimal = Field(default=Decimal("0"), ge=0, description="Sale transaction fees")
@@ -66,6 +72,7 @@ class LotSell(BaseModel):
 
 class LotResponse(BaseModel):
     """Schema for lot response."""
+
     id: int
     asset_id: int
     quantity: Decimal
@@ -79,7 +86,7 @@ class LotResponse(BaseModel):
     sold_price_per_unit: Optional[Decimal] = None
     sold_fees: Optional[Decimal] = None
     created_at: datetime
-    
+
     # Calculated fields
     cost_basis: Decimal
     realized_gain_loss: Optional[Decimal] = None
@@ -89,8 +96,10 @@ class LotResponse(BaseModel):
 
 # ============== Dividend Schemas ==============
 
+
 class DividendCreate(BaseModel):
     """Schema for recording a dividend."""
+
     asset_id: int = Field(..., description="ID of the asset")
     amount: Decimal = Field(..., gt=0, description="Dividend amount")
     payment_date: date = Field(..., description="Date dividend was paid")
@@ -101,6 +110,7 @@ class DividendCreate(BaseModel):
 
 class DividendResponse(BaseModel):
     """Schema for dividend response."""
+
     id: int
     asset_id: int
     amount: Decimal
@@ -109,7 +119,7 @@ class DividendResponse(BaseModel):
     shares_received: Optional[Decimal] = None
     notes: Optional[str] = None
     created_at: datetime
-    
+
     # Include asset info
     asset_symbol: Optional[str] = None
 
@@ -118,12 +128,15 @@ class DividendResponse(BaseModel):
 
 # ============== Portfolio Summary Schemas ==============
 
+
 class HoldingSummary(BaseModel):
     """Summary of a single holding."""
+
     asset_id: int
     symbol: str
     name: str
     asset_type: AssetType
+    currency: str = "CAD"
     total_shares: Decimal
     average_cost: Decimal
     current_price: Optional[Decimal] = None
@@ -136,6 +149,7 @@ class HoldingSummary(BaseModel):
 
 class PortfolioSummary(BaseModel):
     """Complete portfolio summary with metrics."""
+
     total_value: Optional[Decimal] = None
     total_cost_basis: Decimal
     total_gain_loss: Optional[Decimal] = None
@@ -147,6 +161,7 @@ class PortfolioSummary(BaseModel):
 
 class AllocationItem(BaseModel):
     """Single allocation item for pie chart."""
+
     asset_type: AssetType
     value: Decimal
     percentage: Decimal
@@ -155,14 +170,17 @@ class AllocationItem(BaseModel):
 
 class PortfolioAllocation(BaseModel):
     """Portfolio allocation breakdown."""
+
     by_asset_type: list[AllocationItem]
     total_value: Decimal
 
 
 # ============== Performance Schemas ==============
 
+
 class PerformancePoint(BaseModel):
     """Single point in performance history."""
+
     date: date
     total_value: Decimal
     total_cost_basis: Decimal
@@ -172,6 +190,7 @@ class PerformancePoint(BaseModel):
 
 class PortfolioPerformance(BaseModel):
     """Historical portfolio performance."""
+
     period: str  # 7d, 30d, 90d, 1y, all
     data_points: list[PerformancePoint]
     start_value: Optional[Decimal] = None

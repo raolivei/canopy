@@ -10,10 +10,10 @@ from celery.schedules import crontab
 from sqlalchemy import select
 
 from backend.app.config import get_settings
-from backend.db.session import SessionLocal
 from backend.db.models.asset import Asset, AssetType, SyncSource
 from backend.db.models.lot import Lot
 from backend.db.models.portfolio_snapshot import PortfolioSnapshot, SnapshotHolding
+from backend.db.session import SessionLocal
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -120,20 +120,20 @@ def sync_questrade(refresh_token: Optional[str] = None) -> dict:
 @celery_app.task(name="ingest.update_all_prices")
 def update_all_prices() -> dict:
     """Update prices for all tracked assets.
-    
+
     Returns dict with results per symbol.
     """
     # Import here to avoid circular imports
     from backend.services.price_fetcher import PriceFetcher
-    
+
     db = SessionLocal()
     try:
         fetcher = PriceFetcher(db)
         results = fetcher.update_all_prices()
-        
+
         success_count = sum(1 for v in results.values() if v)
         logger.info(f"Price update complete: {success_count}/{len(results)} updated")
-        
+
         return results
     finally:
         db.close()
@@ -143,17 +143,15 @@ def update_all_prices() -> dict:
 def update_asset_price(asset_id: int) -> bool:
     """Update price for a single asset."""
     from backend.services.price_fetcher import PriceFetcher
-    
+
     db = SessionLocal()
     try:
-        asset = db.execute(
-            select(Asset).where(Asset.id == asset_id)
-        ).scalar_one_or_none()
-        
+        asset = db.execute(select(Asset).where(Asset.id == asset_id)).scalar_one_or_none()
+
         if not asset:
             logger.error(f"Asset {asset_id} not found")
             return False
-        
+
         fetcher = PriceFetcher(db)
         return fetcher.update_asset_price(asset)
     finally:
@@ -163,60 +161,64 @@ def update_asset_price(asset_id: int) -> bool:
 @celery_app.task(name="ingest.create_daily_snapshot")
 def create_daily_snapshot() -> dict:
     """Create a daily portfolio snapshot.
-    
+
     Captures total portfolio value, cost basis, and per-asset breakdown.
     """
     db = SessionLocal()
     try:
         today = date.today()
-        
+
         # Check if snapshot already exists for today
         existing = db.execute(
             select(PortfolioSnapshot).where(PortfolioSnapshot.snapshot_date == today)
         ).scalar_one_or_none()
-        
+
         if existing:
             logger.info(f"Snapshot already exists for {today}")
             return {"status": "exists", "date": str(today)}
-        
+
         # Get all assets with unsold lots
         assets = db.execute(select(Asset)).scalars().all()
-        
+
         total_value = Decimal("0")
         total_cost_basis = Decimal("0")
         holdings_data = []
-        
+
         for asset in assets:
             # Calculate totals from unsold lots
-            lots = db.execute(
-                select(Lot)
-                .where(Lot.asset_id == asset.id)
-                .where(Lot.is_sold == False)
-            ).scalars().all()
-            
+            lots = (
+                db.execute(
+                    select(Lot).where(Lot.asset_id == asset.id).where(Lot.is_sold.is_(False))
+                )
+                .scalars()
+                .all()
+            )
+
             if not lots:
                 continue
-            
+
             quantity = sum(lot.quantity for lot in lots)
             cost_basis = sum(lot.cost_basis for lot in lots)
-            
+
             # Market value requires current price
             if asset.current_price is not None:
                 market_value = quantity * asset.current_price
             else:
                 market_value = cost_basis  # Fallback to cost basis
-            
-            holdings_data.append({
-                "asset": asset,
-                "quantity": quantity,
-                "cost_basis": cost_basis,
-                "market_value": market_value,
-                "price": asset.current_price or (cost_basis / quantity if quantity > 0 else Decimal("0")),
-            })
-            
+
+            holdings_data.append(
+                {
+                    "asset": asset,
+                    "quantity": quantity,
+                    "cost_basis": cost_basis,
+                    "market_value": market_value,
+                    "price": asset.current_price or (cost_basis / quantity if quantity > 0 else Decimal("0")),
+                }
+            )
+
             total_value += market_value
             total_cost_basis += cost_basis
-        
+
         # Create snapshot
         snapshot = PortfolioSnapshot(
             snapshot_date=today,
@@ -225,7 +227,7 @@ def create_daily_snapshot() -> dict:
         )
         db.add(snapshot)
         db.flush()  # Get snapshot ID
-        
+
         # Create holdings
         for data in holdings_data:
             holding = SnapshotHolding(
@@ -237,11 +239,11 @@ def create_daily_snapshot() -> dict:
                 price_at_snapshot=data["price"],
             )
             db.add(holding)
-        
+
         db.commit()
-        
+
         logger.info(f"Created snapshot for {today}: value=${total_value}, holdings={len(holdings_data)}")
-        
+
         return {
             "status": "created",
             "date": str(today),
@@ -249,6 +251,6 @@ def create_daily_snapshot() -> dict:
             "total_cost_basis": str(total_cost_basis),
             "holdings_count": len(holdings_data),
         }
-        
+
     finally:
         db.close()
