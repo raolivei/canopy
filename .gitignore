@@ -15,6 +15,9 @@ __pycache__/
 .venv-ci/
 venv/
 
+# uv lockfile — image installs from requirements.txt; commit uv.lock only if CI/Docker switches to uv
+backend/uv.lock
+
 # Env files
 .env
 backend/.env
