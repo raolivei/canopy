@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { format, isToday, isYesterday, isThisWeek, isThisMonth, parseISO } from "date-fns";
-import { formatCurrency, convertCurrency } from "@/utils/currency";
+import { formatCurrency } from "@/utils/currency";
 import { cn } from "@/utils/cn";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -66,7 +66,7 @@ export default function Transactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [displayCurrency, setDisplayCurrency] = useState("CAD");
+  const displayCurrency = "CAD";
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
@@ -98,7 +98,6 @@ export default function Transactions() {
       if (minAmount) params.set("min_amount", minAmount);
       if (maxAmount) params.set("max_amount", maxAmount);
       if (accountFilter !== "all") params.set("account", accountFilter);
-      if (displayCurrency) params.set("currency", displayCurrency);
       params.set("limit", "2000");
 
       const res = await fetch(`/v1/transactions/?${params.toString()}`);
@@ -109,7 +108,7 @@ export default function Transactions() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, typeFilter, categoryFilter, startDate, endDate, minAmount, maxAmount, accountFilter, displayCurrency]);
+  }, [searchQuery, typeFilter, categoryFilter, startDate, endDate, minAmount, maxAmount, accountFilter]);
 
   useEffect(() => {
     fetchTransactions();
@@ -235,14 +234,6 @@ export default function Transactions() {
     ...uniqueAccounts.map((a) => ({ value: a as string, label: a as string })),
   ];
 
-  const currencyOptions = [
-    { value: "CAD", label: "CAD" },
-    { value: "USD", label: "USD" },
-    { value: "BRL", label: "BRL" },
-    { value: "EUR", label: "EUR" },
-    { value: "GBP", label: "GBP" },
-  ];
-
   const hasActiveFilters = typeFilter !== "all" || categoryFilter.length > 0 || searchQuery || startDate || endDate || minAmount || maxAmount || accountFilter !== "all";
 
   const advancedFilterCount = [startDate, endDate, minAmount, maxAmount, accountFilter !== "all" ? accountFilter : ""].filter(Boolean).length;
@@ -363,7 +354,6 @@ export default function Transactions() {
                   placeholder="Categories"
                   className="w-40"
                 />
-                <Select options={currencyOptions} value={displayCurrency} onChange={setDisplayCurrency} className="w-24" />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -497,7 +487,7 @@ export default function Transactions() {
                   <CardContent noPadding>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {txs.map((tx) => (
-                        <TransactionRow key={tx.id} transaction={tx} onDelete={handleDelete} displayCurrency={displayCurrency} />
+                        <TransactionRow key={tx.id} transaction={tx} onDelete={handleDelete} />
                       ))}
                     </div>
                   </CardContent>
@@ -536,23 +526,15 @@ export default function Transactions() {
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             placeholder="e.g., Grocery shopping"
           />
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Amount"
-              type="number"
-              step="0.01"
-              required
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              placeholder="0.00"
-            />
-            <Select
-              label="Currency"
-              options={currencyOptions}
-              value={formData.currency}
-              onChange={(v) => setFormData({ ...formData, currency: v })}
-            />
-          </div>
+          <Input
+            label="Amount (CAD)"
+            type="number"
+            step="0.01"
+            required
+            value={formData.amount}
+            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+            placeholder="0.00"
+          />
           <div className="grid grid-cols-2 gap-4">
             <Select
               label="Type"
@@ -598,10 +580,9 @@ export default function Transactions() {
 interface TransactionRowProps {
   transaction: Transaction;
   onDelete: (id: number) => void;
-  displayCurrency: string;
 }
 
-function TransactionRow({ transaction: tx, onDelete, displayCurrency }: TransactionRowProps) {
+function TransactionRow({ transaction: tx, onDelete }: TransactionRowProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   return (

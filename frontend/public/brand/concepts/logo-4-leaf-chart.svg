@@ -1,0 +1,25 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Canopy leaf-chart concept" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Wallet pocket at the base that the stem tucks into -->
+  <path d="M28 104 H100 Q108 104 108 96 V86 Q108 78 100 78 H88" />
+  <!-- Leaf outline: pointed top, rounded belly, stem dipping into the wallet -->
+  <path d="M64 18
+           C 34 24, 20 52, 28 78
+           C 44 88, 82 86, 96 60
+           C 100 46, 94 28, 64 18 Z" />
+  <!-- Stem continues from leaf into the wallet pocket -->
+  <path d="M64 78 L64 90 Q64 98 72 98 H88" />
+  <!-- Midrib -->
+  <line x1="64" y1="24" x2="64" y2="74" />
+  <!-- Veins that resolve into an ascending line chart on the right side -->
+  <polyline points="50 68, 60 58, 72 60, 84 44, 96 36"
+            stroke-width="4" />
+  <!-- Tiny chart dots -->
+  <circle cx="50" cy="68" r="2.5" fill="currentColor" stroke="none" />
+  <circle cx="60" cy="58" r="2.5" fill="currentColor" stroke="none" />
+  <circle cx="72" cy="60" r="2.5" fill="currentColor" stroke="none" />
+  <circle cx="84" cy="44" r="2.5" fill="currentColor" stroke="none" />
+  <circle cx="96" cy="36" r="3" fill="currentColor" stroke="none" />
+  <!-- Left-side veins (decorative) -->
+  <path d="M64 38 Q 52 42, 42 54" stroke-width="3" />
+  <path d="M64 54 Q 52 58, 40 66" stroke-width="3" />
+</svg>

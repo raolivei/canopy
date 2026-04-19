@@ -22,6 +22,7 @@ TOKEN_URL = "https://login.questrade.com/oauth2/token"
 @dataclass
 class QuestradeAccount:
     """A Questrade account (TFSA, RRSP, Margin, etc.)."""
+
     number: str
     type: str
     status: str
@@ -33,6 +34,7 @@ class QuestradeAccount:
 @dataclass
 class QuestradePosition:
     """A position (holding) in a Questrade account."""
+
     symbol_id: int
     symbol: str
     open_quantity: Decimal
@@ -46,6 +48,7 @@ class QuestradePosition:
 @dataclass
 class QuestradeBalance:
     """Balance summary for an account."""
+
     currency: str
     cash: Decimal
     market_value: Decimal
@@ -73,18 +76,15 @@ class QuestradeIntegrationService:
     def _ensure_token(self) -> None:
         """Refresh access token if expired or missing."""
         import time
-        if (
-            self._access_token
-            and self._api_server
-            and self._expires_at
-            and time.time() < self._expires_at - 60
-        ):
+
+        if self._access_token and self._api_server and self._expires_at and time.time() < self._expires_at - 60:
             return
         self._refresh_token()
 
     def _refresh_token(self) -> None:
         """Exchange refresh token for access token and api_server URL."""
         import time
+
         response = httpx.post(
             TOKEN_URL,
             data={
@@ -145,26 +145,22 @@ class QuestradeIntegrationService:
             open_qty = Decimal(str(p.get("openQuantity", 0)))
             if open_qty <= 0:
                 continue
-            positions.append(QuestradePosition(
-                symbol_id=p.get("symbolId", 0),
-                symbol=p.get("symbol", ""),
-                open_quantity=open_qty,
-                current_market_value=(
-                    Decimal(str(p["currentMarketValue"])) if p.get("currentMarketValue") is not None else None
-                ),
-                current_price=(
-                    Decimal(str(p["currentPrice"])) if p.get("currentPrice") is not None else None
-                ),
-                average_entry_price=(
-                    Decimal(str(p["averageEntryPrice"])) if p.get("averageEntryPrice") is not None else None
-                ),
-                open_pnl=(
-                    Decimal(str(p["openPnl"])) if p.get("openPnl") is not None else None
-                ),
-                closed_pnl=(
-                    Decimal(str(p["closedPnl"])) if p.get("closedPnl") is not None else None
-                ),
-            ))
+            positions.append(
+                QuestradePosition(
+                    symbol_id=p.get("symbolId", 0),
+                    symbol=p.get("symbol", ""),
+                    open_quantity=open_qty,
+                    current_market_value=(
+                        Decimal(str(p["currentMarketValue"])) if p.get("currentMarketValue") is not None else None
+                    ),
+                    current_price=(Decimal(str(p["currentPrice"])) if p.get("currentPrice") is not None else None),
+                    average_entry_price=(
+                        Decimal(str(p["averageEntryPrice"])) if p.get("averageEntryPrice") is not None else None
+                    ),
+                    open_pnl=(Decimal(str(p["openPnl"])) if p.get("openPnl") is not None else None),
+                    closed_pnl=(Decimal(str(p["closedPnl"])) if p.get("closedPnl") is not None else None),
+                )
+            )
         return positions
 
     def get_balances(self, account_number: str) -> list[QuestradeBalance]:
@@ -172,18 +168,18 @@ class QuestradeIntegrationService:
         data = self._get(f"accounts/{account_number}/balances")
         balances = []
         for b in data.get("perCurrencyBalances", []) or []:
-            balances.append(QuestradeBalance(
-                currency=b.get("currency", "CAD"),
-                cash=Decimal(str(b.get("cash", 0))),
-                market_value=Decimal(str(b.get("marketValue", 0))),
-                total_equity=Decimal(str(b.get("totalEquity", 0))),
-                buying_power=(
-                    Decimal(str(b["buyingPower"])) if b.get("buyingPower") is not None else None
-                ),
-                maintenance_excess=(
-                    Decimal(str(b["maintenanceExcess"])) if b.get("maintenanceExcess") is not None else None
-                ),
-            ))
+            balances.append(
+                QuestradeBalance(
+                    currency=b.get("currency", "CAD"),
+                    cash=Decimal(str(b.get("cash", 0))),
+                    market_value=Decimal(str(b.get("marketValue", 0))),
+                    total_equity=Decimal(str(b.get("totalEquity", 0))),
+                    buying_power=(Decimal(str(b["buyingPower"])) if b.get("buyingPower") is not None else None),
+                    maintenance_excess=(
+                        Decimal(str(b["maintenanceExcess"])) if b.get("maintenanceExcess") is not None else None
+                    ),
+                )
+            )
         return balances
 
     def close(self) -> None:

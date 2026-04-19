@@ -1,24 +1,40 @@
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import {
   Home,
   TrendingUp,
-  DollarSign,
   Wallet,
   Menu,
+  UploadCloud,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 
+// The primary mobile slot points at the Wealthsimple importer now that
+// portfolio-snapshot CSVs live under Legacy. Reachable from the
+// command palette / sidebar when needed.
 const mobileNavItems = [
   { name: "Home", href: "/", icon: Home },
-  { name: "Portfolio", href: "/portfolio", icon: TrendingUp },
-  { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
+  { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "More", href: "/settings", icon: Menu },
 ];
 
 export default function MobileNav() {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Render nothing on the server / first client paint. Browser
+  // extensions (e.g. Dark Reader) inject attributes like
+  // ``data-darkreader-inline-stroke`` onto lucide SVG icons before
+  // hydration, producing "Extra attributes from the server" warnings.
+  // Gating renders on ``isMounted`` mirrors what Sidebar already does.
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-area-pb">

@@ -69,25 +69,14 @@ interface ImportResult {
 }
 
 const bankFormats = [
-  { value: "monarch", label: "Monarch Money" },
   { value: "generic", label: "Generic CSV" },
-  { value: "chase", label: "Chase" },
-  { value: "bank_of_america", label: "Bank of America" },
-  { value: "wells_fargo", label: "Wells Fargo" },
-  { value: "capital_one", label: "Capital One" },
-  { value: "amex", label: "American Express" },
-  { value: "td_bank", label: "TD Bank" },
+  { value: "wealthsimple", label: "Wealthsimple" },
   { value: "rbc", label: "RBC" },
-  { value: "nubank", label: "Nubank" },
+  { value: "td_bank", label: "TD" },
+  { value: "scotiabank", label: "Scotiabank" },
 ];
 
-const currencyOptions = [
-  { value: "USD", label: "USD - US Dollar" },
-  { value: "CAD", label: "CAD - Canadian Dollar" },
-  { value: "BRL", label: "BRL - Brazilian Real" },
-  { value: "EUR", label: "EUR - Euro" },
-  { value: "GBP", label: "GBP - British Pound" },
-];
+const currencyOptions = [{ value: "CAD", label: "CAD - Canadian Dollar" }];
 
 export default function Import() {
   const router = useRouter();

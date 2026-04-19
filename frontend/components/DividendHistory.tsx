@@ -18,7 +18,7 @@ interface DividendHistoryProps {
   onDelete?: (id: number) => void;
 }
 
-function formatCurrency(value: number, currency: string = "USD"): string {
+function formatCurrency(value: number, currency: string = "CAD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -40,7 +40,7 @@ const TYPE_COLORS: Record<string, string> = {
   reinvested: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
-export default function DividendHistory({ dividends, currency = "USD" }: DividendHistoryProps) {
+export default function DividendHistory({ dividends, currency = "CAD" }: DividendHistoryProps) {
   const totalDividends = dividends.reduce((sum, d) => sum + Number(d.amount), 0);
 
   if (dividends.length === 0) {

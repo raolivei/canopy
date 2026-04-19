@@ -35,7 +35,7 @@ const TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-function formatCurrency(value: number, currency: string = "USD"): string {
+function formatCurrency(value: number, currency: string = "CAD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -47,7 +47,7 @@ function formatCurrency(value: number, currency: string = "USD"): string {
 export default function AllocationChart({
   data,
   totalValue,
-  currency = "USD",
+  currency = "CAD",
 }: AllocationChartProps) {
   if (data.length === 0) {
     return (

@@ -1,12 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
+import PageLayout from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge, CurrencyBadge } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
-import { Select } from "@/components/ui/Select";
 import { SkeletonMetricCard, SkeletonTable } from "@/components/ui/Skeleton";
 import PortfolioHoldingsTable from "@/components/PortfolioHoldingsTable";
 import AddAssetModal from "@/components/AddAssetModal";
@@ -23,19 +22,20 @@ import {
   Loader2,
   BarChart3,
   Briefcase,
-  Calendar,
 } from "lucide-react";
-import { formatCurrency } from "@/utils/currency";
+import { useMoney } from "@/hooks/useMoney";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
+import { CurrencyViewToggle } from "@/components/CurrencyViewToggle";
+import {
+  convertForView,
+  isSingleCurrencyView,
+  useCurrencyView,
+  viewCurrency,
+} from "@/hooks/useCurrencyView";
+import { useFxRate } from "@/hooks/useFxRate";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-
-const EXCHANGE_RATES: Record<string, Record<string, number>> = {
-  USD: { USD: 1, CAD: 1.35, BRL: 5.0, BTC: 0.000016, ETH: 0.00035 },
-  CAD: { USD: 0.74, CAD: 1, BRL: 3.7, BTC: 0.000012, ETH: 0.00026 },
-  BRL: { USD: 0.2, CAD: 0.27, BRL: 1, BTC: 0.0000032, ETH: 0.00007 },
-};
 
 interface PortfolioSummary {
   total_value: number | null;
@@ -66,27 +66,25 @@ export default function Portfolio() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("holdings");
   const [performancePeriod, setPerformancePeriod] = useState("30d");
-  const [displayCurrency, setDisplayCurrency] = useState("CAD");
-  const [currencyFilter, setCurrencyFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
-  const convertToDisplay = (value: number | string | null, fromCurrency: string): number => {
+  // Questrade-style currency view: drives filtering (CAD / USD only)
+  // and conversion (Combined CAD / Combined USD). The live BoC rate
+  // replaces the 1.35 fallback the page used before the FX service
+  // landed.
+  const { view } = useCurrencyView();
+  const { fmt, pct } = useMoney();
+  const displayCurrency = viewCurrency(view);
+  const fx = useFxRate();
+  const usdCadRate = fx.data?.rate ?? null;
+
+  const convertToDisplay = (
+    value: number | string | null,
+    fromCurrency: string,
+  ): number => {
     if (value === null) return 0;
     const numValue = Number(value);
-    if (fromCurrency === displayCurrency) return numValue;
-
-    if (fromCurrency === "BTC") {
-      const btcToUsd = numValue * 62000;
-      return convertToDisplay(btcToUsd, "USD");
-    }
-    if (fromCurrency === "ETH") {
-      const ethToUsd = numValue * 2400;
-      return convertToDisplay(ethToUsd, "USD");
-    }
-
-    const rates = EXCHANGE_RATES[fromCurrency];
-    if (!rates) return numValue;
-    return numValue * (rates[displayCurrency] || 1);
+    return convertForView(numValue, fromCurrency || "CAD", view, usdCadRate);
   };
 
   const { data: summary, isLoading: summaryLoading } = useQuery<PortfolioSummary>({
@@ -205,8 +203,11 @@ export default function Portfolio() {
     if (!summary?.holdings) return [];
 
     let holdings = summary.holdings;
-    if (currencyFilter && currencyFilter !== "all") {
-      holdings = holdings.filter((h: any) => h.currency === currencyFilter);
+    // Single-currency views filter rather than convert: a "CAD" view
+    // means "show me only my CAD holdings", matching Questrade.
+    if (isSingleCurrencyView(view)) {
+      const target = viewCurrency(view);
+      holdings = holdings.filter((h: any) => (h.currency || "CAD") === target);
     }
 
     return holdings.map((h: any) => ({
@@ -214,33 +215,30 @@ export default function Portfolio() {
       market_value_converted: convertToDisplay(h.market_value, h.currency),
       cost_basis_converted: convertToDisplay(h.cost_basis, h.currency),
     }));
-  }, [summary?.holdings, currencyFilter, displayCurrency]);
+    // convertToDisplay closes over ``view`` and ``usdCadRate``; those
+    // are listed explicitly so the memo re-runs when the user flips
+    // the view or the FX cache refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary?.holdings, view, usdCadRate]);
 
   const totalValue = useMemo(() => {
     return processedHoldings.reduce((sum: number, h: any) => sum + (h.market_value_converted || 0), 0);
   }, [processedHoldings]);
 
-  const availableCurrencies = useMemo(() => {
+  const availableCurrencies = useMemo<string[]>(() => {
     if (!summary?.holdings) return [];
-    const currencies = new Set(summary.holdings.map((h: any) => h.currency));
+    const currencies = new Set<string>(
+      summary.holdings.map((h: any): string => (h.currency as string) || "CAD"),
+    );
     return Array.from(currencies).sort();
   }, [summary?.holdings]);
 
-  const currencyOptions = [
-    { value: "all", label: "All Currencies" },
-    ...availableCurrencies.map((c) => ({ value: c, label: c })),
-  ];
-
-  const displayCurrencyOptions = [
-    { value: "CAD", label: "CAD" },
-    { value: "USD", label: "USD" },
-    { value: "BRL", label: "BRL" },
-  ];
-
   if (summaryLoading) {
     return (
-      <PageLayout title="Portfolio">
-        <PageHeader title="Portfolio" description="Track your investments and assets" />
+      <PageLayout
+        title="Portfolio"
+        description="Track your investments and assets"
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[1, 2, 3, 4].map((i) => (
             <SkeletonMetricCard key={i} />
@@ -265,40 +263,41 @@ export default function Portfolio() {
             <div>
               <p className="text-sm font-medium text-primary-700 dark:text-primary-300 mb-1">
                 Total Portfolio Value
-                {currencyFilter !== "all" && (
-                  <CurrencyBadge currency={currencyFilter} className="ml-2" />
-                )}
+                <CurrencyBadge currency={displayCurrency} className="ml-2" />
               </p>
               <h1 className="text-4xl lg:text-5xl font-semibold tracking-tight text-slate-900 dark:text-white mb-2">
-                {formatCurrency(totalValue, displayCurrency)}
+                {fmt(totalValue, displayCurrency)}
               </h1>
               <div className="flex items-center gap-3">
-                <Badge variant={summary?.total_return_pct && summary.total_return_pct >= 0 ? "success" : "danger"}>
-                  {summary?.total_return_pct && summary.total_return_pct >= 0 ? (
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3 mr-1" />
-                  )}
-                  {summary?.total_return_pct?.toFixed(2) || 0}% all time
-                </Badge>
+                {(() => {
+                  // FastAPI serializes Decimal as a JSON string, so we
+                  // always coerce before doing numeric work — avoids
+                  // ``"… is not a function"`` on ``.toFixed``.
+                  const pctNum =
+                    summary?.total_return_pct === null ||
+                    summary?.total_return_pct === undefined
+                      ? null
+                      : Number(summary.total_return_pct);
+                  const pctValid = pctNum !== null && Number.isFinite(pctNum);
+                  const isPositive = pctValid && (pctNum as number) >= 0;
+                  return (
+                    <Badge variant={isPositive ? "success" : "danger"}>
+                      {isPositive ? (
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3 mr-1" />
+                      )}
+                      {pctValid ? pct(pctNum as number, 2) : pct(0, 2)} all time
+                    </Badge>
+                  );
+                })()}
                 <span className="text-sm text-slate-500 dark:text-slate-400">
                   {processedHoldings.length} holdings
                 </span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Select
-                options={currencyOptions}
-                value={currencyFilter}
-                onChange={setCurrencyFilter}
-                className="w-36"
-              />
-              <Select
-                options={displayCurrencyOptions}
-                value={displayCurrency}
-                onChange={setDisplayCurrency}
-                className="w-24"
-              />
+            <div className="flex flex-wrap items-start gap-3">
+              <CurrencyViewToggle />
               <Button
                 variant="secondary"
                 leftIcon={createSnapshot.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <PieChart className="w-4 h-4" />}
@@ -336,13 +335,13 @@ export default function Portfolio() {
       >
         <MetricCard
           title="Total Value"
-          value={formatCurrency(totalValue, displayCurrency)}
+          value={fmt(totalValue, displayCurrency)}
           icon={<Briefcase className="w-5 h-5" />}
           iconBg="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400"
         />
         <MetricCard
           title="Total Gain/Loss"
-          value={summary?.total_gain_loss !== null ? formatCurrency(summary?.total_gain_loss || 0, displayCurrency) : "—"}
+          value={summary?.total_gain_loss !== null ? fmt(summary?.total_gain_loss || 0, displayCurrency) : "—"}
           subtitle={summary?.total_gain_loss !== null ? undefined : "No cost basis data"}
           icon={<TrendingUp className="w-5 h-5" />}
           iconBg={cn(
@@ -353,14 +352,18 @@ export default function Portfolio() {
         />
         <MetricCard
           title="Total Dividends"
-          value={formatCurrency(Number(summary?.total_dividends ?? 0), displayCurrency)}
+          value={fmt(Number(summary?.total_dividends ?? 0), displayCurrency)}
           icon={<DollarSign className="w-5 h-5" />}
           iconBg="bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400"
         />
         <MetricCard
           title="Holdings"
           value={String(processedHoldings.length)}
-          subtitle={currencyFilter !== "all" ? `${currencyFilter} assets` : "assets tracked"}
+          subtitle={
+            isSingleCurrencyView(view)
+              ? `${displayCurrency} assets`
+              : "assets tracked"
+          }
           icon={<BarChart3 className="w-5 h-5" />}
           iconBg="bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400"
         />
@@ -413,13 +416,22 @@ export default function Portfolio() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {availableCurrencies.map((currency) => {
+                    {(() => {
+                      // The allocation panel always shows the full CAD/USD
+                      // split regardless of the active view, so compute a
+                      // dedicated total off the unfiltered holdings.
+                      const panelTotal = (summary?.holdings || []).reduce(
+                        (sum: number, h: any) =>
+                          sum + convertToDisplay(h.market_value, h.currency),
+                        0,
+                      );
+                      return availableCurrencies.map((currency: string) => {
                       const currencyHoldings = summary?.holdings?.filter((h: any) => h.currency === currency) || [];
                       const currencyTotal = currencyHoldings.reduce(
                         (sum: number, h: any) => sum + convertToDisplay(h.market_value, h.currency),
                         0
                       );
-                      const percentage = totalValue > 0 ? (currencyTotal / totalValue) * 100 : 0;
+                      const percentage = panelTotal > 0 ? (currencyTotal / panelTotal) * 100 : 0;
 
                       return (
                         <div key={currency} className="space-y-2">
@@ -431,7 +443,7 @@ export default function Portfolio() {
                               </span>
                             </div>
                             <span className="font-medium text-slate-900 dark:text-white">
-                              {formatCurrency(currencyTotal, displayCurrency)}
+                              {fmt(currencyTotal, displayCurrency)}
                             </span>
                           </div>
                           <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -441,11 +453,12 @@ export default function Portfolio() {
                             />
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {percentage.toFixed(1)}% of portfolio
+                            {pct(percentage, 1)} of portfolio
                           </p>
                         </div>
                       );
-                    })}
+                    });
+                    })()}
                   </div>
                 </CardContent>
               </Card>

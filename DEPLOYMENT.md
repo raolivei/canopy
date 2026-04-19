@@ -63,6 +63,22 @@ kubectl rollout status deployment/canopy-frontend -n canopy
 
 ## CI/CD with GitHub Actions
 
+### GitHub Container Registry (when `ghcr.io/…/canopy-api` looks “missing”)
+
+1. **Use a full image reference** — Docker needs a tag or digest. `ghcr.io/raolivei/canopy-api` alone is not a valid pull spec. Examples: `ghcr.io/raolivei/canopy-api:v0.10.3`, `ghcr.io/raolivei/canopy-api:latest` (only if CI published `latest` on `main`), or `ghcr.io/raolivei/canopy-api@sha256:…`.
+
+2. **Packages appear after the first green push** — The GHCR package is created when [Build and Push Docker Images](https://github.com/raolivei/canopy/actions/workflows/build-and-push.yml) completes successfully and pushes. In the repo: **Packages** (right sidebar) or `https://github.com/raolivei/canopy/pkgs/container/canopy-api` (name may match the image component).
+
+3. **Private repositories → private packages** — Anonymous `docker pull` fails. Log in before pull/push:
+   ```bash
+   echo YOUR_GH_PAT | docker login ghcr.io -u raolivei --password-stdin
+   ```
+   Use a classic PAT with **read:packages** (pull) or **write:packages** (push). For Kubernetes, create an `imagePullSecret` with the same credentials.
+
+4. **Tag must exist** — Flux / Helm in `pi-fleet` may pin `v0.6.0`. If that tag was never built for `linux/arm64` or was garbage-collected, bump the chart to a tag that Actions actually published (check the workflow run “Docker Build Summary” or GHCR tags).
+
+5. **Workflow did not run** — Pushes only run when changed paths match `.github/workflows/build-and-push.yml`. Opening a PR that only touches docs will not rebuild images.
+
 ### Setup Self-Hosted Runner
 
 ```bash

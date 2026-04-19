@@ -15,6 +15,7 @@ import {
   Moon,
   Sun,
   ArrowRight,
+  UploadCloud,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
@@ -39,8 +40,14 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  // Portal must only mount after hydration to avoid SSR/CSR mismatch.
+  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -72,20 +79,56 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         keywords: ["home", "overview"],
       },
       {
+        id: "wealthsimple-import",
+        title: "Wealthsimple CSV import",
+        description: "Drop monthly statements from any Wealthsimple account",
+        icon: <UploadCloud className="w-4 h-4" />,
+        category: "Navigation",
+        action: () => router.push("/portfolio/wealthsimple-import"),
+        keywords: [
+          "wealthsimple",
+          "ws",
+          "csv",
+          "statement",
+          "tfsa",
+          "rrsp",
+          "fhsa",
+          "chequing",
+          "credit",
+        ],
+      },
+      {
+        id: "monarch-import",
+        title: "Monarch CSV import",
+        description: "Backfill historical transactions from Monarch Money",
+        icon: <UploadCloud className="w-4 h-4" />,
+        category: "Navigation",
+        action: () => router.push("/portfolio/monarch-import"),
+        keywords: [
+          "monarch",
+          "money",
+          "csv",
+          "backfill",
+          "historical",
+          "transactions",
+        ],
+      },
+      {
+        id: "import-snapshot",
+        title: "Import portfolio snapshot",
+        description: "CAD snapshot CSV for accounts that don\u2019t auto-sync",
+        icon: <Upload className="w-4 h-4" />,
+        category: "Legacy",
+        action: () => router.push("/portfolio/import"),
+        keywords: ["csv", "review", "snapshot", "portfolio", "cad", "dpsp"],
+      },
+      {
         id: "portfolio",
-        title: "Go to Portfolio",
+        title: "Go to Holdings",
         icon: <TrendingUp className="w-4 h-4" />,
         category: "Navigation",
         action: () => router.push("/portfolio"),
-        keywords: ["investments", "holdings", "stocks"],
-      },
-      {
-        id: "transactions",
-        title: "Go to Transactions",
-        icon: <DollarSign className="w-4 h-4" />,
-        category: "Navigation",
-        action: () => router.push("/transactions"),
-        keywords: ["expenses", "income", "payments"],
+        keywords: ["investments", "holdings", "stocks", "lots"],
       },
       {
         id: "accounts",
@@ -104,28 +147,38 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         keywords: ["analytics", "reports", "statistics"],
       },
       {
-        id: "import",
-        title: "Import Data",
-        icon: <Upload className="w-4 h-4" />,
-        category: "Navigation",
-        action: () => router.push("/import"),
-        keywords: ["csv", "upload", "file"],
-      },
-      {
-        id: "integrations",
-        title: "Go to Integrations",
-        icon: <Plug className="w-4 h-4" />,
-        category: "Navigation",
-        action: () => router.push("/settings/integrations"),
-        keywords: ["connect", "api", "sync"],
-      },
-      {
         id: "settings",
         title: "Go to Settings",
         icon: <Settings className="w-4 h-4" />,
         category: "Navigation",
         action: () => router.push("/settings"),
         keywords: ["preferences", "config"],
+      },
+      {
+        id: "transactions",
+        title: "Go to Transactions",
+        icon: <DollarSign className="w-4 h-4" />,
+        category: "Advanced",
+        action: () => router.push("/transactions"),
+        keywords: ["expenses", "income", "payments"],
+      },
+      {
+        id: "import-bank-csv",
+        title: "Bank CSV import",
+        description: "Legacy bank transaction import",
+        icon: <Upload className="w-4 h-4" />,
+        category: "Advanced",
+        action: () => router.push("/import"),
+        keywords: ["csv", "upload", "file", "bank"],
+      },
+      {
+        id: "integrations",
+        title: "Integrations",
+        description: "Wise, Questrade, and other connections",
+        icon: <Plug className="w-4 h-4" />,
+        category: "Advanced",
+        action: () => router.push("/settings/integrations"),
+        keywords: ["connect", "api", "sync"],
       },
       {
         id: "add-transaction",
@@ -367,7 +420,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     </AnimatePresence>
   );
 
-  if (typeof window === "undefined") return null;
+  if (!mounted) return null;
 
   return createPortal(content, document.body);
 }

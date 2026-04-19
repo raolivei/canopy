@@ -15,7 +15,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db() -> Generator[Session, None, None]:
     """FastAPI dependency for database sessions.
-    
+
     Yields a database session and ensures it's closed after the request.
     """
     db = SessionLocal()
@@ -28,9 +28,9 @@ def get_db() -> Generator[Session, None, None]:
 @contextmanager
 def get_db_session() -> Generator[Session, None, None]:
     """Context manager for database sessions outside of FastAPI.
-    
+
     Use this for background tasks, scripts, or non-FastAPI code.
-    
+
     Example:
         with get_db_session() as db:
             db.add(my_object)

@@ -145,7 +145,16 @@ function ToastContainer({
   toasts: ToastData[];
   onRemove: (id: string) => void;
 }) {
-  if (typeof window === "undefined") return null;
+  // Defer mount until after hydration so SSR output (null) matches the first
+  // client render. Without this, `createPortal` into document.body during the
+  // initial client render throws a hydration mismatch (#418) because the
+  // server emitted no matching node.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
 
   return createPortal(
     <div className="fixed bottom-4 right-4 z-[60] flex flex-col-reverse gap-2 pointer-events-none">

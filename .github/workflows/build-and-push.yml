@@ -13,10 +13,14 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - ".github/workflows/**"
+      - "VERSION"
   workflow_dispatch:
 
+# ``contents: write`` lets the reusable docker-build workflow push annotated
+# git tags (``v*``) that mirror ``VERSION`` when ``create-git-tag`` is enabled.
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 concurrency:
@@ -29,6 +33,10 @@ jobs:
     with:
       image-name: canopy-api
       context: ./backend
+      # Annotated git tag ``v$(cat VERSION)`` on ``main`` after a successful
+      # image push — aligns the repo with GHCR semver tags. Idempotent when
+      # api + frontend jobs race (second push is a no-op).
+      create-git-tag: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     secrets:
       REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -37,5 +45,6 @@ jobs:
     with:
       image-name: canopy-frontend
       context: ./frontend
+      create-git-tag: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     secrets:
       REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}

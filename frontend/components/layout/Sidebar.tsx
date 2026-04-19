@@ -12,25 +12,125 @@ import {
   Target,
   Plug,
   ChevronLeft,
+  ChevronDown,
   Moon,
   BarChart2,
   Sun,
   Command,
+  UploadCloud,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 
-const navigation = [
+const primaryNavigation = [
   { name: "Dashboard", href: "/", icon: Home },
-  { name: "Portfolio", href: "/portfolio", icon: TrendingUp },
-  { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Wealthsimple import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
+  { name: "Monarch import", href: "/portfolio/monarch-import", icon: UploadCloud },
+  { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Insights", href: "/insights", icon: Target },
   { name: "Annual Report", href: "/report", icon: BarChart2 },
-  { name: "Import", href: "/import", icon: Upload },
-  { name: "Integrations", href: "/settings/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
+
+// Active-but-power-user features. Kept reachable, just out of the
+// primary vertical.
+const advancedNavigation = [
+  { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Bank CSV import", href: "/import", icon: Upload },
+  { name: "Integrations", href: "/settings/integrations", icon: Plug },
+];
+
+// Old flows we still ship for back-compat (portfolio-review snapshots
+// are the one case we explicitly carry over from 0.7.x). Separated
+// from "Advanced" so it's clear these are not where new work happens.
+const legacyNavigation = [
+  { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
+];
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: typeof Home;
+}
+
+interface RenderSectionArgs {
+  title: string;
+  items: NavItem[];
+  open: boolean;
+  setOpen: (next: boolean) => void;
+  isCollapsed: boolean;
+  router: ReturnType<typeof useRouter>;
+}
+
+// Shared rendering for the collapsible Advanced / Legacy sections.
+// Keeps both groups visually identical while letting each own its own
+// expand/collapse state.
+function renderSection({
+  title,
+  items,
+  open,
+  setOpen,
+  isCollapsed,
+  router,
+}: RenderSectionArgs) {
+  return (
+    <>
+      {!isCollapsed && (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+        >
+          <ChevronDown
+            className={cn("w-4 h-4 transition-transform", open ? "rotate-180" : "")}
+          />
+          {title}
+        </button>
+      )}
+
+      {(open || isCollapsed) &&
+        items.map((item) => {
+          const isActive =
+            router.pathname === item.href ||
+            (item.href !== "/" && router.pathname.startsWith(item.href));
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                "group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                  : "text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-800 dark:hover:text-slate-200"
+              )}
+              title={isCollapsed ? item.name : undefined}
+            >
+              <Icon className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500" />
+              <AnimatePresence mode="wait">
+                {!isCollapsed && (
+                  <motion.span
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: "auto" }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="truncate"
+                  >
+                    {item.name}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Link>
+          );
+        })}
+    </>
+  );
+}
 
 interface SidebarProps {
   onCommandPaletteOpen?: () => void;
@@ -41,6 +141,9 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [legacyOpen, setLegacyOpen] = useState(false);
+  const { privacyMode, togglePrivacyMode, hydrated: privacyHydrated } = usePrivacyMode();
 
   useEffect(() => {
     setIsMounted(true);
@@ -99,14 +202,21 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="flex items-center gap-2"
               >
-                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">C</span>
-                </div>
-                <span className="font-semibold text-slate-900 dark:text-white">
-                  Canopy
-                </span>
+                <Link
+                  href="/"
+                  aria-label="Canopy home"
+                  className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <img
+                    src="/brand/canopy-icon.svg"
+                    alt="Canopy"
+                    className="w-8 h-8 rounded-lg"
+                  />
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    Canopy
+                  </span>
+                </Link>
               </motion.div>
             ) : (
               <motion.div
@@ -115,9 +225,19 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center mx-auto"
+                className="mx-auto"
               >
-                <span className="text-white font-bold text-sm">C</span>
+                <Link
+                  href="/"
+                  aria-label="Canopy home"
+                  className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <img
+                    src="/brand/canopy-icon.svg"
+                    alt="Canopy"
+                    className="w-8 h-8 rounded-lg"
+                  />
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>
@@ -161,7 +281,7 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {primaryNavigation.map((item) => {
             const isActive =
               router.pathname === item.href ||
               (item.href !== "/" && router.pathname.startsWith(item.href));
@@ -203,10 +323,50 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
               </Link>
             );
           })}
+
+          {renderSection({
+            title: "Advanced",
+            items: advancedNavigation,
+            open: advancedOpen,
+            setOpen: setAdvancedOpen,
+            isCollapsed,
+            router,
+          })}
+
+          {renderSection({
+            title: "Legacy",
+            items: legacyNavigation,
+            open: legacyOpen,
+            setOpen: setLegacyOpen,
+            isCollapsed,
+            router,
+          })}
         </nav>
 
         {/* Footer */}
         <div className="px-3 py-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <button
+            type="button"
+            onClick={togglePrivacyMode}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium",
+              "text-slate-600 dark:text-slate-400",
+              "hover:bg-slate-100 dark:hover:bg-slate-800",
+              "transition-colors",
+              privacyHydrated && privacyMode && "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200",
+            )}
+            title={privacyHydrated && privacyMode ? "Show amounts" : "Hide amounts (privacy)"}
+          >
+            {privacyHydrated && privacyMode ? (
+              <EyeOff className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+            ) : (
+              <Eye className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+            )}
+            {!isCollapsed && (
+              <span>{privacyHydrated && privacyMode ? "Show amounts" : "Hide amounts"}</span>
+            )}
+          </button>
+
           {/* Dark Mode Toggle */}
           <button
             onClick={toggleDarkMode}

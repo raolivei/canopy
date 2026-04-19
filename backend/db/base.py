@@ -8,6 +8,7 @@ from backend.app.config import get_settings
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
+
     pass
 
 

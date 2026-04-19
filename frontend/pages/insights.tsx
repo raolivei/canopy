@@ -3,18 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
 import { SkeletonMetricCard, SkeletonChart } from "@/components/ui/Skeleton";
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
   Target,
   PieChart,
-  Globe,
   Calendar,
   ChevronDown,
   ChevronUp,
@@ -46,19 +42,18 @@ import {
   getAxisProps,
   isDarkMode as checkDarkMode,
 } from "@/utils/chartTheme";
+import { formatCurrency } from "@/utils/currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface NetWorth {
-  total_usd: number;
-  total_assets_usd: number;
-  total_liabilities_usd: number;
-  liquid_assets_usd: number;
-  investment_assets_usd: number;
-  retirement_assets_usd: number;
-  real_estate_equity_usd: number;
-  assets_by_currency: Record<string, number>;
-  liabilities_by_currency: Record<string, number>;
+  total_cad: number;
+  total_assets_cad: number;
+  total_liabilities_cad: number;
+  liquid_assets_cad: number;
+  investment_assets_cad: number;
+  retirement_assets_cad: number;
+  real_estate_equity_cad: number;
   change_1d: number | null;
   change_1d_percent: number | null;
   change_1m: number | null;
@@ -69,15 +64,8 @@ interface NetWorth {
 
 interface Allocation {
   by_type: Record<string, number>;
-  by_currency: Record<string, number>;
   by_country: Record<string, number>;
   by_institution: Record<string, number>;
-}
-
-interface CurrencyExposure {
-  exposures: Record<string, number>;
-  amounts_usd: Record<string, number>;
-  risk_assessment: string;
 }
 
 interface Growth {
@@ -93,7 +81,6 @@ interface Growth {
 interface InsightsSummary {
   net_worth: NetWorth;
   allocation: Allocation;
-  currency_exposure: CurrencyExposure;
   growth: Growth;
 }
 
@@ -134,16 +121,6 @@ interface FIRESummary {
   scenarios: Scenario[];
 }
 
-function formatCurrency(value: number | null, currency: string = "USD"): string {
-  if (value === null) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function formatPercent(value: number | null): string {
   if (value === null) return "—";
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
@@ -155,28 +132,27 @@ function formatYears(years: number | null): string {
   return `${years.toFixed(1)} years`;
 }
 
+function formatCad(value: number | null): string {
+  if (value === null) return "—";
+  return formatCurrency(value, "CAD");
+}
+
 const COLORS = [...CHART_PALETTE];
 
-const CURRENCY_FLAGS: Record<string, string> = {
-  CAD: "🇨🇦",
-  USD: "🇺🇸",
-  BRL: "🇧🇷",
-  EUR: "🇪🇺",
-  Crypto: "₿",
-};
-
 export default function Insights() {
-  const [baseCurrency, setBaseCurrency] = useState<"USD" | "CAD" | "BRL" | "EUR">("USD");
   const [monthlyExpenses, setMonthlyExpenses] = useState(5000);
   const [monthlySavings, setMonthlySavings] = useState(2000);
-  const [expenseCurrency, setExpenseCurrency] = useState("CAD");
   const [showFIREDetails, setShowFIREDetails] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
-  const { data: insights, isLoading: insightsLoading, error: insightsError } = useQuery<InsightsSummary>({
-    queryKey: ["insights-summary", baseCurrency],
+  const {
+    data: insights,
+    isLoading: insightsLoading,
+    error: insightsError,
+  } = useQuery<InsightsSummary>({
+    queryKey: ["insights-summary"],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/v1/insights/summary?base_currency=${baseCurrency}`);
+      const res = await fetch(`${API_URL}/v1/insights/summary`);
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(errBody.detail || `Failed to fetch insights (${res.status})`);
@@ -186,11 +162,11 @@ export default function Insights() {
     retry: 1,
   });
 
-  const { data: fire, isLoading: fireLoading } = useQuery<FIRESummary>({
-    queryKey: ["fire-summary", monthlyExpenses, monthlySavings, expenseCurrency],
+  const { data: fire } = useQuery<FIRESummary>({
+    queryKey: ["fire-summary", monthlyExpenses, monthlySavings],
     queryFn: async () => {
       const res = await fetch(
-        `${API_URL}/v1/insights/fire?monthly_expenses=${monthlyExpenses}&monthly_savings=${monthlySavings}&currency=${expenseCurrency}`
+        `${API_URL}/v1/insights/fire?monthly_expenses=${monthlyExpenses}&monthly_savings=${monthlySavings}`,
       );
       if (!res.ok) throw new Error("Failed to fetch FIRE data");
       return res.json();
@@ -204,28 +180,17 @@ export default function Insights() {
       }))
     : [];
 
-  const currencyExposure = insights?.currency_exposure.exposures
-    ? Object.entries(insights.currency_exposure.exposures).map(([name, value]) => ({
-        name,
-        value: Number(value.toFixed(1)),
-        amount: insights.currency_exposure.amounts_usd[name] || 0,
-      }))
-    : [];
-
   const projectionData =
-    fire?.projections.filter((_, i) => i % 5 === 0 || i === fire.projections.length - 1) || [];
-
-  const currencyOptions = [
-    { value: "USD", label: "USD" },
-    { value: "CAD", label: "CAD" },
-    { value: "BRL", label: "BRL" },
-    { value: "EUR", label: "EUR" },
-  ];
+    fire?.projections.filter((_, i) => i % 5 === 0 || i === fire.projections.length - 1) ||
+    [];
 
   if (insightsLoading) {
     return (
       <PageLayout title="Insights">
-        <PageHeader title="Insights" description="Financial overview, projections, and FIRE planning" />
+        <PageHeader
+          title="Insights"
+          description="Financial overview, projections, and FIRE planning (CAD)"
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {Array.from({ length: 4 }).map((_, i) => (
             <SkeletonMetricCard key={i} />
@@ -242,7 +207,10 @@ export default function Insights() {
   if (!insights) {
     return (
       <PageLayout title="Insights">
-        <PageHeader title="Insights" description="Financial overview, projections, and FIRE planning" />
+        <PageHeader
+          title="Insights"
+          description="Financial overview, projections, and FIRE planning (CAD)"
+        />
         <Card>
           <CardContent className="py-12 text-center">
             {insightsError ? (
@@ -256,7 +224,7 @@ export default function Insights() {
               </>
             ) : (
               <p className="text-slate-500 dark:text-slate-400">
-                No data available. Please add some transactions or portfolio holdings first.
+                No data yet. Drop a Wealthsimple statement to populate your insights.
               </p>
             )}
           </CardContent>
@@ -269,25 +237,7 @@ export default function Insights() {
     <PageLayout title="Insights" description="Financial overview, projections, and FIRE planning">
       <PageHeader
         title="Insights"
-        description="Financial overview, projections, and FIRE planning"
-        actions={
-          <div className="flex items-center gap-2">
-            {(["USD", "CAD", "BRL", "EUR"] as const).map((curr) => (
-              <button
-                key={curr}
-                onClick={() => setBaseCurrency(curr)}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                  baseCurrency === curr
-                    ? "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300"
-                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                )}
-              >
-                {curr}
-              </button>
-            ))}
-          </div>
-        }
+        description="Canadian net worth, allocation, and FIRE planning — all in CAD"
       />
 
       {/* Net Worth Hero */}
@@ -302,10 +252,10 @@ export default function Insights() {
             <div className="relative">
               <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-2">
                 <Sparkles className="w-4 h-4" />
-                Net Worth
+                Net Worth (CAD)
               </div>
               <div className="text-4xl font-bold text-slate-900 dark:text-white mb-4">
-                {formatCurrency(insights.net_worth.total_usd, baseCurrency)}
+                {formatCad(insights.net_worth.total_cad)}
               </div>
               <div className="flex items-center gap-6">
                 {insights.net_worth.change_1m_percent !== null && (
@@ -314,7 +264,7 @@ export default function Insights() {
                       "flex items-center text-sm",
                       insights.net_worth.change_1m_percent >= 0
                         ? "text-success-600 dark:text-success-400"
-                        : "text-danger-600 dark:text-danger-400"
+                        : "text-danger-600 dark:text-danger-400",
                     )}
                   >
                     {insights.net_worth.change_1m_percent >= 0 ? (
@@ -331,7 +281,7 @@ export default function Insights() {
                       "flex items-center text-sm",
                       insights.net_worth.change_ytd_percent >= 0
                         ? "text-success-600 dark:text-success-400"
-                        : "text-danger-600 dark:text-danger-400"
+                        : "text-danger-600 dark:text-danger-400",
                     )}
                   >
                     {insights.net_worth.change_ytd_percent >= 0 ? (
@@ -357,31 +307,30 @@ export default function Insights() {
       >
         <MetricCard
           title="Total Assets"
-          value={formatCurrency(insights.net_worth.total_assets_usd, baseCurrency)}
+          value={formatCad(insights.net_worth.total_assets_cad)}
           icon={TrendingUp}
           iconColor="text-success-500"
-          subtitle={`${Object.keys(insights.net_worth.assets_by_currency).length} currencies`}
         />
         <MetricCard
           title="Total Liabilities"
-          value={formatCurrency(insights.net_worth.total_liabilities_usd, baseCurrency)}
+          value={formatCad(insights.net_worth.total_liabilities_cad)}
           icon={TrendingDown}
           iconColor="text-danger-500"
-          subtitle={`${Object.keys(insights.net_worth.liabilities_by_currency).length} accounts`}
         />
         <MetricCard
           title="YTD Change"
           value={formatPercent(insights.net_worth.change_ytd_percent)}
           valueColor={
-            (insights.net_worth.change_ytd_percent || 0) >= 0 ? "text-success-600" : "text-danger-600"
+            (insights.net_worth.change_ytd_percent || 0) >= 0
+              ? "text-success-600"
+              : "text-danger-600"
           }
           icon={Calendar}
           iconColor="text-accent-500"
-          subtitle={formatCurrency(insights.net_worth.change_ytd, baseCurrency)}
+          subtitle={formatCad(insights.net_worth.change_ytd)}
         />
       </motion.div>
 
-      {/* Tabs */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -419,7 +368,10 @@ export default function Insights() {
                           label={({ name, value }) => `${name}: ${value}%`}
                         >
                           {allocationByType.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
                           ))}
                         </Pie>
                         <Tooltip
@@ -428,58 +380,6 @@ export default function Insights() {
                         />
                       </RechartsPieChart>
                     </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Currency Exposure */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Globe className="w-5 h-5 text-success-500" />
-                      <CardTitle>Currency Exposure</CardTitle>
-                    </div>
-                    <Badge
-                      variant={
-                        insights.currency_exposure.risk_assessment === "diversified"
-                          ? "success"
-                          : insights.currency_exposure.risk_assessment === "balanced"
-                            ? "warning"
-                            : "danger"
-                      }
-                    >
-                      {insights.currency_exposure.risk_assessment}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {currencyExposure.map((item, index) => (
-                      <div key={item.name} className="flex items-center gap-3">
-                        <span className="w-8 text-lg">{CURRENCY_FLAGS[item.name] || "💱"}</span>
-                        <span className="w-12 text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {item.name}
-                        </span>
-                        <div className="flex-1">
-                          <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${item.value}%`,
-                                backgroundColor: COLORS[index % COLORS.length],
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <span className="w-12 text-sm text-right font-medium text-slate-600 dark:text-slate-400">
-                          {item.value.toFixed(1)}%
-                        </span>
-                        <span className="w-20 text-sm text-right text-slate-500 dark:text-slate-500">
-                          {formatCurrency(item.amount, "USD")}
-                        </span>
-                      </div>
-                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -520,7 +420,7 @@ export default function Insights() {
               </Card>
 
               {/* By Country */}
-              <Card>
+              <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle>By Country</CardTitle>
                 </CardHeader>
@@ -528,27 +428,35 @@ export default function Insights() {
                   <div className="h-48">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={Object.entries(insights.allocation.by_country).map(([name, value]) => ({
-                          name:
-                            name === "CA"
-                              ? "🇨🇦 Canada"
-                              : name === "US"
-                                ? "🇺🇸 USA"
-                                : name === "BR"
-                                  ? "🇧🇷 Brazil"
-                                  : name,
-                          value: Number(value.toFixed(1)),
-                        }))}
+                        data={Object.entries(insights.allocation.by_country).map(
+                          ([name, value]) => ({
+                            name: name === "CA" ? "🇨🇦 Canada" : name,
+                            value: Number(value.toFixed(1)),
+                          }),
+                        )}
                         layout="vertical"
                       >
                         <CartesianGrid {...getGridProps(checkDarkMode())} />
-                        <XAxis type="number" tickFormatter={(v) => `${v}%`} {...getAxisProps(checkDarkMode())} />
-                        <YAxis dataKey="name" type="category" width={100} {...getAxisProps(checkDarkMode())} />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(v) => `${v}%`}
+                          {...getAxisProps(checkDarkMode())}
+                        />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          width={100}
+                          {...getAxisProps(checkDarkMode())}
+                        />
                         <Tooltip
                           contentStyle={getTooltipStyle(checkDarkMode())}
                           formatter={(value: number) => `${value}%`}
                         />
-                        <Bar dataKey="value" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} />
+                        <Bar
+                          dataKey="value"
+                          fill={CHART_COLORS.primary}
+                          radius={[0, 4, 4, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -563,7 +471,7 @@ export default function Insights() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Target className="w-5 h-5 text-warning-500" />
-                    <CardTitle>FIRE Calculator</CardTitle>
+                    <CardTitle>FIRE Calculator (CAD)</CardTitle>
                   </div>
                   <Button
                     variant="ghost"
@@ -584,30 +492,17 @@ export default function Insights() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Monthly Expenses
+                        Monthly Expenses (CAD)
                       </label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          value={monthlyExpenses}
-                          onChange={(e) => setMonthlyExpenses(Number(e.target.value))}
-                          className="flex-1"
-                        />
-                        <Select
-                          options={[
-                            { value: "CAD", label: "CAD" },
-                            { value: "USD", label: "USD" },
-                            { value: "BRL", label: "BRL" },
-                          ]}
-                          value={expenseCurrency}
-                          onChange={setExpenseCurrency}
-                          className="w-24"
-                        />
-                      </div>
+                      <Input
+                        type="number"
+                        value={monthlyExpenses}
+                        onChange={(e) => setMonthlyExpenses(Number(e.target.value))}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Monthly Savings
+                        Monthly Savings (CAD)
                       </label>
                       <Input
                         type="number"
@@ -617,8 +512,14 @@ export default function Insights() {
                     </div>
                     <div className="flex items-end">
                       <div className="text-sm text-slate-600 dark:text-slate-400">
-                        <div>SWR: {((fire?.metrics.safe_withdrawal_rate || 0.04) * 100).toFixed(0)}%</div>
-                        <div>Return: {((fire?.metrics.expected_return || 0.07) * 100).toFixed(0)}%</div>
+                        <div>
+                          SWR:{" "}
+                          {((fire?.metrics.safe_withdrawal_rate || 0.04) * 100).toFixed(0)}%
+                        </div>
+                        <div>
+                          Return:{" "}
+                          {((fire?.metrics.expected_return || 0.07) * 100).toFixed(0)}%
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -632,11 +533,13 @@ export default function Insights() {
                           FIRE Number
                         </div>
                         <div className="text-2xl font-bold text-warning-700 dark:text-warning-300">
-                          {formatCurrency(fire.metrics.fire_number, "USD")}
+                          {formatCad(fire.metrics.fire_number)}
                         </div>
                       </div>
                       <div className="text-center p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-                        <div className="text-sm text-primary-600 dark:text-primary-400 mb-1">Progress</div>
+                        <div className="text-sm text-primary-600 dark:text-primary-400 mb-1">
+                          Progress
+                        </div>
                         <div className="text-2xl font-bold text-primary-700 dark:text-primary-300">
                           {fire.metrics.progress_percentage.toFixed(1)}%
                         </div>
@@ -667,7 +570,7 @@ export default function Insights() {
                           Monthly at FIRE
                         </div>
                         <div className="text-2xl font-bold text-accent-700 dark:text-accent-300">
-                          {formatCurrency(fire.metrics.monthly_income_at_fire, "USD")}
+                          {formatCad(fire.metrics.monthly_income_at_fire)}
                         </div>
                       </div>
                     </div>
@@ -683,12 +586,14 @@ export default function Insights() {
                               {...getAxisProps(checkDarkMode())}
                             />
                             <YAxis
-                              tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
+                              tickFormatter={(value) =>
+                                `C$${(value / 1000000).toFixed(1)}M`
+                              }
                               {...getAxisProps(checkDarkMode())}
                             />
                             <Tooltip
                               contentStyle={getTooltipStyle(checkDarkMode())}
-                              formatter={(value: number) => [formatCurrency(value, "USD"), ""]}
+                              formatter={(value: number) => [formatCad(value), ""]}
                               labelFormatter={(year) => `Year ${year}`}
                             />
                             <Area
@@ -735,11 +640,12 @@ export default function Insights() {
                                     "text-xs",
                                     scenario.difference_years < 0
                                       ? "text-success-600"
-                                      : "text-danger-600"
+                                      : "text-danger-600",
                                   )}
                                 >
                                   {scenario.difference_years < 0 ? "" : "+"}
-                                  {scenario.difference_years?.toFixed(1)} years vs baseline
+                                  {scenario.difference_years?.toFixed(1)} years vs
+                                  baseline
                                 </div>
                               )}
                             </div>
@@ -764,39 +670,47 @@ export default function Insights() {
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Avg Monthly</div>
+                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                      Avg Monthly
+                    </div>
                     <div
                       className={cn(
                         "text-xl font-bold",
                         insights.growth.average_monthly >= 0
                           ? "text-success-600 dark:text-success-400"
-                          : "text-danger-600 dark:text-danger-400"
+                          : "text-danger-600 dark:text-danger-400",
                       )}
                     >
                       {formatPercent(insights.growth.average_monthly)}
                     </div>
                   </div>
                   <div className="text-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Annualized</div>
+                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                      Annualized
+                    </div>
                     <div
                       className={cn(
                         "text-xl font-bold",
                         insights.growth.yearly_rate >= 0
                           ? "text-success-600 dark:text-success-400"
-                          : "text-danger-600 dark:text-danger-400"
+                          : "text-danger-600 dark:text-danger-400",
                       )}
                     >
                       {formatPercent(insights.growth.yearly_rate)}
                     </div>
                   </div>
                   <div className="text-center p-4 bg-success-50 dark:bg-success-900/20 rounded-lg">
-                    <div className="text-sm text-success-600 dark:text-success-400 mb-1">Best Month</div>
+                    <div className="text-sm text-success-600 dark:text-success-400 mb-1">
+                      Best Month
+                    </div>
                     <div className="text-xl font-bold text-success-700 dark:text-success-300">
                       {formatPercent(insights.growth.best_month_return)}
                     </div>
                   </div>
                   <div className="text-center p-4 bg-danger-50 dark:bg-danger-900/20 rounded-lg">
-                    <div className="text-sm text-danger-600 dark:text-danger-400 mb-1">Worst Month</div>
+                    <div className="text-sm text-danger-600 dark:text-danger-400 mb-1">
+                      Worst Month
+                    </div>
                     <div className="text-xl font-bold text-danger-700 dark:text-danger-300">
                       {formatPercent(insights.growth.worst_month_return)}
                     </div>

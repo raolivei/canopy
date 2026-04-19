@@ -1,74 +1,42 @@
-"""Insights calculator for portfolio analytics.
+"""Insights calculator for Canadian (CAD-only) portfolios.
 
 Canopy - Personal Finance Platform
 
 Provides:
-- Net worth calculation (multi-currency with USD base)
-- Asset allocation by type, currency, country
+- Net worth calculation (CAD)
+- Asset allocation by type, country, institution
 - Growth rate calculations (monthly, yearly)
-- Currency exposure analysis
-- Passive income tracking
 """
 
-from datetime import date, datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
-from dataclasses import dataclass, field
-
-from sqlalchemy import func
-from sqlalchemy.orm import Session
 
 from backend.db.models import (
     Asset,
     AssetType,
-    Lot,
-    PortfolioSnapshot,
-    SnapshotHolding,
     Liability,
+    PortfolioSnapshot,
     RealEstateProperty,
 )
-
-
-# Default exchange rates (will be fetched dynamically in production)
-DEFAULT_EXCHANGE_RATES = {
-    "USD": Decimal("1.0"),
-    "CAD": Decimal("0.74"),  # 1 CAD = 0.74 USD
-    "BRL": Decimal("0.17"),  # 1 BRL = 0.17 USD
-    "EUR": Decimal("1.08"),  # 1 EUR = 1.08 USD
-    "BTC": Decimal("97000"),  # 1 BTC = ~$97,000 USD
-    "ETH": Decimal("3400"),   # 1 ETH = ~$3,400 USD
-}
-
-
-@dataclass
-class CurrencyAmount:
-    """Amount with currency information."""
-    amount: Decimal
-    currency: str
-    amount_usd: Decimal = Decimal("0")
-    
-    def __post_init__(self):
-        if self.amount_usd == Decimal("0") and self.currency in DEFAULT_EXCHANGE_RATES:
-            self.amount_usd = self.amount * DEFAULT_EXCHANGE_RATES[self.currency]
+from sqlalchemy.orm import Session
 
 
 @dataclass
 class NetWorthSummary:
-    """Summary of net worth across all currencies."""
-    total_assets_usd: Decimal = Decimal("0")
-    total_liabilities_usd: Decimal = Decimal("0")
-    net_worth_usd: Decimal = Decimal("0")
-    
-    # By currency
-    assets_by_currency: dict[str, Decimal] = field(default_factory=dict)
-    liabilities_by_currency: dict[str, Decimal] = field(default_factory=dict)
-    
+    """Summary of net worth (CAD)."""
+
+    total_assets_cad: Decimal = Decimal("0")
+    total_liabilities_cad: Decimal = Decimal("0")
+    net_worth_cad: Decimal = Decimal("0")
+
     # Components
-    liquid_assets_usd: Decimal = Decimal("0")  # Cash, bank accounts
-    investment_assets_usd: Decimal = Decimal("0")  # Stocks, ETFs, crypto
-    retirement_assets_usd: Decimal = Decimal("0")  # RRSP, TFSA, etc.
-    real_estate_equity_usd: Decimal = Decimal("0")  # Property equity
-    
+    liquid_assets_cad: Decimal = Decimal("0")
+    investment_assets_cad: Decimal = Decimal("0")
+    retirement_assets_cad: Decimal = Decimal("0")
+    real_estate_equity_cad: Decimal = Decimal("0")
+
     # Change tracking
     change_1d: Optional[Decimal] = None
     change_1d_percent: Optional[Decimal] = None
@@ -80,16 +48,17 @@ class NetWorthSummary:
 
 @dataclass
 class AllocationBreakdown:
-    """Asset allocation breakdown."""
-    by_type: dict[str, Decimal] = field(default_factory=dict)  # stock: 35%, crypto: 20%, etc.
-    by_currency: dict[str, Decimal] = field(default_factory=dict)  # CAD: 45%, USD: 35%, etc.
-    by_country: dict[str, Decimal] = field(default_factory=dict)  # CA: 50%, US: 30%, BR: 20%
-    by_institution: dict[str, Decimal] = field(default_factory=dict)  # Wealthsimple: 40%, etc.
+    """Asset allocation breakdown (percentages)."""
+
+    by_type: dict[str, Decimal] = field(default_factory=dict)
+    by_country: dict[str, Decimal] = field(default_factory=dict)
+    by_institution: dict[str, Decimal] = field(default_factory=dict)
 
 
 @dataclass
 class GrowthMetrics:
     """Portfolio growth metrics."""
+
     monthly_growth_rate: Decimal = Decimal("0")
     yearly_growth_rate: Decimal = Decimal("0")
     average_monthly_growth: Decimal = Decimal("0")
@@ -99,384 +68,261 @@ class GrowthMetrics:
     worst_month_return: Optional[Decimal] = None
 
 
-@dataclass 
-class CurrencyExposure:
-    """Currency exposure analysis."""
-    exposures: dict[str, Decimal] = field(default_factory=dict)  # Currency -> percentage
-    amounts_usd: dict[str, Decimal] = field(default_factory=dict)  # Currency -> amount in USD
-    risk_assessment: str = "balanced"  # "concentrated", "balanced", "diversified"
-
-
 class InsightsCalculator:
-    """Calculator for portfolio insights and analytics."""
-    
-    def __init__(
-        self, 
-        db: Session, 
-        exchange_rates: Optional[dict[str, Decimal]] = None,
-        base_currency: str = "USD"
-    ):
+    """Calculator for Canadian portfolio insights and analytics (CAD)."""
+
+    def __init__(self, db: Session):
         self.db = db
-        self.exchange_rates = exchange_rates or DEFAULT_EXCHANGE_RATES
-        self.base_currency = base_currency
-    
-    def convert_to_usd(self, amount: Decimal, currency: str) -> Decimal:
-        """Convert an amount to USD."""
-        if currency == "USD":
-            return amount
-        rate = self.exchange_rates.get(currency, Decimal("1"))
-        return amount * rate
-    
-    def convert_from_usd(self, amount_usd: Decimal, target_currency: str) -> Decimal:
-        """Convert USD to target currency."""
-        if target_currency == "USD":
-            return amount_usd
-        rate = self.exchange_rates.get(target_currency, Decimal("1"))
-        if rate == 0:
-            return Decimal("0")
-        return amount_usd / rate
-    
+
     def calculate_net_worth(self) -> NetWorthSummary:
-        """Calculate total net worth across all assets and liabilities."""
+        """Calculate total CAD net worth across all assets and liabilities."""
         summary = NetWorthSummary()
-        
-        # Get all assets
-        assets = self.db.query(Asset).filter(Asset.is_liability == False).all()
-        
+
+        assets = self.db.query(Asset).filter(Asset.is_liability.is_(False)).all()
+
         for asset in assets:
             if asset.current_price is None:
                 continue
-                
-            # Apply ownership percentage
-            value = asset.current_price * asset.ownership_percentage
-            value_usd = self.convert_to_usd(value, asset.currency)
-            
-            # Add to totals
-            summary.total_assets_usd += value_usd
-            
-            # Track by currency
-            if asset.currency not in summary.assets_by_currency:
-                summary.assets_by_currency[asset.currency] = Decimal("0")
-            summary.assets_by_currency[asset.currency] += value
-            
-            # Categorize by type
+
+            # Apply ownership percentage. Values are treated as CAD.
+            value = Decimal(asset.current_price) * asset.ownership_percentage
+            summary.total_assets_cad += value
+
             if asset.is_bank_account or asset.asset_type == AssetType.CASH:
-                summary.liquid_assets_usd += value_usd
+                summary.liquid_assets_cad += value
             elif asset.is_retirement_account:
-                summary.retirement_assets_usd += value_usd
+                summary.retirement_assets_cad += value
             else:
-                summary.investment_assets_usd += value_usd
-        
-        # Get all liabilities
-        liabilities = self.db.query(Liability).filter(
-            Liability.status == "active"
-        ).all()
-        
+                summary.investment_assets_cad += value
+
+        liabilities = self.db.query(Liability).filter(Liability.status == "active").all()
         for liability in liabilities:
-            value_usd = self.convert_to_usd(liability.current_balance, liability.currency)
-            summary.total_liabilities_usd += value_usd
-            
-            if liability.currency not in summary.liabilities_by_currency:
-                summary.liabilities_by_currency[liability.currency] = Decimal("0")
-            summary.liabilities_by_currency[liability.currency] += liability.current_balance
-        
-        # Get real estate equity
+            summary.total_liabilities_cad += liability.current_balance
+
         properties = self.db.query(RealEstateProperty).all()
         for prop in properties:
-            # Use estimated market value if available, otherwise use paid amount
             if prop.estimated_market_value:
                 equity = prop.user_market_value or Decimal("0")
             else:
                 equity = prop.total_paid
-            summary.real_estate_equity_usd += self.convert_to_usd(equity, prop.currency)
-        
-        # Add real estate to total assets
-        summary.total_assets_usd += summary.real_estate_equity_usd
-        
-        # Calculate net worth
-        summary.net_worth_usd = summary.total_assets_usd - summary.total_liabilities_usd
-        
-        # Calculate changes from historical data
+            summary.real_estate_equity_cad += equity
+
+        summary.total_assets_cad += summary.real_estate_equity_cad
+        summary.net_worth_cad = summary.total_assets_cad - summary.total_liabilities_cad
+
         self._calculate_changes(summary)
-        
         return summary
-    
+
     def _calculate_changes(self, summary: NetWorthSummary) -> None:
         """Calculate net worth changes over different periods."""
         today = date.today()
-        
-        # Get historical snapshots
-        snapshots = self.db.query(PortfolioSnapshot).order_by(
-            PortfolioSnapshot.snapshot_date.desc()
-        ).limit(365).all()
-        
+
+        snapshots = (
+            self.db.query(PortfolioSnapshot)
+            .order_by(PortfolioSnapshot.snapshot_date.desc())
+            .limit(365)
+            .all()
+        )
         if not snapshots:
             return
-        
-        # Find comparison points
+
         one_day_ago = today - timedelta(days=1)
         one_month_ago = today - timedelta(days=30)
         year_start = date(today.year, 1, 1)
-        
+
         for snapshot in snapshots:
-            snapshot_date = snapshot.snapshot_date
-            
-            if summary.change_1d is None and snapshot_date <= one_day_ago:
-                summary.change_1d = summary.net_worth_usd - snapshot.total_value
+            sd = snapshot.snapshot_date
+            if summary.change_1d is None and sd <= one_day_ago:
+                summary.change_1d = summary.net_worth_cad - snapshot.total_value
                 if snapshot.total_value > 0:
-                    summary.change_1d_percent = (summary.change_1d / snapshot.total_value) * 100
-            
-            if summary.change_1m is None and snapshot_date <= one_month_ago:
-                summary.change_1m = summary.net_worth_usd - snapshot.total_value
+                    summary.change_1d_percent = (
+                        summary.change_1d / snapshot.total_value
+                    ) * 100
+            if summary.change_1m is None and sd <= one_month_ago:
+                summary.change_1m = summary.net_worth_cad - snapshot.total_value
                 if snapshot.total_value > 0:
-                    summary.change_1m_percent = (summary.change_1m / snapshot.total_value) * 100
-            
-            if summary.change_ytd is None and snapshot_date <= year_start:
-                summary.change_ytd = summary.net_worth_usd - snapshot.total_value
+                    summary.change_1m_percent = (
+                        summary.change_1m / snapshot.total_value
+                    ) * 100
+            if summary.change_ytd is None and sd <= year_start:
+                summary.change_ytd = summary.net_worth_cad - snapshot.total_value
                 if snapshot.total_value > 0:
-                    summary.change_ytd_percent = (summary.change_ytd / snapshot.total_value) * 100
-    
+                    summary.change_ytd_percent = (
+                        summary.change_ytd / snapshot.total_value
+                    ) * 100
+
     def calculate_allocation(self) -> AllocationBreakdown:
-        """Calculate asset allocation breakdown."""
+        """Calculate asset allocation breakdown (CAD-based percentages)."""
         allocation = AllocationBreakdown()
-        
-        # Get all non-liability assets
-        assets = self.db.query(Asset).filter(Asset.is_liability == False).all()
-        
-        total_usd = Decimal("0")
+        assets = self.db.query(Asset).filter(Asset.is_liability.is_(False)).all()
+
+        total_cad = Decimal("0")
         type_totals: dict[str, Decimal] = {}
-        currency_totals: dict[str, Decimal] = {}
         country_totals: dict[str, Decimal] = {}
         institution_totals: dict[str, Decimal] = {}
-        
+
         for asset in assets:
             if asset.current_price is None:
                 continue
-            
-            value = asset.current_price * asset.ownership_percentage
-            value_usd = self.convert_to_usd(value, asset.currency)
-            total_usd += value_usd
-            
-            # By type
+
+            value = Decimal(asset.current_price) * asset.ownership_percentage
+            total_cad += value
+
             asset_type = asset.asset_type.value
-            # Simplify retirement account types
             if asset_type.startswith("retirement_"):
                 asset_type = "retirement"
             elif asset_type.startswith("bank_"):
                 asset_type = "cash"
             elif asset_type.startswith("liability_"):
-                continue  # Skip liabilities
-            
-            type_totals[asset_type] = type_totals.get(asset_type, Decimal("0")) + value_usd
-            
-            # By currency
-            currency_totals[asset.currency] = currency_totals.get(asset.currency, Decimal("0")) + value_usd
-            
-            # By country
-            country = asset.country or "Other"
-            country_totals[country] = country_totals.get(country, Decimal("0")) + value_usd
-            
-            # By institution
-            institution = asset.institution or "Other"
-            institution_totals[institution] = institution_totals.get(institution, Decimal("0")) + value_usd
-        
-        # Convert to percentages
-        if total_usd > 0:
-            allocation.by_type = {k: (v / total_usd) * 100 for k, v in type_totals.items()}
-            allocation.by_currency = {k: (v / total_usd) * 100 for k, v in currency_totals.items()}
-            allocation.by_country = {k: (v / total_usd) * 100 for k, v in country_totals.items()}
-            allocation.by_institution = {k: (v / total_usd) * 100 for k, v in institution_totals.items()}
-        
-        return allocation
-    
-    def calculate_currency_exposure(self) -> CurrencyExposure:
-        """Calculate currency exposure analysis."""
-        exposure = CurrencyExposure()
-        
-        # Get all assets
-        assets = self.db.query(Asset).filter(Asset.is_liability == False).all()
-        
-        total_usd = Decimal("0")
-        currency_amounts: dict[str, Decimal] = {}
-        
-        for asset in assets:
-            if asset.current_price is None:
                 continue
-            
-            value = asset.current_price * asset.ownership_percentage
-            value_usd = self.convert_to_usd(value, asset.currency)
-            total_usd += value_usd
-            
-            # Group crypto currencies
-            currency = asset.currency
-            if currency in ["BTC", "ETH"]:
-                currency = "Crypto"
-            
-            currency_amounts[currency] = currency_amounts.get(currency, Decimal("0")) + value_usd
-        
-        # Calculate percentages
-        if total_usd > 0:
-            exposure.exposures = {k: (v / total_usd) * 100 for k, v in currency_amounts.items()}
-        exposure.amounts_usd = currency_amounts
-        
-        # Assess risk based on concentration
-        max_exposure = max(exposure.exposures.values()) if exposure.exposures else 0
-        if max_exposure > 70:
-            exposure.risk_assessment = "concentrated"
-        elif max_exposure > 50:
-            exposure.risk_assessment = "balanced"
-        else:
-            exposure.risk_assessment = "diversified"
-        
-        return exposure
-    
+
+            type_totals[asset_type] = type_totals.get(asset_type, Decimal("0")) + value
+
+            country = asset.country or "CA"
+            country_totals[country] = country_totals.get(country, Decimal("0")) + value
+
+            institution = asset.institution or "Other"
+            institution_totals[institution] = (
+                institution_totals.get(institution, Decimal("0")) + value
+            )
+
+        if total_cad > 0:
+            allocation.by_type = {
+                k: (v / total_cad) * 100 for k, v in type_totals.items()
+            }
+            allocation.by_country = {
+                k: (v / total_cad) * 100 for k, v in country_totals.items()
+            }
+            allocation.by_institution = {
+                k: (v / total_cad) * 100 for k, v in institution_totals.items()
+            }
+
+        return allocation
+
     def calculate_growth_metrics(self) -> GrowthMetrics:
-        """Calculate portfolio growth metrics."""
+        """Calculate portfolio growth metrics from historical snapshots."""
         metrics = GrowthMetrics()
-        
-        # Get historical snapshots
-        snapshots = self.db.query(PortfolioSnapshot).order_by(
-            PortfolioSnapshot.snapshot_date.asc()
-        ).all()
-        
+        snapshots = (
+            self.db.query(PortfolioSnapshot)
+            .order_by(PortfolioSnapshot.snapshot_date.asc())
+            .all()
+        )
+
         if len(snapshots) < 2:
             return metrics
-        
-        # Calculate monthly returns
+
         monthly_returns: list[tuple[date, Decimal]] = []
-        
         for i in range(1, len(snapshots)):
             prev = snapshots[i - 1]
             curr = snapshots[i]
-            
             if prev.total_value > 0:
-                return_pct = ((curr.total_value - prev.total_value) / prev.total_value) * 100
+                return_pct = (
+                    (curr.total_value - prev.total_value) / prev.total_value
+                ) * 100
                 monthly_returns.append((curr.snapshot_date, return_pct))
-        
+
         if monthly_returns:
-            # Average monthly growth
-            metrics.average_monthly_growth = sum(r[1] for r in monthly_returns) / len(monthly_returns)
-            
-            # Best and worst months
+            metrics.average_monthly_growth = sum(
+                r[1] for r in monthly_returns
+            ) / len(monthly_returns)
             best = max(monthly_returns, key=lambda x: x[1])
             worst = min(monthly_returns, key=lambda x: x[1])
-            
             metrics.best_month = best[0]
             metrics.best_month_return = best[1]
             metrics.worst_month = worst[0]
             metrics.worst_month_return = worst[1]
-        
-        # Calculate overall growth rates
+
         first_snapshot = snapshots[0]
         last_snapshot = snapshots[-1]
-        
         if first_snapshot.total_value > 0:
-            total_return = (last_snapshot.total_value - first_snapshot.total_value) / first_snapshot.total_value
-            
-            # Time period in years
+            total_return = (
+                last_snapshot.total_value - first_snapshot.total_value
+            ) / first_snapshot.total_value
             days = (last_snapshot.snapshot_date - first_snapshot.snapshot_date).days
             years = days / 365.25
-            
             if years > 0:
-                # Annualized return
-                metrics.yearly_growth_rate = ((1 + total_return) ** (1 / years) - 1) * 100
-                
-                # Monthly (simplified)
+                metrics.yearly_growth_rate = (
+                    (1 + total_return) ** (Decimal("1") / Decimal(years)) - 1
+                ) * 100
                 months = days / 30.44
                 if months > 0:
-                    metrics.monthly_growth_rate = ((1 + total_return) ** (1 / months) - 1) * 100
-        
+                    metrics.monthly_growth_rate = (
+                        (1 + total_return) ** (Decimal("1") / Decimal(months)) - 1
+                    ) * 100
+
         return metrics
-    
-    def get_historical_net_worth(
-        self, 
-        period: str = "1y"
-    ) -> list[dict]:
+
+    def get_historical_net_worth(self, period: str = "1y") -> list[dict]:
         """Get historical net worth data for charting.
-        
+
         Args:
             period: Time period - "7d", "30d", "90d", "1y", "all"
-        
+
         Returns:
-            List of {date, net_worth, assets, liabilities} dicts
+            List of ``{date, net_worth, cost_basis}`` dicts (all CAD).
         """
         today = date.today()
-        
-        # Determine start date based on period
-        period_days = {
-            "7d": 7,
-            "30d": 30,
-            "90d": 90,
-            "1y": 365,
-            "all": 3650,  # ~10 years
-        }
+        period_days = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": 3650}
         days = period_days.get(period, 365)
         start_date = today - timedelta(days=days)
-        
-        # Get snapshots
-        snapshots = self.db.query(PortfolioSnapshot).filter(
-            PortfolioSnapshot.snapshot_date >= start_date
-        ).order_by(PortfolioSnapshot.snapshot_date.asc()).all()
-        
-        result = []
-        for snapshot in snapshots:
-            result.append({
+
+        snapshots = (
+            self.db.query(PortfolioSnapshot)
+            .filter(PortfolioSnapshot.snapshot_date >= start_date)
+            .order_by(PortfolioSnapshot.snapshot_date.asc())
+            .all()
+        )
+
+        return [
+            {
                 "date": snapshot.snapshot_date.isoformat(),
                 "net_worth": float(snapshot.total_value),
                 "cost_basis": float(snapshot.total_cost_basis),
-            })
-        
-        return result
+            }
+            for snapshot in snapshots
+        ]
 
 
-def get_insights_summary(db: Session, base_currency: str = "USD") -> dict:
-    """Get a complete insights summary for the dashboard.
-    
-    Returns all key metrics in a single call for efficiency.
-    """
-    calculator = InsightsCalculator(db, base_currency=base_currency)
-    
+def get_insights_summary(db: Session) -> dict:
+    """Get a complete insights summary for the dashboard (CAD)."""
+    calculator = InsightsCalculator(db)
     net_worth = calculator.calculate_net_worth()
     allocation = calculator.calculate_allocation()
-    currency_exposure = calculator.calculate_currency_exposure()
     growth = calculator.calculate_growth_metrics()
-    
+
+    def _f(v: Optional[Decimal]) -> Optional[float]:
+        return float(v) if v is not None else None
+
     return {
         "net_worth": {
-            "total_usd": float(net_worth.net_worth_usd),
-            "total_assets_usd": float(net_worth.total_assets_usd),
-            "total_liabilities_usd": float(net_worth.total_liabilities_usd),
-            "liquid_assets_usd": float(net_worth.liquid_assets_usd),
-            "investment_assets_usd": float(net_worth.investment_assets_usd),
-            "retirement_assets_usd": float(net_worth.retirement_assets_usd),
-            "real_estate_equity_usd": float(net_worth.real_estate_equity_usd),
-            "assets_by_currency": {k: float(v) for k, v in net_worth.assets_by_currency.items()},
-            "liabilities_by_currency": {k: float(v) for k, v in net_worth.liabilities_by_currency.items()},
-            "change_1d": float(net_worth.change_1d) if net_worth.change_1d else None,
-            "change_1d_percent": float(net_worth.change_1d_percent) if net_worth.change_1d_percent else None,
-            "change_1m": float(net_worth.change_1m) if net_worth.change_1m else None,
-            "change_1m_percent": float(net_worth.change_1m_percent) if net_worth.change_1m_percent else None,
-            "change_ytd": float(net_worth.change_ytd) if net_worth.change_ytd else None,
-            "change_ytd_percent": float(net_worth.change_ytd_percent) if net_worth.change_ytd_percent else None,
+            "total_cad": float(net_worth.net_worth_cad),
+            "total_assets_cad": float(net_worth.total_assets_cad),
+            "total_liabilities_cad": float(net_worth.total_liabilities_cad),
+            "liquid_assets_cad": float(net_worth.liquid_assets_cad),
+            "investment_assets_cad": float(net_worth.investment_assets_cad),
+            "retirement_assets_cad": float(net_worth.retirement_assets_cad),
+            "real_estate_equity_cad": float(net_worth.real_estate_equity_cad),
+            "change_1d": _f(net_worth.change_1d),
+            "change_1d_percent": _f(net_worth.change_1d_percent),
+            "change_1m": _f(net_worth.change_1m),
+            "change_1m_percent": _f(net_worth.change_1m_percent),
+            "change_ytd": _f(net_worth.change_ytd),
+            "change_ytd_percent": _f(net_worth.change_ytd_percent),
         },
         "allocation": {
             "by_type": {k: float(v) for k, v in allocation.by_type.items()},
-            "by_currency": {k: float(v) for k, v in allocation.by_currency.items()},
             "by_country": {k: float(v) for k, v in allocation.by_country.items()},
-            "by_institution": {k: float(v) for k, v in allocation.by_institution.items()},
-        },
-        "currency_exposure": {
-            "exposures": {k: float(v) for k, v in currency_exposure.exposures.items()},
-            "amounts_usd": {k: float(v) for k, v in currency_exposure.amounts_usd.items()},
-            "risk_assessment": currency_exposure.risk_assessment,
+            "by_institution": {
+                k: float(v) for k, v in allocation.by_institution.items()
+            },
         },
         "growth": {
             "monthly_rate": float(growth.monthly_growth_rate),
             "yearly_rate": float(growth.yearly_growth_rate),
             "average_monthly": float(growth.average_monthly_growth),
             "best_month": growth.best_month.isoformat() if growth.best_month else None,
-            "best_month_return": float(growth.best_month_return) if growth.best_month_return else None,
+            "best_month_return": _f(growth.best_month_return),
             "worst_month": growth.worst_month.isoformat() if growth.worst_month else None,
-            "worst_month_return": float(growth.worst_month_return) if growth.worst_month_return else None,
+            "worst_month_return": _f(growth.worst_month_return),
         },
     }
