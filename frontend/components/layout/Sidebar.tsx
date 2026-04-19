@@ -108,16 +108,21 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="flex items-center gap-2"
               >
-                <img
-                  src="/brand/canopy-icon.svg"
-                  alt="Canopy"
-                  className="w-8 h-8 rounded-lg"
-                />
-                <span className="font-semibold text-slate-900 dark:text-white">
-                  Canopy
-                </span>
+                <Link
+                  href="/"
+                  aria-label="Canopy home"
+                  className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <img
+                    src="/brand/canopy-icon.svg"
+                    alt="Canopy"
+                    className="w-8 h-8 rounded-lg"
+                  />
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    Canopy
+                  </span>
+                </Link>
               </motion.div>
             ) : (
               <motion.div
@@ -128,11 +133,17 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                 transition={{ duration: 0.15 }}
                 className="mx-auto"
               >
-                <img
-                  src="/brand/canopy-icon.svg"
-                  alt="Canopy"
-                  className="w-8 h-8 rounded-lg"
-                />
+                <Link
+                  href="/"
+                  aria-label="Canopy home"
+                  className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <img
+                    src="/brand/canopy-icon.svg"
+                    alt="Canopy"
+                    className="w-8 h-8 rounded-lg"
+                  />
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>
