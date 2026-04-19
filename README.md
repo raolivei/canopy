@@ -49,7 +49,7 @@ Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net wort
 
 **Supported account classes** (auto-classified from filename + header):
 
-- **Investments** → `Asset`: TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging (`🇮🇳🇯🇵🇧🇷`), Crypto. Shown on **Holdings**.
+- **Investments** → `Asset`: TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging-markets baskets, Crypto. Shown on **Holdings**.
 - **Cash** → `Asset` (`BANK_CHECKING`): Chequing. Shown on **Accounts**.
 - **Debt** → `Liability`: credit card, Portfolio line of credit. Shown on **Accounts**.
 - **Skipped**: Direct Indexing (flagged but never written).
@@ -74,8 +74,8 @@ Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net wort
 For users migrating from Monarch Money, Canopy ingests the full Monarch transaction export to backfill historical activity without double-counting anything Wealthsimple already owns.
 
 - Upload at `/portfolio/monarch-import`. Accepts the default Monarch export (`monarch-transactions-*.csv`).
-- **Auto-classification**: each account label is routed to investment / cash / debt. Monarch's pseudo-accounts (`Transfer`, `Income`, `Uncategorized`) and foreign-currency accounts (USD/EUR/JPY/...) are skipped with per-file counters.
-- **Autocreate**: unseen accounts are materialised as new `Asset` / `Liability` rows (CAD, Canada), with type inferred from keywords (`tfsa`, `rrsp`, `fhsa`, `dpsp`, `chequing`, `savings`, `visa`, `credit line`, ...). Existing entities are matched by exact name or by trailing account last-4.
+- **Auto-classification**: each account label is routed to investment / cash / debt. Canopy is **CAD + USD only** — USD accounts (WS USD, US credit cards) are first-class; any other currency prefix (EUR/JPY/GBP/BRL/TRY) is skipped as `FOREIGN`. Monarch's pseudo-accounts (`Transfer`, `Income`, `Uncategorized`) are always skipped.
+- **Autocreate**: unseen accounts are materialised as new `Asset` / `Liability` rows (currency inherited from the row — CAD or USD — country = `CA`), with type inferred from keywords (`tfsa`, `rrsp`, `fhsa`, `dpsp`, `chequing`, `savings`, `visa`, `credit line`, ...). Existing entities are matched by exact name or by trailing account last-4.
 - **Two-layer dedup**:
     1. **Per-account Wealthsimple cutover** - once WS owns an account from date `X` onward, Monarch rows for that account on or after `X` are dropped. WS is authoritative for its window.
     2. **Canonical-hash backstop** - a source-agnostic `sha256(entity_key | date | amount)` fingerprint is recorded in `imported_events.canonical_hash` and checked on every insert, catching cross-source duplicates that slip through the cutover.
@@ -87,7 +87,7 @@ For users migrating from Monarch Money, Canopy ingests the full Monarch transact
 
 ### Portfolio Review Snapshots (✅ Implemented in 0.7.0, CAD-only in 0.9.0)
 
-For CAD-denominated holdings that don't export a machine-readable CSV (private equity, real estate, DPSP), drop a TSV/CSV snapshot at `/portfolio/import` and Canopy persists it as a dated review row. Non-Canadian sections (Brazil, Crypto) in legacy spreadsheets are ignored; only the Canadian block is ingested.
+For CAD-denominated holdings that don't export a machine-readable CSV (private equity, real estate, DPSP), drop a TSV/CSV snapshot at `/portfolio/import` and Canopy persists it as a dated review row. Non-Canadian sections in legacy multi-region spreadsheets are recognised and silently skipped; only the Canadian block is ingested.
 
 ### Transaction Management (✅ Implemented)
 

@@ -14,6 +14,14 @@ class ImportStatus(str, Enum):
 
 
 class BankFormat(str, Enum):
+    """Supported CSV import formats.
+
+    Canopy is CAD + USD only. Historic Brazilian-brokerage formats
+    (Nubank, Clear, XP, B3 CEI, Itau, Bradesco, Santander) have been
+    removed from the product; Wealthsimple and Monarch are the
+    recommended import paths.
+    """
+
     GENERIC = "generic"
     MONARCH = "monarch"
     # US Banks
@@ -32,17 +40,6 @@ class BankFormat(str, Enum):
     BMO = "bmo"
     WEALTHSIMPLE = "wealthsimple"
     WEALTHSIMPLE_TRADE = "wealthsimple_trade"
-    # Brazilian Banks
-    NUBANK = "nubank"
-    NUBANK_INVESTMENTS = "nubank_investments"
-    CLEAR = "clear"
-    CLEAR_POSITIONS = "clear_positions"
-    XP = "xp"
-    XP_POSITIONS = "xp_positions"
-    B3_CEI = "b3_cei"
-    ITAU = "itau"
-    BRADESCO = "bradesco"
-    SANTANDER = "santander"
     # International
     WISE = "wise"
     # Custom
@@ -93,7 +90,7 @@ class CSVImportConfig(BaseModel):
 
     bank_format: BankFormat = BankFormat.GENERIC
     field_mapping: FieldMapping
-    default_currency: str = "USD"
+    default_currency: str = "CAD"
     default_account: Optional[str] = None
     skip_rows: int = 0  # Number of header rows to skip
     skip_duplicates: bool = True

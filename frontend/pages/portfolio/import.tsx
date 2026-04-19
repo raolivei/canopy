@@ -156,7 +156,7 @@ export default function PortfolioImportPage() {
     <PageLayout title="Import snapshot">
       <PageHeader
         title="Import portfolio snapshot"
-        description="Upload one or more Canadian holdings snapshots (CSV or tab-separated) for assets that don't auto-sync \u2014 e.g. private equity, real estate, DPSP. Brazil and crypto sections are ignored. For Wealthsimple monthly statements, use the Wealthsimple importer instead."
+        description="Upload one or more Canadian holdings snapshots (CSV or tab-separated) for assets that don't auto-sync \u2014 e.g. private equity, real estate, DPSP. Only CAD rows are ingested. For Wealthsimple monthly statements, use the Wealthsimple importer instead."
       />
 
       <Card className="max-w-2xl">

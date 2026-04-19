@@ -240,6 +240,7 @@ class MonarchImporter:
             label=row.account_label,
             account_class=row.account_class,
             last4=row.account_last4,
+            currency=row.currency,
         )
         self._account_cache[key] = resolved
         return resolved
@@ -299,10 +300,14 @@ class MonarchImporter:
         tx_type = _transaction_type_for(row)
         occurred_at = datetime.combine(row.occurred_on, time.min, tzinfo=timezone.utc)
         description = row.merchant or row.original_statement or "Monarch row"
+        # Canopy is CAD + USD only. Any other currency is filtered
+        # upstream by AccountClass.FOREIGN; everything that reaches here
+        # is tagged CAD or USD.
+        currency = row.currency if row.currency in {"CAD", "USD"} else "CAD"
         return Transaction(
             description=description[:500],
             amount=row.amount,
-            currency="CAD",  # app-scope; foreign accounts are filtered upstream
+            currency=currency,
             type=tx_type,
             date=occurred_at,
             category=row.category[:100] if row.category else None,

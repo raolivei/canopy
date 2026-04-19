@@ -9,9 +9,19 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
-## [0.9.0] - 2026-04-18 — CAD-only, Canadian investments focus
+## [0.9.0] - 2026-04-18 — Canadian investments focus, CAD + USD
 
-Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Brazil and USD multi-currency plumbing is removed. The Accounts page is wired to a dedicated endpoint that only shows cash / credit / LOC — investments stay on Holdings.
+Simplify the product: Canopy is a Canadian investment tracker scoped to **CAD + USD**. Brazil and all other non-Canadian / non-USD plumbing is removed. The Accounts page is wired to a dedicated endpoint that only shows cash / credit / LOC — investments stay on Holdings.
+
+### Scope cleanup — CAD + USD only
+
+- **Monarch importer** now treats USD accounts (WS USD, US chequing, US credit cards) as first-class: `USD account (...)`, `USA Checking (...)`, and `Credit Card USA (...)` are routed to CASH / DEBT with `currency=USD`; autocreated entities inherit the row's currency (CAD **or** USD). Any other prefix (EUR / JPY / GBP / BRL / TRY) is classified as `FOREIGN` and skipped.
+- **Legacy bank-CSV importer** (`backend/services/csv_parser.py`, `backend/models/csv_import.py`): Brazilian brokerage formats (Nubank, Clear, XP, B3 CEI, Itau, Bradesco, Santander) removed from the `BankFormat` enum, detection regex, and field mappings. `_parse_brazilian_amount` helper deleted; `_parse_amount` currency strip list narrowed to `$ / C$ / CAD / USD`. Default currency is now `CAD`.
+- **Integrations catalog** (`GET /v1/integrations/csv-formats`, `GET /v1/integrations`): Brazilian bank entries (Nubank / Clear / XP / B3 CEI / Pluggy) dropped.
+- **Real-estate model**: default `country='CA'`, default `currency='CAD'` (was `BR` / `BRL`).
+- **Frontend `CurrencyBadge`**: dropped `BRL` / `EUR` / `GBP` colour slots; only `CAD` + `USD` remain.
+- **Portfolio-review parser** keeps its skip logic for legacy multi-region spreadsheets (BR / Crypto / Emerging / International sections were already ignored in 0.9.0) — only the Canada section contributes rows.
+- **Data purge** (Alembic `20260423_0011`): one-shot migration that deletes any remaining rows with `country='BR'` or `currency='BRL'` across `assets`, `liabilities`, `transactions`, and `real_estate_properties`, cascading through `account_balance_history`, `lots`, `dividends`, `price_history`, `liability_balance_history`, `liability_payments`, and real-estate children.
 
 ### Added
 
@@ -28,8 +38,8 @@ Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Bra
 
 ### Changed
 
-- **Single currency**: the product is CAD only. The multi-currency API (`/v1/currency`), exchange-rate service, `CurrencySelector` component, and currency dropdowns on Transactions / Insights / Import / Settings / Portfolio are all removed.
-- **Portfolio review parser**: Brazil and Crypto sections are now ignored; only the Canadian section is ingested. Intended for CAD-denominated holdings that don't auto-sync (private equity, real estate, DPSP). Columns collapse to `Value (CAD)`.
+- **Scope is CAD + USD**: the product is a Canadian investment tracker. The multi-currency API (`/v1/currency`), exchange-rate service, `CurrencySelector` component, and currency dropdowns on Transactions / Insights / Import / Settings / Portfolio are all removed. `AccountBalanceHistory` keeps CAD + USD sub-balances side-by-side (see 0.9.0 fix below); net-worth aggregation filters to CAD.
+- **Portfolio review parser**: only the Canadian section is ingested. Non-Canadian sections in legacy multi-region spreadsheets (e.g. Brazil / Crypto / Emerging / International blocks) are silently skipped. Intended for CAD-denominated holdings that don't auto-sync (private equity, real estate, DPSP). Columns collapse to `Value (CAD)`.
 - **Database** (Alembic `20260420_0008`): `portfolio_reviews.total_value_usd` → `total_value_cad`; `portfolio_review_lines.value_usd` → `value_cad`; `region`, `currency`, `value_native`, `pct_region`, `fx_note` columns dropped.
 - **Insights / FIRE calculators** (`services/insights_calculator.py`, `services/fire_calculator.py`) rewritten to operate on CAD directly — no conversion step, no `base_currency` parameter, no currency-exposure section.
 - **Asset model**: default `currency="CAD"`, default `country="CA"`. `RETIREMENT_401K`, `RETIREMENT_IRA`, `RETIREMENT_ROTH_IRA` enum values dropped (Canadian-registered accounts only).

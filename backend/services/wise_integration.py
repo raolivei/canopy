@@ -140,7 +140,7 @@ class WiseIntegrationService:
         """Get transactions for a specific currency.
 
         Args:
-            currency: Currency code (e.g., "USD", "CAD", "BRL")
+            currency: Currency code (e.g., "CAD", "USD")
             start_date: Start of date range (defaults to 90 days ago)
             end_date: End of date range (defaults to now)
             profile_id: Profile ID (defaults to personal profile)

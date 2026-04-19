@@ -7,9 +7,10 @@ section title lines without tabs still work next to TSV data rows.
 Skips plan rows where both local value and pct are empty (e.g. Questrade
 ``VTI (QT)`` targets with ``—``).
 
-Only the Canada section is consumed; any other sections (legacy Brazil / Crypto)
-are ignored so CSVs exported from the original multi-region spreadsheet still
-parse cleanly but contribute only the Canadian holdings.
+Canopy is CAD + USD only. Only the Canada section is ingested; any other
+section headers (legacy multi-region spreadsheets that used to include
+Brazil / Crypto / International blocks, plus straight-up non-CAD tables)
+are recognised and silently skipped so imports keep working.
 """
 
 from __future__ import annotations
@@ -189,7 +190,7 @@ def _is_section_canada(first_cell: str, line: str) -> bool:
 
 
 def _is_section_other(first_cell: str, line: str) -> bool:
-    """Brazil / Crypto / Emerging / International — anything not Canada."""
+    """Any section that isn't Canada — silently skipped (CAD-only scope)."""
     if _is_section_canada(first_cell, line):
         return False
     if _SECTION_OTHER.search(line):

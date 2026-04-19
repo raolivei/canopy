@@ -79,20 +79,25 @@ def resolve_account(
     label: str,
     account_class: AccountClass,
     last4: Optional[str],
+    currency: str = "CAD",
 ) -> Optional[ResolvedAccount]:
     """Resolve a single Monarch account label.
 
     Returns ``None`` when the class is ``PSEUDO`` or ``UNKNOWN`` - the
-    caller should skip the row.
+    caller should skip the row. ``currency`` is used only when
+    autocreating a new Asset / Liability: existing entities keep their
+    stored currency.
     """
     if account_class in {AccountClass.PSEUDO, AccountClass.UNKNOWN, AccountClass.FOREIGN}:
         return None
 
     if account_class == AccountClass.DEBT:
-        return _resolve_liability(db, label=label, last4=last4)
+        return _resolve_liability(db, label=label, last4=last4, currency=currency)
 
     # INVESTMENT and CASH both land on an Asset row.
-    return _resolve_asset(db, label=label, account_class=account_class, last4=last4)
+    return _resolve_asset(
+        db, label=label, account_class=account_class, last4=last4, currency=currency
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +111,7 @@ def _resolve_asset(
     label: str,
     account_class: AccountClass,
     last4: Optional[str],
+    currency: str,
 ) -> ResolvedAccount:
     # 1) name match
     existing = db.execute(select(Asset).where(Asset.name == label)).scalar_one_or_none()
@@ -128,7 +134,7 @@ def _resolve_asset(
         symbol=_unique_symbol(db, label),
         name=label,
         asset_type=_asset_type_for(label, account_class),
-        currency="CAD",
+        currency=currency if currency in {"CAD", "USD"} else "CAD",
         institution=INSTITUTION,
         country="CA",
         sync_source="csv_import",
@@ -176,6 +182,7 @@ def _resolve_liability(
     *,
     label: str,
     last4: Optional[str],
+    currency: str,
 ) -> ResolvedAccount:
     existing = db.execute(select(Liability).where(Liability.name == label)).scalar_one_or_none()
     if existing is not None:
@@ -199,7 +206,7 @@ def _resolve_liability(
         institution=INSTITUTION,
         liability_type=liability_type.value,
         account_number_last4=last4[-4:] if last4 else None,
-        currency="CAD",
+        currency=currency if currency in {"CAD", "USD"} else "CAD",
         country="CA",
     )
     db.add(liability)

@@ -1,7 +1,8 @@
 """Canadian portfolio review API: CSV import, allocation, timeline, compare.
 
-All values are CAD. Legacy Brazil / Crypto sections in imported CSVs are
-ignored by the parser; only the Canada section contributes.
+All values are CAD. Canopy is a Canadian investment tracker; non-Canadian
+sections in legacy spreadsheet exports are recognised and skipped by the
+parser, and only the Canada section contributes rows.
 """
 
 from collections import defaultdict

@@ -55,14 +55,14 @@ class RealEstateProperty(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     # Property identification
-    name: Mapped[str] = mapped_column(String(255))  # e.g., "Apartamento Porto Alegre"
+    name: Mapped[str] = mapped_column(String(255))  # e.g., "Toronto condo"
     address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     state: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    country: Mapped[str] = mapped_column(String(2), default="BR")  # ISO 3166-1 alpha-2
+    country: Mapped[str] = mapped_column(String(2), default="CA")  # ISO 3166-1 alpha-2
 
-    # Financial details
-    currency: Mapped[str] = mapped_column(String(3), default="BRL")
+    # Financial details (CAD + USD only; see AccountBalanceHistory for multi-currency balances).
+    currency: Mapped[str] = mapped_column(String(3), default="CAD")
     total_contract_value: Mapped[Decimal] = mapped_column(
         Numeric(precision=18, scale=2)
     )  # Total value of the property in contract

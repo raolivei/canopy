@@ -206,10 +206,12 @@ def test_layer2_canonical_hash_blocks_cross_source_duplicate(db: Session) -> Non
 
 
 def test_foreign_and_pseudo_accounts_are_skipped_not_imported(db: Session) -> None:
+    # Canopy is CAD + USD only: EUR / BRL / JPY / GBP / TRY are foreign.
+    # Pseudo accounts (Transfer / Income / Uncategorized) are also skipped.
     f = _file(
         "2024-01-05,A,Income,Transfer,raw,,5.00,",
-        "2024-01-05,B,Shopping,USD account (...2015),raw,,-10.00,",
-        "2024-01-05,C,Shopping,EUR account (...0991),raw,,-5.00,",
+        "2024-01-05,B,Shopping,EUR account (...0991),raw,,-5.00,",
+        "2024-01-05,C,Shopping,BRL account (...9988),raw,,-100.00,",
         "2024-01-05,D,Groceries,RBC Day to Day Banking (...8813),raw,,-25.00,",
     )
     summary = MonarchImporter(db).ingest([f])
@@ -219,3 +221,26 @@ def test_foreign_and_pseudo_accounts_are_skipped_not_imported(db: Session) -> No
     assert rep.imported == 1
     assert rep.skipped_pseudo == 1
     assert rep.skipped_foreign == 2
+
+
+def test_usd_accounts_autocreate_with_usd_currency(db: Session) -> None:
+    # USD chequing and USD credit card are first-class in Canopy.
+    # Autocreated entities inherit the row's currency, not a hardcoded CAD.
+    f = _file(
+        "2024-02-05,Amazon,Shopping,USD account (...2015),AMZN,,-20.00,",
+        "2024-02-06,Amazon,Shopping,Credit Card USA (...5305),US AMZN,,-10.00,",
+    )
+    summary = MonarchImporter(db).ingest([f])
+    db.commit()
+
+    assert summary.transactions_added == 2
+    usd_asset = db.execute(select(Asset).where(Asset.name == "USD account (...2015)")).scalar_one()
+    assert usd_asset.currency == "USD"
+    usd_liab = db.execute(
+        select(Liability).where(Liability.name == "Credit Card USA (...5305)")
+    ).scalar_one()
+    assert usd_liab.currency == "USD"
+
+    # Written transactions carry the same currency.
+    txs = db.execute(select(Transaction)).scalars().all()
+    assert {t.currency for t in txs} == {"USD"}

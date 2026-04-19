@@ -459,11 +459,6 @@ async def get_integration_status():
                 "name": "Plaid",
                 "description": "Automatic bank connections for US/Canada",
             },
-            {
-                "id": "pluggy",
-                "name": "Pluggy",
-                "description": "Brazilian Open Finance integration",
-            },
         ],
     }
 
@@ -476,70 +471,6 @@ async def get_csv_formats():
     """Get information about supported CSV formats."""
     return {
         "formats": [
-            {
-                "id": "nubank",
-                "name": "Nubank",
-                "country": "Brazil",
-                "type": "bank",
-                "export_instructions": "App > Conta > Extrato > Exportar CSV",
-                "sample_headers": ["date", "title", "amount", "category"],
-            },
-            {
-                "id": "nubank_investments",
-                "name": "Nubank Investimentos",
-                "country": "Brazil",
-                "type": "brokerage",
-                "export_instructions": "App > Investimentos > Extrato > Exportar",
-                "sample_headers": ["Data", "Descrição", "Valor", "Tipo", "Ativo"],
-            },
-            {
-                "id": "clear",
-                "name": "Clear Investimentos",
-                "country": "Brazil",
-                "type": "brokerage",
-                "export_instructions": "Portal > Relatórios > Notas de Corretagem > Exportar CSV",
-                "sample_headers": [
-                    "Data Negócio",
-                    "C/V",
-                    "Código",
-                    "Especificação do Título",
-                    "Quantidade",
-                    "Preço",
-                    "Valor Total",
-                ],
-            },
-            {
-                "id": "xp",
-                "name": "XP Investimentos",
-                "country": "Brazil",
-                "type": "brokerage",
-                "export_instructions": "Portal > Meus Investimentos > Posição > Exportar",
-                "sample_headers": [
-                    "Data do Negócio",
-                    "Código do Ativo",
-                    "Tipo de Movimentação",
-                    "Quantidade",
-                    "Preço Unitário",
-                    "Valor Líquido",
-                ],
-            },
-            {
-                "id": "b3_cei",
-                "name": "B3 CEI (Canal Eletrônico do Investidor)",
-                "country": "Brazil",
-                "type": "consolidated",
-                "export_instructions": "cei.b3.com.br > Extratos e Informativos > Negociação > Exportar",
-                "sample_headers": [
-                    "Data do Negócio",
-                    "Código de Negociação",
-                    "Tipo de Movimentação",
-                    "Instituição",
-                    "Quantidade",
-                    "Preço",
-                    "Valor",
-                ],
-                "notes": "Consolidates all Brazilian brokerages in one export",
-            },
             {
                 "id": "rbc",
                 "name": "RBC Royal Bank",

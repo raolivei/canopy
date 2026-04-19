@@ -58,16 +58,38 @@ def test_skips_monarch_pseudo_accounts() -> None:
     assert result.skipped_pseudo == 3
 
 
-def test_classifies_foreign_currency_accounts() -> None:
+def test_classifies_non_cad_usd_accounts_as_foreign() -> None:
+    # Canopy is CAD + USD only. Any other currency prefix is skipped.
     text = _csv(
-        "2025-05-06,Amazon,Shopping,USD account (...2015),AMZN,,-20.00,",
         "2025-05-06,Shopping,Shopping,EUR account (...0991),IKEA EUR,,-15.00,",
         "2025-05-06,Cafe,Restaurants,JPY account (...9625),Tokyo coffee,,-500,",
-        "2025-05-06,Card,Shopping,Credit Card USA (...5305),US Amazon,,-10.00,",
+        "2025-05-06,Shop,Shopping,GBP account (...1234),UK shop,,-12.00,",
+        "2025-05-06,Store,Shopping,BRL account (...9988),Brasil store,,-100.00,",
+        "2025-05-06,Tea,Restaurants,TRY account (...3333),Istanbul tea,,-50.00,",
     )
     result = parse_monarch_csv(text)
     assert len(result.rows) == 0
-    assert result.skipped_foreign == 4
+    assert result.skipped_foreign == 5
+
+
+def test_usd_accounts_are_imported_as_cad_peers() -> None:
+    # USD is first-class in Canopy now. These rows must be kept, with
+    # currency=USD and the correct cash/debt classification.
+    text = _csv(
+        "2025-05-06,Amazon,Shopping,USD account (...2015),AMZN,,-20.00,",
+        "2025-05-06,Card,Shopping,Credit Card USA (...5305),US Amazon,,-10.00,",
+        "2025-05-06,Fees,Fees,USA Checking (...4321),raw,,-5.00,",
+    )
+    result = parse_monarch_csv(text)
+    assert result.skipped_foreign == 0
+    assert len(result.rows) == 3
+    by_label = {r.account_label: r for r in result.rows}
+    assert by_label["USD account (...2015)"].account_class == AccountClass.CASH
+    assert by_label["USD account (...2015)"].currency == "USD"
+    assert by_label["Credit Card USA (...5305)"].account_class == AccountClass.DEBT
+    assert by_label["Credit Card USA (...5305)"].currency == "USD"
+    assert by_label["USA Checking (...4321)"].account_class == AccountClass.CASH
+    assert by_label["USA Checking (...4321)"].currency == "USD"
 
 
 def test_classifies_account_families() -> None:

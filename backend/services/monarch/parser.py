@@ -15,6 +15,10 @@ skip), infer currency from the account label (``"USD account (...2015)"``
 -> ``USD``), and tag pseudo-accounts that Monarch uses internally
 (``Transfer``, ``Income``, ``Uncategorized``).
 
+Canopy is CAD + USD only. Accounts labelled in any other currency
+(EUR / JPY / GBP / BRL / TRY, etc.) are classified as ``FOREIGN`` and
+silently dropped at ingest time.
+
 No database I/O here: resolving an account label to a Canopy
 :class:`Asset` / :class:`Liability` lives in ``accounts.py``, and writing
 transactions lives in ``importer.py``.
@@ -53,7 +57,7 @@ class AccountClass(str, enum.Enum):
     INVESTMENT = "investment"
     CASH = "cash"
     DEBT = "debt"
-    FOREIGN = "foreign"  # non-CAD; skipped by default at import time
+    FOREIGN = "foreign"  # non-CAD and non-USD; skipped at import time
     PSEUDO = "pseudo"  # Monarch's internal Transfer/Income/Uncategorized
     UNKNOWN = "unknown"
 
@@ -151,15 +155,14 @@ _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 # "(...2003)", "(...DqRQ)", "(...-5g0)", "(....8120)"
 _LAST4_RE = re.compile(r"\(\.\.\.\.?([A-Za-z0-9\-]+)\)$")
 
+# Account-label prefixes that denote non-CAD / non-USD currencies.
+# Canopy is CAD + USD only; any other prefix -> FOREIGN -> skipped.
 _FOREIGN_PREFIXES = (
-    "USD ",
-    "USA ",
     "EUR ",
     "JPY ",
     "GBP ",
     "BRL ",
     "TRY ",
-    "Credit Card USA",
 )
 
 
@@ -221,12 +224,12 @@ def _classify_account(label: str) -> AccountClass:
     """Classify a Monarch account label into a routing bucket.
 
     Heuristic, in priority order:
-      1. Foreign-currency prefixes (USD/EUR/JPY/TRY/USA) -> FOREIGN
-      2. Credit-card / line-of-credit keywords -> DEBT
+      1. Non-CAD / non-USD currency prefixes (EUR/JPY/GBP/BRL/TRY) -> FOREIGN
+      2. Credit-card / line-of-credit keywords -> DEBT (USD cards included)
       3. Investment account keywords (TFSA, RRSP, FHSA, DPSP, MANAGED_,
          SELF_DIRECTED_, CRYPTO) -> INVESTMENT
-      4. Chequing / Savings / "Day to Day" / "Find & Save" / CASH / CAD
-         account -> CASH
+      4. Chequing / Savings / "Day to Day" / "Find & Save" / CASH /
+         "CAD account" / "USD account" -> CASH
       5. Otherwise -> UNKNOWN (importer will skip with a warning)
     """
     if label.startswith(_FOREIGN_PREFIXES):
@@ -257,6 +260,7 @@ def _classify_account(label: str) -> AccountClass:
         "find & save",
         "cash",
         "cad account",
+        "usd account",
         "eq bank",
     )
     if any(m in lower for m in cash_markers):
