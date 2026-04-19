@@ -165,7 +165,10 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
     for asset in assets:
         latest = db.execute(
             select(AccountBalanceHistory)
-            .where(AccountBalanceHistory.asset_id == asset.id)
+            .where(
+                AccountBalanceHistory.asset_id == asset.id,
+                AccountBalanceHistory.currency == "CAD",
+            )
             .order_by(AccountBalanceHistory.as_of_date.desc())
             .limit(1)
         ).scalar_one_or_none()
@@ -207,14 +210,19 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
     ``LiabilityBalanceHistory`` row, group by date, and carry forward the
     most recent balance per account so each date produces a full snapshot.
     """
-    # Snapshot balance-per-asset and classify by investment vs cash
+    # Snapshot balance-per-asset and classify by investment vs cash.
+    # CAD-only at the aggregation layer: non-CAD sub-balances (e.g. USD cash
+    # in a TFSA holding US stocks) are preserved on-disk but excluded from
+    # net-worth totals to avoid mixing units.
     asset_rows = db.execute(
         select(
             AccountBalanceHistory.as_of_date,
             AccountBalanceHistory.asset_id,
             AccountBalanceHistory.balance,
             Asset.asset_type,
-        ).join(Asset, Asset.id == AccountBalanceHistory.asset_id)
+        )
+        .join(Asset, Asset.id == AccountBalanceHistory.asset_id)
+        .where(AccountBalanceHistory.currency == "CAD")
     ).all()
 
     liab_rows = db.execute(

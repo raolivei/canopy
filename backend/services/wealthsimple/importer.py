@@ -332,33 +332,23 @@ class WealthsimpleImporter:
                 )
             report.rows_imported += 1
 
-        # End-of-statement snapshots.
-        #
-        # Canopy is CAD-only, so we only persist the CAD end-of-period balance.
-        # Wealthsimple investment statements can carry a small USD cash sliver
-        # (e.g. TFSA holding US stocks) — we warn and skip it instead of
-        # writing a second row that would violate
-        # ``uq_account_balance_asset_date`` (asset_id, as_of_date).
+        # End-of-statement snapshots: one row per (asset, as_of_date, currency).
+        # Wealthsimple investment accounts can carry both a CAD and a USD cash
+        # sub-balance (e.g. TFSA holding US stocks); we persist both. Net-worth
+        # aggregation filters to CAD to avoid mixing units.
         if asset is not None and last_row_by_currency:
-            cad_row = last_row_by_currency.get("CAD")
-            if cad_row is not None and cad_row.balance is not None:
-                as_of = _statement_end(meta.statement_period_start, cad_row.occurred_on)
+            for currency, row in last_row_by_currency.items():
+                if row.balance is None:
+                    continue
+                as_of = _statement_end(meta.statement_period_start, row.occurred_on)
                 added = self._upsert_account_snapshot(
                     asset_id=asset.id,
                     as_of_date=as_of,
-                    balance=cad_row.balance,
-                    currency="CAD",
+                    balance=row.balance,
+                    currency=currency,
                 )
                 if added:
                     summary.account_snapshots_added += 1
-            skipped_currencies = sorted(
-                c for c, r in last_row_by_currency.items() if c != "CAD" and r.balance is not None
-            )
-            if skipped_currencies:
-                report.warnings.append(
-                    "Skipped non-CAD balance snapshot(s) for "
-                    f"{', '.join(skipped_currencies)} (CAD-only scope)."
-                )
 
         if liability is not None:
             if meta.account_kind == WsAccountKind.LINE_OF_CREDIT and last_row_by_currency:
@@ -680,15 +670,17 @@ class WealthsimpleImporter:
         balance: Decimal,
         currency: str,
     ) -> bool:
+        # Dedupe key is (asset_id, as_of_date, currency) — see
+        # ``uq_account_balance_asset_date_currency`` on the model.
         existing = self.db.execute(
             select(AccountBalanceHistory).where(
                 AccountBalanceHistory.asset_id == asset_id,
                 AccountBalanceHistory.as_of_date == as_of_date,
+                AccountBalanceHistory.currency == currency,
             )
         ).scalar_one_or_none()
         if existing is not None:
             existing.balance = balance
-            existing.currency = currency
             return False
         self.db.add(
             AccountBalanceHistory(

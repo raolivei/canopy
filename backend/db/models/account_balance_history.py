@@ -36,7 +36,18 @@ class AccountBalanceHistory(Base):
     source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (UniqueConstraint("asset_id", "as_of_date", name="uq_account_balance_asset_date"),)
+    # Multi-currency: Wealthsimple investment accounts can carry both a CAD
+    # and a USD cash sub-balance on the same statement-end date, so the
+    # unique key must include ``currency``. Net-worth aggregation still
+    # filters to CAD to avoid mixing units.
+    __table_args__ = (
+        UniqueConstraint(
+            "asset_id",
+            "as_of_date",
+            "currency",
+            name="uq_account_balance_asset_date_currency",
+        ),
+    )
 
     def __repr__(self) -> str:
         return f"<AccountBalanceHistory(asset_id={self.asset_id}, as_of={self.as_of_date}, balance={self.balance})>"

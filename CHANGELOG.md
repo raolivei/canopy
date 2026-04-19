@@ -42,16 +42,17 @@ Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Bra
 ### Fixed
 
 - **Wealthsimple DIV rows no longer blow up the importer.** `Dividend.dividend_type` column now uses `values_callable` so SQLAlchemy emits the enum **value** (`"cash"`) instead of the enum **name** (`"CASH"`), matching the lowercase values stored in the Postgres `dividendtype` enum. Same fix pattern as the earlier `AssetType` column. Previously, any file with a DIV transaction failed with `invalid input value for enum dividendtype: "CASH"`.
-- **Wealthsimple importer no longer crashes on CAD + USD cash sub-balances.**
-  End-of-statement `account_balance_history` writes are now CAD-only:
-  Wealthsimple investment statements (TFSA, FHSA, Retirement, etc.) can carry
-  a small USD cash sliver when the account holds US stocks. The importer was
-  writing one snapshot per currency for the same `(asset_id, as_of_date)`,
-  which collided with the `uq_account_balance_asset_date` unique constraint
-  and aborted the whole batch with
-  `duplicate key value violates unique constraint
-  "uq_account_balance_asset_date"`. Non-CAD end-of-period balances are now
-  skipped with a per-file warning, matching the CAD-only scope of the app.
+- **Wealthsimple importer now stores CAD + USD cash sub-balances side-by-side.**
+  Wealthsimple investment statements (TFSA, FHSA, Retirement, ...) can carry
+  both a CAD and a USD cash sub-balance when the account holds US stocks.
+  The importer was writing one `account_balance_history` row per currency
+  for the same `(asset_id, as_of_date)`, which collided with the old
+  `uq_account_balance_asset_date` unique constraint and aborted the whole
+  batch. Alembic `20260421_0009` widens the unique key to
+  `(asset_id, as_of_date, currency)` — now both rows can coexist. The
+  net-worth aggregator and latest-balance lookups explicitly filter to
+  `currency = 'CAD'` so totals stay in one unit; non-CAD rows are preserved
+  on-disk for future display on account detail.
 - **Snapshot importer now guides Wealthsimple uploads to the right page.** Dropping files like `Chequing-monthly-statement-transactions-…`, `credit-card-statement-transactions-…`, or `TFSA-monthly-statement-transactions-…` on `/portfolio/import` returned a cryptic "No Canadian rows found" error. The frontend now detects these filename patterns at select-time and shows a banner with a one-click switch to `/portfolio/wealthsimple-import` (plus a "drop Wealthsimple files, keep the snapshots" shortcut); the backend mirrors the detection and returns an actionable error naming the correct importer if a Wealthsimple file still hits the snapshot endpoint.
 
 ---
