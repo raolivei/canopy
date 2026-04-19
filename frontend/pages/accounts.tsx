@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -122,10 +122,119 @@ const accountTypeConfig: Record<
 const isDebtKind = (kind: AccountKind) =>
   kind === "credit" || kind === "loan" || kind === "line_of_credit";
 
+type GroupMode = "flat" | "institution" | "debit_credit";
+
+function institutionLabel(account: Account): string {
+  const s = account.institution?.trim();
+  return s && s.length > 0 ? s : "Other institution";
+}
+
+function compareInstitutionGroup(a: string, b: string): number {
+  const other = "other institution";
+  const aa = a.toLowerCase() === other ? "\uffff" : a.toLowerCase();
+  const bb = b.toLowerCase() === other ? "\uffff" : b.toLowerCase();
+  return aa.localeCompare(bb);
+}
+
+function sortAccountsByInstitutionThenName(a: Account, b: Account): number {
+  const inst = compareInstitutionGroup(
+    institutionLabel(a),
+    institutionLabel(b),
+  );
+  if (inst !== 0) return inst;
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+function sortAccountsByName(a: Account, b: Account): number {
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+interface AccountCardProps {
+  account: Account;
+  index: number;
+  view: ReturnType<typeof useCurrencyView>["view"];
+  displayCurrency: string;
+  rate: number | null;
+  fmt: ReturnType<typeof useMoney>["fmt"];
+}
+
+function AccountCard({
+  account,
+  index,
+  view,
+  displayCurrency,
+  rate,
+  fmt,
+}: AccountCardProps) {
+  const config = accountTypeConfig[account.kind];
+  const Icon = config.icon;
+  const debt = isDebtKind(account.kind);
+  const native = account.currency || "CAD";
+  const excluded =
+    (view === "CAD" && native !== "CAD") ||
+    (view === "USD" && native !== "USD");
+  const viewedAmount = convertForView(account.balance, native, view, rate);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05 + index * 0.03 }}
+      className={cn(excluded && "opacity-40")}
+    >
+      <Card variant="interactive" className="h-full">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className={cn("p-3 rounded-xl", config.bgColor)}>
+              <Icon className={cn("w-6 h-6", config.iconColor)} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{native}</Badge>
+              <Badge variant="secondary">{config.label}</Badge>
+            </div>
+          </div>
+          <h3 className="font-semibold text-slate-900 dark:text-white mb-1 truncate">
+            {account.name}
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 truncate">
+            {[account.institution, account.last4 && `•••• ${account.last4}`]
+              .filter(Boolean)
+              .join(" · ") || "—"}
+          </p>
+          <p
+            className={cn(
+              "text-2xl font-bold",
+              debt
+                ? "text-danger-600 dark:text-danger-400"
+                : "text-slate-900 dark:text-white",
+            )}
+          >
+            {debt ? "-" : ""}
+            {fmt(account.balance, native)}
+          </p>
+          {!excluded &&
+            (view === "COMBINED_CAD" || view === "COMBINED_USD") &&
+            displayCurrency !== native && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                ≈ {fmt(viewedAmount, displayCurrency)} @ FX
+              </p>
+            )}
+          {account.source && (
+            <p className="text-xs text-slate-400 mt-2 capitalize">
+              Synced from {account.source}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 export default function Accounts() {
   const router = useRouter();
   const { view } = useCurrencyView();
   const { fmt } = useMoney();
+  const [groupMode, setGroupMode] = useState<GroupMode>("flat");
   const { data, isLoading, error } = useQuery<AccountsResponse>({
     queryKey: ["accounts"],
     queryFn: async () => {
@@ -160,16 +269,57 @@ export default function Accounts() {
 
   const displayCurrency = viewCurrency(view);
 
+  const institutionSections = useMemo(() => {
+    const map = new Map<string, Account[]>();
+    for (const a of accounts) {
+      const key = institutionLabel(a);
+      const list = map.get(key) ?? [];
+      list.push(a);
+      map.set(key, list);
+    }
+    for (const list of map.values()) {
+      list.sort(sortAccountsByName);
+    }
+    return [...map.entries()].sort(([ka], [kb]) =>
+      compareInstitutionGroup(ka, kb),
+    );
+  }, [accounts]);
+
+  const debitCreditSections = useMemo(() => {
+    const banking = accounts
+      .filter((a) => !isDebtKind(a.kind))
+      .sort(sortAccountsByInstitutionThenName);
+    const credit = accounts
+      .filter((a) => isDebtKind(a.kind))
+      .sort(sortAccountsByInstitutionThenName);
+    return [
+      {
+        key: "banking",
+        title: "Cash & banking (debit)",
+        subtitle:
+          "Chequing, savings, and cash — positive balances are money you hold.",
+        items: banking,
+      },
+      {
+        key: "credit",
+        title: "Credit & loans (credit)",
+        subtitle:
+          "Cards, lines of credit, and loans — amounts shown are what you owe.",
+        items: credit,
+      },
+    ];
+  }, [accounts]);
+
   return (
     <PageLayout
       title="Accounts"
-      description="Cash, credit, and loans — investments live on Holdings"
+      description="Cash, credit, and loans — group by institution or debit vs credit. Investments live on Portfolio."
     >
       <PageHeader
         title="Accounts"
-        description="Cash, credit, and loans — investments live on Holdings"
+        description="Cash, credit, and loans — group by institution or debit vs credit. Investments live on Portfolio."
         actions={
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col items-end gap-3 sm:flex-row sm:items-start sm:gap-4">
             <CurrencyViewToggle />
             <Button
               variant="primary"
@@ -274,90 +424,143 @@ export default function Accounts() {
       )}
 
       {hasAccounts && (
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">
+                Group accounts
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Flat list, by bank, or cash vs credit products
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Group accounts by">
+              <Button
+                type="button"
+                size="sm"
+                variant={groupMode === "flat" ? "primary" : "secondary"}
+                aria-pressed={groupMode === "flat"}
+                onClick={() => setGroupMode("flat")}
+              >
+                None
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={groupMode === "institution" ? "primary" : "secondary"}
+                aria-pressed={groupMode === "institution"}
+                onClick={() => setGroupMode("institution")}
+              >
+                Institution
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={groupMode === "debit_credit" ? "primary" : "secondary"}
+                aria-pressed={groupMode === "debit_credit"}
+                onClick={() => setGroupMode("debit_credit")}
+              >
+                Debit vs credit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasAccounts && groupMode === "flat" && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {accounts.map((account, index) => {
-            const config = accountTypeConfig[account.kind];
-            const Icon = config.icon;
-            const debt = isDebtKind(account.kind);
-            // Questrade-style: account cards always show the *native*
-            // balance in the account's own currency, with the currency
-            // code prominently displayed. The top-line summary is what
-            // rolls up to the selected view.
-            const native = account.currency || "CAD";
-            // When a single-currency view is active and the account is
-            // in the other currency, fade it so the user can see what's
-            // being excluded at a glance.
-            const excluded =
-              (view === "CAD" && native !== "CAD") ||
-              (view === "USD" && native !== "USD");
-            const viewedAmount = convertForView(
-              account.balance,
-              native,
-              view,
-              rate,
-            );
-            return (
-              <motion.div
+          {[...accounts]
+            .sort(sortAccountsByInstitutionThenName)
+            .map((account, index) => (
+              <AccountCard
                 key={account.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 + index * 0.03 }}
-                className={cn(excluded && "opacity-40")}
-              >
-                <Card variant="interactive" className="h-full">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={cn("p-3 rounded-xl", config.bgColor)}>
-                        <Icon className={cn("w-6 h-6", config.iconColor)} />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{native}</Badge>
-                        <Badge variant="secondary">{config.label}</Badge>
-                      </div>
-                    </div>
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-1 truncate">
-                      {account.name}
-                    </h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 truncate">
-                      {[account.institution, account.last4 && `•••• ${account.last4}`]
-                        .filter(Boolean)
-                        .join(" · ") || "—"}
-                    </p>
-                    <p
-                      className={cn(
-                        "text-2xl font-bold",
-                        debt
-                          ? "text-danger-600 dark:text-danger-400"
-                          : "text-slate-900 dark:text-white",
-                      )}
-                    >
-                      {debt ? "-" : ""}
-                      {fmt(account.balance, native)}
-                    </p>
-                    {/* Show the converted figure below only when the
-                        view isn't already the native currency — keeps
-                        the card from repeating itself. */}
-                    {!excluded &&
-                      (view === "COMBINED_CAD" || view === "COMBINED_USD") &&
-                      displayCurrency !== native && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          ≈ {fmt(viewedAmount, displayCurrency)} @ FX
-                        </p>
-                      )}
-                    {account.source && (
-                      <p className="text-xs text-slate-400 mt-2 capitalize">
-                        Synced from {account.source}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            );
-          })}
+                account={account}
+                index={index}
+                view={view}
+                displayCurrency={displayCurrency}
+                rate={rate}
+                fmt={fmt}
+              />
+            ))}
+        </motion.div>
+      )}
+
+      {hasAccounts && groupMode === "institution" && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-10"
+        >
+          {institutionSections.map(([institution, rows], sectionIdx) => (
+            <section key={institution}>
+              <div className="mb-4 flex items-baseline justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {institution}
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {rows.length} account{rows.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {rows.map((account, index) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    index={sectionIdx * 3 + index}
+                    view={view}
+                    displayCurrency={displayCurrency}
+                    rate={rate}
+                    fmt={fmt}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </motion.div>
+      )}
+
+      {hasAccounts && groupMode === "debit_credit" && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-10"
+        >
+          {debitCreditSections.map((section) => (
+            <section key={section.key}>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  {section.title}
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {section.subtitle}
+                </p>
+                {section.items.length === 0 ? (
+                  <p className="mt-2 text-sm text-slate-400">No accounts in this group.</p>
+                ) : null}
+              </div>
+              {section.items.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {section.items.map((account, index) => (
+                    <AccountCard
+                      key={account.id}
+                      account={account}
+                      index={index}
+                      view={view}
+                      displayCurrency={displayCurrency}
+                      rate={rate}
+                      fmt={fmt}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ))}
         </motion.div>
       )}
     </PageLayout>

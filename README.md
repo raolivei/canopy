@@ -1,390 +1,85 @@
 # Canopy
 
-**Your Canadian investments. Under one canopy.**
+**Canadian net worth and investments — self-hosted.**
 
-Canopy is a self-hosted Canadian-investment tracker built around **continuous net-worth tracking in CAD and USD**:
+Canopy is a personal finance app for **CAD + USD**: Wealthsimple and Monarch CSV imports, optional **Wise** (CAD/USD balances) and **Questrade** integrations, portfolio holdings, cash/credit accounts, insights, and a **FIRE calculator**. Data stays on your infrastructure (e.g. k3s at home, Tailscale access).
 
-- **Drop Wealthsimple statements** (any mix of TFSA / RRSP / FHSA / Crypto / Chequing / Credit Card / Line of Credit CSVs) — they're auto-classified into investments, cash, and debt and de-duplicated on re-import. Accounts are created automatically; they show up under Accounts (cash + credit + LOC) or Holdings (investments).
-- **Backfill from Monarch Money** — drop your full Monarch transaction export and Canopy autocreates any missing accounts, routes transactions to them, skips foreign-currency / pseudo accounts, and defers to Wealthsimple for any date where WS already owns the account (per-account cutover + canonical-hash backstop for cross-source dedup).
-- **Capture CAD-denominated holdings that don't auto-sync** (private equity, real estate, DPSP) as dated **portfolio review snapshots** — TSV/CSV in, history by as-of date out.
-- **Questrade-style currency views**: every balance surface — dashboard, Accounts, Holdings, net-worth timeline — reacts to a single global toggle: **CAD only**, **USD only**, **Combined CAD** (USD converted into CAD), or **Combined USD** (CAD converted into USD). Historical points use the FX rate as of that date; live totals use the latest Bank of Canada rate, cached locally in the `fx_rates` table.
+## What it does
 
-It is inspired by Monarch Money, Ghostfolio, and Firefly III, runs fully local on Raspberry Pi k3s clusters (accessed privately over Tailscale — never on the public internet), and stores all data locally without cloud dependencies.
+| Area | Description |
+|------|-------------|
+| **Dashboard** | Net worth from Wealthsimple timeline + Monarch balances; currency toggle (CAD / USD / combined). |
+| **Import** | Wealthsimple statements, Monarch transactions + balances, legacy portfolio snapshots, bank CSV. |
+| **Portfolio** | Positions & accounts (securities vs cash/registered balances), allocation, performance, dividends. |
+| **Accounts** | Chequing, savings, credit, LOC — grouped optionally by institution or debit vs credit. |
+| **Insights** | Net worth, allocation, growth from snapshots; **FIRE** with default 7% or **CAGR from portfolio snapshots** (≥60 days of history). |
+| **Integrations** | Wise sync (CAD/USD only), Questrade (OAuth refresh token). |
 
-## Project Objectives
+## Stack
 
-- A single dashboard for Canadian net-worth tracking — investments, cash, and debt in **CAD and USD**, with a Questrade-style toggle for single-currency or combined views.
-- Drop-in Wealthsimple statement support; Questrade / Wise / RBC CSV next.
-- Store all data locally — no cloud dependencies.
-- Accounts page separates bank / credit / LOC from investment holdings.
-- Run lean — optimized for Raspberry Pi hardware.
-- Modular so other developers can fork and extend.
+- **Backend:** FastAPI, SQLAlchemy, PostgreSQL, Alembic  
+- **Frontend:** Next.js, React Query, Tailwind, Recharts  
+- **FX:** Bank of Canada USDCAD cache (`fx_rates`) for combined views  
 
-### Design Rationale
+Default local ports (see `docker-compose` / workspace config): **frontend `3001`**, **API `8001`**.
 
-**Why Single Dashboard?**
-Financial health requires seeing the big picture. Combining portfolio, budgeting, and transactions in one view helps users understand their complete financial situation without switching between tools.
-
-**Why Local Storage?**
-
-- **Privacy:** Financial data never leaves your control
-- **Security:** No cloud breaches can expose your data
-- **Control:** You decide when and how to back up
-- **Compliance:** Meets data residency requirements
-
-**Why CAD + USD Only?**
-Scope keeps the product simple and the UX uncluttered. Canopy is built for Canadians tracking Canadian-registered accounts (TFSA / RRSP / FHSA / DPSP) and CAD-denominated debt — with first-class support for the USD-denominated positions those accounts often hold (Wealthsimple USD cash balances, USD credit cards, Questrade / RBC USD sub-accounts). Other currencies (EUR / JPY / GBP / BRL / TRY) are skipped at import; the Questrade-style view toggle decides whether to show balances in CAD, in USD, or combined into either unit using the live Bank of Canada rate.
-
-**Why CSV/OFX Import?**
-Most banks don't offer APIs. CSV/OFX files are universal formats that allow users to import transaction history from any financial institution, making the tool truly platform-agnostic.
-
-**Why Raspberry Pi Optimized?**
-Democratizes self-hosting by using affordable, low-power hardware. Enables 24/7 operation without significant electricity costs while maintaining full control over data.
-
-## Core Features
-
-### Wealthsimple CSV Auto-Importer (✅ Primary input channel — 0.8.0)
-
-Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net worth (investments + cash − debt) works from a single drop, no API keys required.
-
-**Supported account classes** (auto-classified from filename + header):
-
-- **Investments** → `Asset`: TFSA, TFSA Long, RRSP (`Retirement ⛱️`), FHSA, Emerging-markets baskets, Crypto. Shown on **Holdings**.
-- **Cash** → `Asset` (`BANK_CHECKING`): Chequing. Shown on **Accounts**.
-- **Debt** → `Liability`: credit card, Portfolio line of credit. Shown on **Accounts**.
-- **Skipped**: Direct Indexing (flagged but never written).
-
-**Flow**:
-
-1. Drop any mix of CSVs at `/portfolio/wealthsimple-import`.
-2. Preview shows account label, type, row counts, duplicates, and warnings.
-3. Commit writes normalized `Transaction`, `Lot` (on BUY), `Dividend` (on DIV), `AccountBalanceHistory` / `LiabilityBalanceHistory` end-of-statement snapshots. Credit-card balances are reconstructed from `opening_balance + sum(deltas)`.
-4. Each row is hashed into `ImportedEvent` so re-dropping the same file is a no-op.
-5. Dashboard net-worth hero and timeline chart (`/v1/wealthsimple-import/networth-timeline`) update immediately.
-
-**Relevant files**:
-
-- Backend: `backend/services/wealthsimple/{filename_parser,row_parser,description_parser,importer}.py`, `backend/api/wealthsimple_import.py`
-- Frontend: `frontend/pages/portfolio/wealthsimple-import.tsx`, `frontend/pages/index.tsx` (net-worth hero)
-- Migration: `backend/alembic/versions/20260419_0007_add_liability_opening_balance.py`
-- Tests: `backend/tests/test_wealthsimple_{filename_parser,description_parser,importer}.py` (30 tests)
-
-### Monarch Money CSV Importer (✅ Added in 0.9.0)
-
-For users migrating from Monarch Money, Canopy ingests the full Monarch transaction export to backfill historical activity without double-counting anything Wealthsimple already owns.
-
-- Upload at `/portfolio/monarch-import`. Accepts the default Monarch export (`monarch-transactions-*.csv`).
-- **Auto-classification**: each account label is routed to investment / cash / debt. Canopy is **CAD + USD only** — USD accounts (WS USD, US credit cards) are first-class; any other currency prefix (EUR/JPY/GBP/BRL/TRY) is skipped as `FOREIGN`. Monarch's pseudo-accounts (`Transfer`, `Income`, `Uncategorized`) are always skipped.
-- **Autocreate**: unseen accounts are materialised as new `Asset` / `Liability` rows (currency inherited from the row — CAD or USD — country = `CA`), with type inferred from keywords (`tfsa`, `rrsp`, `fhsa`, `dpsp`, `chequing`, `savings`, `visa`, `credit line`, ...). Existing entities are matched by exact name or by trailing account last-4.
-- **Two-layer dedup**:
-    1. **Per-account Wealthsimple cutover** - once WS owns an account from date `X` onward, Monarch rows for that account on or after `X` are dropped. WS is authoritative for its window.
-    2. **Canonical-hash backstop** - a source-agnostic `sha256(entity_key | date | amount)` fingerprint is recorded in `imported_events.canonical_hash` and checked on every insert, catching cross-source duplicates that slip through the cutover.
-- Re-uploading the same Monarch CSV is a no-op (per-source hash match).
-
-**Endpoints**: `POST /v1/monarch-import/preview` (savepoint-rollback dry run) and `POST /v1/monarch-import/commit`.
-
-**Relevant files**: `backend/services/monarch/{parser,accounts,importer}.py`, `backend/api/monarch_import.py`, `backend/services/canonical_hash.py`, `frontend/pages/portfolio/monarch-import.tsx`.
-
-### Multi-Currency Views (✅ Added in 0.10.0)
-
-Canopy mirrors the Questrade / Wealthsimple "show me one currency or the combined total" UX across every balance surface — dashboard, Accounts, Holdings, net-worth timeline.
-
-- **Four views**: `CAD`, `USD`, `Combined CAD`, `Combined USD`. State lives in `localStorage` (`canopy.currencyView`) and syncs across tabs via the `storage` event.
-- **Single-currency views** filter rows that don't match — a CAD-only dashboard hides USD cash/debt entirely.
-- **Combined views** convert the opposite side. Timelines apply the FX rate as of each historical point (falling back to the most recent prior observation for weekends / holidays); live totals use the latest rate.
-- **FX source**: Bank of Canada Valet API (`FX_USDCAD_DAILY`). Rates are cached in `fx_rates(pair, as_of_date, rate)` and refreshed on demand — no external calls at render time. `GET /v1/fx/usd-cad` returns the current rate plus a staleness flag; the `CurrencyViewToggle` surfaces an amber warning if the cached rate is older than 3 days.
-
-**Relevant files**: `backend/db/models/fx_rate.py`, `backend/services/fx.py`, `backend/api/fx.py`, `backend/alembic/versions/20260424_0012_add_fx_rates.py`, `frontend/hooks/useCurrencyView.ts`, `frontend/hooks/useFxRate.ts`, `frontend/components/CurrencyViewToggle.tsx`.
-
-### Portfolio Review Snapshots (✅ Implemented in 0.7.0, CAD-only in 0.9.0)
-
-For CAD-denominated holdings that don't export a machine-readable CSV (private equity, real estate, DPSP), drop a TSV/CSV snapshot at `/portfolio/import` and Canopy persists it as a dated review row. Non-Canadian sections in legacy multi-region spreadsheets are recognised and silently skipped; only the Canadian block is ingested.
-
-### Transaction Management (✅ Implemented)
-
-- ✅ Transaction tracking with categories and types (income, expense, transfer, buy, sell)
-- ✅ Single-currency (CAD) display across the app
-- ✅ Modern Monarch Money-inspired UI with dark mode support
-- ✅ Dashboard with charts and statistics (cash flow, spending by category)
-- ✅ Transaction CRUD API endpoints
-- ✅ CSV import for Wealthsimple / RBC / TD / Scotiabank / generic CSV
-- ✅ Duplicate detection and validation
-- ✅ Investment transaction tracking with ticker symbols
-- ✅ Rich transaction data (merchant, notes, tags, original statement)
-
-### Portfolio & Insights (✅ Implemented)
-
-- ✅ Investment portfolio tracking (stocks, ETFs, crypto, registered accounts TFSA / RRSP / FHSA / DPSP)
-- ✅ Net worth dashboard in CAD
-- ✅ Asset allocation by type, country, and institution
-- ✅ Growth metrics (monthly/yearly rates, best/worst months)
-- ✅ Historical portfolio snapshots and trends
-- ✅ Real estate tracking with payment schedules (50% partnership support)
-- ✅ Liability tracking (credit cards, loans, mortgages)
-
-### FIRE Planning (✅ Implemented)
-
-- ✅ FIRE number calculation (based on expenses and safe withdrawal rate)
-- ✅ Years-to-FIRE projection with compound growth
-- ✅ 30-year net worth projections
-- ✅ What-if scenarios (save more, different returns, reduce expenses)
-- ✅ Passive income projections at FIRE
-
-### Integrations (🔄 In Progress)
-
-- 🔄 Questrade API (OAuth 2.0) - UI ready, API pending
-- 🔄 Wise API - UI ready, API pending (CAD balance only)
-- 🔄 RBC Canada CSV export - planned
-- ✅ Wealthsimple CSV drop (`/portfolio/wealthsimple-import`)
-
-### Planned Features
-
-- 💰 Budgeting with categories and goals
-- 🧾 OFX import
-- 📤 Local backup to S3-compatible storage (MinIO/B2)
-- 🔒 Encrypted secrets (no external vault)
-- 📊 Dividend calendar and income streams
-
-## Current Version
-
-**v0.8.0** — Wealthsimple CSV auto-importer + unified net-worth dashboard. See [CHANGELOG.md](./CHANGELOG.md).
-
-## Deployment & Security
-
-Canopy handles personal financial data (bank transactions, investment positions, account numbers, net worth). The recommended deployment:
-
-- **Private ingress only** — expose `canopy.eldertree.local` inside the cluster and **do not** publish a public `canopy.eldertree.xyz` (or equivalent) host. HTTP Basic Auth on a public URL is not sufficient protection for this data.
-- **Access from anywhere via Tailscale** — all client devices (Mac, iOS, Android) join the tailnet and resolve `canopy.eldertree.local` through Pi-hole. See `pi-fleet/docs/TAILSCALE.md` in the infra repo for the iOS/Android setup.
-- **Secrets in Vault** — database passwords and any future API keys are managed by External Secrets Operator, never committed to Git.
-
-## Quick Start
-
-### Prerequisites
-
-- Docker and Docker Compose (recommended)
-- Python 3.11+ with venv (for local development fallback)
-- Node.js 18+ and npm (for local development fallback)
-- k3s cluster (optional, for production deployment)
-
-### Recommended: Docker Compose (Primary Method)
+## Quick start
 
 ```bash
-# Load port assignments from workspace-config
-source ../workspace-config/ports/.env.ports
-
-# Start all services with hot reload
+# From repo root, with workspace port env if you use it:
+source ../workspace-config/ports/.env.ports   # optional
 docker-compose up
-
-# Or start in detached mode
-docker-compose up -d
 ```
 
-**Access:**
+- App: http://localhost:3001  
+- API docs: http://localhost:8001/docs  
 
-- Frontend: http://localhost:3001
-- API: http://localhost:8001
-- API Docs: http://localhost:8001/docs
+Set **`NEXT_PUBLIC_API_URL`** (e.g. `http://localhost:8001`) so the browser can reach the API from the Next dev server.
 
-**Benefits:**
+Local fallback without Docker: `backend` → uvicorn on 8001; `frontend` → `npm run dev` (port from `package.json` / env).
 
-- Consistent environment (matches production)
-- Hot reload enabled via volume mounts
-- No local Python/Node version conflicts
-- Single command to start everything
-
-See `../workspace-config/docs/DOCKER_COMPOSE_GUIDE.md` for complete guide.
-
-### Alternative: Local Development (Fallback)
-
-#### Backend Setup
-
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-PYTHONPATH=/path/to/canopy python3 -m uvicorn app.server:app --reload --host 0.0.0.0 --port 8001
-```
-
-**Why PYTHONPATH?**
-Python needs to find the `backend` module for absolute imports (`from backend.api import ...`). Setting PYTHONPATH to project root allows imports to work regardless of current directory.
-
-**Why `--reload`?**
-Enables auto-reload on code changes during development, speeding up iteration. Remove in production for better performance.
-
-**Why `0.0.0.0`?**
-Binds to all network interfaces, allowing access from other devices on your network (e.g., testing on mobile). Use `127.0.0.1` for localhost-only access.
-
-#### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-**Why Separate Processes?**
-Backend and frontend are independent services. Separating them allows:
-
-- Independent scaling
-- Different deployment strategies
-- Team members to work on one without affecting the other
-- Technology choices (Python backend, Node.js frontend)
-
-### Testing
-
-Run the test script to verify all functionality:
-
-```bash
-./test_app.sh
-```
-
-### Access
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-
-## Repo Structure
+## Repo layout
 
 ```
 canopy/
- ├── backend/
- │   ├── api/              # API endpoints
- │   │   ├── portfolio.py      # Portfolio CRUD
- │   │   ├── insights.py       # Insights & FIRE calculations
- │   │   ├── integrations.py   # External API integrations
- │   │   ├── transactions.py   # Transaction management
- │   │   └── currency.py       # Currency conversion
- │   ├── db/               # Database layer
- │   │   ├── models/           # SQLAlchemy ORM models
- │   │   │   ├── asset.py          # Assets (20+ types)
- │   │   │   ├── real_estate.py    # Real estate & payments
- │   │   │   ├── liability.py      # Liabilities & tracking
- │   │   │   └── ...
- │   │   ├── base.py           # SQLAlchemy base
- │   │   └── session.py        # Session management
- │   ├── services/         # Business logic
- │   │   ├── insights_calculator.py  # Net worth, allocation
- │   │   ├── fire_calculator.py      # FIRE planning
- │   │   ├── price_fetcher.py        # Yahoo Finance
- │   │   └── portfolio_calculator.py # Portfolio metrics
- │   ├── scripts/          # Utility scripts
- │   │   └── seed_portfolio.py   # Database seeding
- │   ├── alembic/          # Database migrations
- │   ├── models/           # Pydantic schemas
- │   ├── app/              # FastAPI application
- │   └── ingest/           # CSV import + Celery tasks
- ├── frontend/
- │   ├── components/       # React components
- │   │   ├── AllocationChart.tsx
- │   │   ├── PerformanceChart.tsx
- │   │   ├── PortfolioHoldingsTable.tsx
- │   │   └── ...
- │   ├── pages/            # Next.js pages
- │   │   ├── insights.tsx      # Insights dashboard
- │   │   ├── portfolio.tsx     # Portfolio management
- │   │   ├── settings/
- │   │   │   └── integrations.tsx  # API integrations
- │   │   └── ...
- │   └── utils/            # Utility functions
- ├── k8s/                  # Kubernetes manifests
- ├── .github/workflows/    # CI/CD
- ├── CHANGELOG.md          # Version history
- ├── ARCHITECTURE.md       # Architecture decisions
- └── README.md
+├── backend/           # FastAPI — api/, services/, db/models/, alembic/
+├── frontend/        # Next.js — pages/, components/
+├── k8s/               # Kubernetes manifests (eldertree / GHCR)
+├── CHANGELOG.md
+└── README.md
 ```
 
-## CSV Import
+Deeper docs: [CHANGELOG.md](./CHANGELOG.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md).
 
-Canopy now supports importing transactions from CSV files with smart format detection:
+## GitHub issues — triage (manual)
 
-### Supported Formats
+Close or narrow when you merge work:
 
-- **Monarch Money** - Full support including merchant names, categories, tags, and investment transactions
-- **Chase Bank** - Standard CSV export format
-- **Bank of America** - Checking and credit card statements
-- **Wells Fargo** - Transaction history exports
-- **Capital One** - With debit/credit columns
-- **American Express** - Card statements
-- **TD Bank, RBC, Nubank** - And many more
-- **Generic CSV** - Custom field mapping for any format
+| Issue | Suggested action |
+|-------|------------------|
+| [#23 Wise API](https://github.com/raolivei/canopy/issues/23) | **Close or narrow** — Wise sync exists (CAD/USD balances + transactions). Open follow-ups only for extra currencies/FX. |
+| [#21 Questrade](https://github.com/raolivei/canopy/issues/21) | **Keep open** until OAuth + sync are stable in prod; UI exists. |
+| [#24 Dividends](https://github.com/raolivei/canopy/issues/24) | **Open** — tracking UI exists; “income streams” scope may still apply. |
+| [#26 Property](https://github.com/raolivei/canopy/issues/26) | **Open**. |
+| [#27 API docs](https://github.com/raolivei/canopy/issues/27) | **Open**. |
+| [#29 / #30 “suites”](https://github.com/raolivei/canopy/issues) | **Open** — roadmap. |
 
-### Key Features
+## Branches
 
-- 🎯 Automatic format detection
-- 🔍 Duplicate transaction detection
-- 🇨🇦 CAD-only (USD-listed securities inside Wealthsimple accounts are still imported)
-- 📊 Import preview before committing
-- 🏷️ Rich data support (merchant, tags, notes, original statement)
-- 📈 Investment transaction tracking (Buy/Sell with ticker symbols)
-- 📝 Import history tracking
+After merging feature work to `main`, delete stale locals:
 
-See **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** for detailed instructions and examples.
+```bash
+git checkout main && git pull
+git branch --merged main   # safe candidates
+git branch -d <branch-name>
+```
 
-## Insights & FIRE Planning
-
-The Insights page (`/insights`) provides comprehensive financial analytics:
-
-### Net Worth Dashboard
-
-- Total net worth in CAD
-- Assets vs liabilities breakdown
-- Allocation by account type / country / institution
-- Growth metrics (monthly, yearly, YTD)
-
-### FIRE Calculator
-
-Calculate your path to Financial Independence:
-
-- **FIRE Number**: Target net worth based on your expenses
-- **Years to FIRE**: How long until you reach financial independence
-- **Progress**: Visual progress bar showing % complete
-- **Projections**: 30-year net worth projections
-
-Default assumptions (customizable):
-
-- Monthly expenses: C$5,000
-- Safe Withdrawal Rate: 4%
-- Expected Return: 7%
-
-### What-If Scenarios
-
-Compare different scenarios:
-
-- Save $500 more per month
-- Save $1000 more per month
-- Reduce expenses by 10%
-- 8% vs 7% vs 5% annual returns
-
-## Bootstrapping data
-
-Canopy has no seed script — it is designed to be populated from your own statements:
-
-1. Drop a Wealthsimple monthly statement (any combination of TFSA / RRSP / FHSA / Chequing / Credit Card / LOC / Crypto CSVs) at `/portfolio/wealthsimple-import`. Accounts + transactions + balance snapshots are created automatically.
-2. (Optional) Drop a CAD portfolio snapshot (TSV/CSV) at `/portfolio/import` for holdings that don't auto-sync (private equity, real estate, DPSP).
-
-Both paths feed the same net-worth timeline and Accounts page.
-
-## Documentation
-
-- **[CHANGELOG.md](./CHANGELOG.md)** - Version history and release notes
-- **[MASTER_PROMPT.md](./MASTER_PROMPT.md)** - Complete application recreation guide
-- **[CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md)** - CSV import documentation and format guide
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture decisions and rationale
-- **[test_app.sh](./test_app.sh)** - Test script for verifying functionality
-- **[examples/](./examples/)** - Sample CSV files for different formats
-
-## GitHub Issues
-
-Track ongoing development:
-
-- [#21 - Questrade API Integration](https://github.com/raolivei/canopy/issues/21)
-- [#23 - Wise API Integration](https://github.com/raolivei/canopy/issues/23)
-- [#24 - Dividend Tracking](https://github.com/raolivei/canopy/issues/24)
-- [#25 - Real-time Currency Rates](https://github.com/raolivei/canopy/issues/25)
-- [#26 - Property Value Estimation](https://github.com/raolivei/canopy/issues/26)
+Remote deletes: `git push origin --delete <branch>` only when the branch is merged and obsolete.
 
 ## Brand
 
-Active logo lives in [`frontend/public/brand/`](./frontend/public/brand/). Brand explorations (five logo concepts — wallet-leaf, tree-coin, maple-shield, leaf-chart, monogram) are available at [`/logos`](https://canopy.eldertree.xyz/logos) once deployed, or at `http://localhost:3000/logos` locally.
+Logo: [`frontend/public/brand/`](./frontend/public/brand/).
+
+## Security
+
+Treat as **sensitive financial data**. Prefer private network / Tailscale; do not expose the app broadly without strong auth. Secrets via your cluster’s secret store (e.g. Vault), not in Git.

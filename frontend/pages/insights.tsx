@@ -96,6 +96,9 @@ interface FIREMetrics {
   annual_expenses: number;
   safe_withdrawal_rate: number;
   expected_return: number;
+  return_assumption_source?: string;
+  historical_annual_return_pct?: number | null;
+  historical_data_span_days?: number | null;
 }
 
 interface ProjectionPoint {
@@ -143,6 +146,7 @@ export default function Insights() {
   const [monthlyExpenses, setMonthlyExpenses] = useState(5000);
   const [monthlySavings, setMonthlySavings] = useState(2000);
   const [showFIREDetails, setShowFIREDetails] = useState(false);
+  const [useHistoricalReturn, setUseHistoricalReturn] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
   const {
@@ -163,11 +167,16 @@ export default function Insights() {
   });
 
   const { data: fire } = useQuery<FIRESummary>({
-    queryKey: ["fire-summary", monthlyExpenses, monthlySavings],
+    queryKey: ["fire-summary", monthlyExpenses, monthlySavings, useHistoricalReturn],
     queryFn: async () => {
-      const res = await fetch(
-        `${API_URL}/v1/insights/fire?monthly_expenses=${monthlyExpenses}&monthly_savings=${monthlySavings}`,
-      );
+      const params = new URLSearchParams({
+        monthly_expenses: String(monthlyExpenses),
+        monthly_savings: String(monthlySavings),
+      });
+      if (useHistoricalReturn) {
+        params.set("use_historical_return", "true");
+      }
+      const res = await fetch(`${API_URL}/v1/insights/fire?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch FIRE data");
       return res.json();
     },
@@ -489,7 +498,7 @@ export default function Insights() {
               </CardHeader>
               <CardContent>
                 {showFIREDetails && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Monthly Expenses (CAD)
@@ -510,6 +519,20 @@ export default function Insights() {
                         onChange={(e) => setMonthlySavings(Number(e.target.value))}
                       />
                     </div>
+                    <div className="flex flex-col gap-3 md:col-span-1">
+                      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={useHistoricalReturn}
+                          onChange={(e) => setUseHistoricalReturn(e.target.checked)}
+                          className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        Use CAGR from portfolio snapshots
+                      </label>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Requires at least two snapshots ≥60 days apart (from Create snapshot / scheduled jobs). Falls back to 7% if not enough data.
+                      </p>
+                    </div>
                     <div className="flex items-end">
                       <div className="text-sm text-slate-600 dark:text-slate-400">
                         <div>
@@ -518,7 +541,17 @@ export default function Insights() {
                         </div>
                         <div>
                           Return:{" "}
-                          {((fire?.metrics.expected_return || 0.07) * 100).toFixed(0)}%
+                          {((fire?.metrics.expected_return || 0.07) * 100).toFixed(1)}%
+                          {fire?.metrics.return_assumption_source === "historical" &&
+                            fire.metrics.historical_data_span_days != null && (
+                              <span className="text-success-600 dark:text-success-400">
+                                {" "}
+                                (CAGR, {fire.metrics.historical_data_span_days}d)
+                              </span>
+                            )}
+                          {fire?.metrics.return_assumption_source === "historical_unavailable" && (
+                            <span className="text-amber-600 dark:text-amber-400"> (default 7% — not enough snapshot history)</span>
+                          )}
                         </div>
                       </div>
                     </div>

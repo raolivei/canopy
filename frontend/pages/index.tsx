@@ -18,8 +18,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
+  LineChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -230,7 +232,8 @@ export default function Dashboard() {
           date: format(new Date(p.date), "MMM yyyy"),
           investments: parseFloat(slice.investments),
           cash: parseFloat(slice.cash),
-          debt: -Math.abs(parseFloat(slice.debt)),
+          /** Debt magnitude (positive) — shown on its own axis vs. asset stack. */
+          debt_abs: Math.abs(parseFloat(slice.debt)),
           net_worth: parseFloat(slice.net_worth),
         };
       }),
@@ -415,24 +418,32 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle>Net worth over time</CardTitle>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Built from Wealthsimple statement uploads (investments + cash
-                  minus debt) — displayed in {displayCurrency}
+                  Stacked areas = assets you own (investments + cash). Red line =
+                  total debt (separate scale). Bold line = net worth. Data from
+                  Wealthsimple uploads — {displayCurrency}
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="h-72">
+                <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={networthData}>
+                    <ComposedChart data={networthData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                       <CartesianGrid {...getGridProps(checkDarkMode())} />
                       <XAxis
                         dataKey="date"
                         {...getAxisProps(checkDarkMode())}
                       />
                       <YAxis
+                        yAxisId="left"
                         {...getAxisProps(checkDarkMode())}
-                        tickFormatter={(v) =>
-                          fmt(v as number, displayCurrency)
-                        }
+                        tickFormatter={(v) => fmt(v as number, displayCurrency)}
+                        width={56}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        {...getAxisProps(checkDarkMode())}
+                        tickFormatter={(v) => fmt(v as number, displayCurrency)}
+                        width={56}
                       />
                       <Tooltip
                         contentStyle={getTooltipStyle(checkDarkMode())}
@@ -442,35 +453,45 @@ export default function Dashboard() {
                         ]}
                       />
                       <Legend />
-                      <Line
+                      <Area
+                        yAxisId="left"
                         type="monotone"
                         dataKey="investments"
+                        name="Investments (assets)"
+                        stackId="assets"
                         stroke={CHART_COLORS.primary}
-                        strokeWidth={2}
-                        dot={false}
+                        fill={CHART_COLORS.primary}
+                        fillOpacity={0.55}
                       />
-                      <Line
+                      <Area
+                        yAxisId="left"
                         type="monotone"
                         dataKey="cash"
+                        name="Cash (assets)"
+                        stackId="assets"
                         stroke={CHART_COLORS.success}
-                        strokeWidth={2}
-                        dot={false}
+                        fill={CHART_COLORS.success}
+                        fillOpacity={0.5}
                       />
                       <Line
+                        yAxisId="right"
                         type="monotone"
-                        dataKey="debt"
+                        dataKey="debt_abs"
+                        name="Debt (owed)"
                         stroke={CHART_COLORS.danger}
                         strokeWidth={2}
                         dot={false}
                       />
                       <Line
+                        yAxisId="left"
                         type="monotone"
                         dataKey="net_worth"
+                        name="Net worth"
                         stroke={CHART_COLORS.accent}
-                        strokeWidth={3}
+                        strokeWidth={2.5}
                         dot={{ r: 3 }}
                       />
-                    </LineChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>

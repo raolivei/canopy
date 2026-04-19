@@ -22,7 +22,10 @@ from backend.models.portfolio_schemas import (
     PortfolioAllocation,
     PortfolioSummary,
 )
-from backend.services.portfolio_calculator import PortfolioCalculator
+from backend.services.portfolio_calculator import (
+    BALANCE_BASED_ASSET_TYPES,
+    PortfolioCalculator,
+)
 
 router = APIRouter(prefix="/v1/portfolio", tags=["portfolio"])
 
@@ -63,10 +66,16 @@ async def list_assets(
 
     assets = db.execute(query.order_by(Asset.symbol)).scalars().all()
     calculator = PortfolioCalculator(db)
+    balance_ids = [
+        a.id
+        for a in assets
+        if not a.is_liability and a.asset_type in BALANCE_BASED_ASSET_TYPES
+    ]
+    balance_map = calculator.native_balances_from_history(balance_ids)
 
     result = []
     for asset in assets:
-        summary = calculator.get_holding_summary(asset)
+        summary = calculator.get_holding_summary(asset, balance_map=balance_map)
         result.append(
             AssetWithHoldings(
                 id=asset.id,
@@ -98,7 +107,12 @@ async def get_asset(asset_id: int, db: DbSession):
         raise HTTPException(status_code=404, detail="Asset not found")
 
     calculator = PortfolioCalculator(db)
-    summary = calculator.get_holding_summary(asset)
+    balance_map = (
+        calculator.native_balances_from_history([asset.id])
+        if asset.asset_type in BALANCE_BASED_ASSET_TYPES
+        else {}
+    )
+    summary = calculator.get_holding_summary(asset, balance_map=balance_map)
 
     return AssetWithHoldings(
         id=asset.id,

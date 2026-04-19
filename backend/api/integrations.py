@@ -1,17 +1,18 @@
 """API endpoints for third-party integrations (Wise, etc.)."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from backend.app.config import get_settings
 from backend.db.models.asset import Asset, AssetType
 from backend.db.models.transaction import Transaction as TransactionModel
 from backend.db.session import DbSession
+from backend.services.wise_integration import WISE_SYNC_CURRENCIES
 
 router = APIRouter(prefix="/v1/integrations", tags=["integrations"])
 
@@ -176,11 +177,16 @@ class WiseSyncResponse(BaseModel):
     assets_updated: int
     transactions_imported: int
     currencies: list[str]
+    skipped_currencies: list[str] = Field(default_factory=list)
 
 
 @router.post("/wise/sync", response_model=WiseSyncResponse)
 async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
-    """Fetch Wise balances and transactions, then upsert Canopy assets and import transactions."""
+    """Fetch Wise balances and transactions, then upsert Canopy assets and import transactions.
+
+    Only **CAD** and **USD** Wise balances are synced into Canopy (the product scope).
+    Other pockets (e.g. JPY, EUR) are skipped until multi-currency FX is modeled end-to-end.
+    """
     from backend.services.wise_integration import WiseIntegrationService
 
     token = request.api_token or get_settings().wise_api_token
@@ -196,15 +202,23 @@ async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
     assets_updated = 0
     transactions_imported = 0
     currencies: list[str] = []
+    skipped_currencies: list[str] = []
+    now = datetime.now(timezone.utc)
 
     with WiseIntegrationService(token, sandbox=request.sandbox) as wise:
-        balances = wise.get_balances()
-        for b in balances:
+        all_balances = wise.get_balances()
+        for b in all_balances:
+            ccy = b.currency.upper()
+            if ccy not in WISE_SYNC_CURRENCIES:
+                skipped_currencies.append(b.currency)
+                continue
             currencies.append(b.currency)
             symbol = f"WISE_{b.currency}"
             existing = db.execute(select(Asset).where(Asset.symbol == symbol)).scalar_one_or_none()
+            balance_value = Decimal(str(b.amount))
             if existing:
-                # Could update balance-related fields here if we stored current_balance on Asset
+                existing.current_price = balance_value
+                existing.price_updated_at = now
                 assets_updated += 1
             else:
                 asset = Asset(
@@ -214,11 +228,17 @@ async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
                     currency=b.currency,
                     institution="Wise",
                     sync_source="WISE",
+                    current_price=balance_value,
+                    price_updated_at=now,
                 )
                 db.add(asset)
                 assets_created += 1
 
-        transactions = wise.get_all_transactions(start_date=start_date, end_date=end_date)
+        transactions = wise.get_all_transactions(
+            start_date=start_date,
+            end_date=end_date,
+            currencies=set(WISE_SYNC_CURRENCIES),
+        )
         existing_ids = {
             row[0]
             for row in db.execute(
@@ -226,6 +246,8 @@ async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
             ).all()
         }
         for tx in transactions:
+            if (tx.currency or "").upper() not in WISE_SYNC_CURRENCIES:
+                continue
             if tx.id in existing_ids:
                 continue
             db.add(
@@ -248,6 +270,7 @@ async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
         assets_updated=assets_updated,
         transactions_imported=transactions_imported,
         currencies=currencies,
+        skipped_currencies=sorted(set(skipped_currencies)),
     )
 
 
@@ -314,7 +337,7 @@ async def test_questrade_connection(request: QuestradeConnectRequest):
         if "401" in msg or "Unauthorized" in msg or "invalid_grant" in msg:
             raise HTTPException(
                 status_code=401,
-                detail="Invalid or expired refresh token. Generate a new one at my.questrade.com/APIAccess.",
+                detail="Invalid or expired refresh token. In Questrade: API Centre → your personal app → New manual authorization → copy the token (see questrade.com/api/documentation/getting-started).",
             )
         raise HTTPException(status_code=400, detail=f"Connection failed: {msg}")
 

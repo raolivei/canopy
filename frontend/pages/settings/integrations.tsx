@@ -23,8 +23,24 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
-const INTEGRATIONS_BASE = API_BASE ? `${API_BASE}/v1/integrations` : "/v1/integrations";
+/** Base URL for ``/v1/integrations/*`` — never use a relative fallback (breaks Sync with "Failed to fetch"). */
+function integrationsRoot(): string {
+  const base = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
+  return base ? `${base}/v1/integrations` : "";
+}
+
+function missingApiUrlMessage(): string {
+  return "NEXT_PUBLIC_API_URL is not set. Add it to frontend/.env.local (for example http://localhost:8000) so the browser can reach the Canopy API.";
+}
+
+function integrationNetworkError(err: unknown): string {
+  if (err instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(String(err.message))) {
+    return integrationsRoot()
+      ? "Could not reach the Canopy backend. Confirm the API is running and NEXT_PUBLIC_API_URL matches its URL (and CORS allows this origin)."
+      : missingApiUrlMessage();
+  }
+  return err instanceof Error ? err.message : "Request failed";
+}
 const WISE_TOKEN_KEY = "canopy_wise_token";
 const WISE_SANDBOX_KEY = "canopy_wise_sandbox";
 const QUESTRADE_TOKEN_KEY = "canopy_questrade_token";
@@ -32,7 +48,6 @@ const QUESTRADE_TOKEN_KEY = "canopy_questrade_token";
 interface Integration {
   id: string;
   name: string;
-  logo: string;
   description: string;
   status: "connected" | "disconnected" | "pending";
   lastSync?: string;
@@ -41,45 +56,65 @@ interface Integration {
   docsUrl: string;
 }
 
+const INTEGRATION_LOGOS: Record<string, string> = {
+  questrade: "/integrations/questrade.svg",
+  wise: "/integrations/wise.svg",
+  wealthsimple: "/integrations/wealthsimple.svg",
+};
+
+function IntegrationMark({ id }: { id: string }) {
+  const src = INTEGRATION_LOGOS[id];
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      className={cn(
+        "h-10 w-10 shrink-0 object-contain",
+        id === "wise" && "dark:brightness-0 dark:invert",
+      )}
+      aria-hidden
+    />
+  );
+}
+
 const integrations: Integration[] = [
   {
     id: "questrade",
     name: "Questrade",
-    logo: "🇨🇦",
     description: "Canadian discount brokerage. Connect your TFSA, RRSP, and trading accounts.",
     status: "disconnected",
     setupSteps: [
-      "Go to my.questrade.com/APIAccess",
-      "Register a new application",
-      "Copy your Client ID and generate a refresh token",
-      "Enter the credentials below",
+      "Log in at questrade.com → open API Centre from the account menu (top right)",
+      "Activate the API, register a personal app, then New manual authorization",
+      "Generate a token and copy it before closing the dialog — Questrade treats it as the refresh token (expires in 7 days unless renewed)",
+      "Paste it below (official flow: questrade.com/api/documentation → Getting started)",
     ],
-    docsUrl: "https://www.questrade.com/api/documentation",
+    docsUrl: "https://www.questrade.com/api/documentation/getting-started",
   },
   {
     id: "wise",
     name: "Wise",
-    logo: "💱",
-    description: "Track your CAD balance automatically (FX conversions are folded into CAD).",
+    description:
+      "Sync CAD and USD Wise balances and transactions. Other currencies (e.g. JPY, EUR) are skipped — Canopy only models CAD/USD today.",
     status: "disconnected",
     setupSteps: [
       "Log in to Wise and go to Settings",
       "Navigate to API tokens",
-      "Generate a new Personal Token",
-      "Enter the token below",
+      "Generate a new Personal Token (read-only is enough)",
+      "Enter the token below and sync — only CAD & USD pockets are imported",
     ],
     docsUrl: "https://wise.com/developers/api",
   },
   {
     id: "wealthsimple",
     name: "Wealthsimple",
-    logo: "🍁",
     description: "Canadian robo-advisor. RRSP, TFSA, FHSA, and Cash accounts.",
     status: "disconnected",
     setupSteps: [
-      "Wealthsimple does not have a public API",
-      "Use CSV export from the app",
-      "Import via the Import page",
+      "Wealthsimple does not offer a public API",
+      "Export CSVs from the app and use Wealthsimple import in the sidebar",
+      "Monarch Money CSV is supported for broader institution coverage",
     ],
     docsUrl: "",
   },
@@ -95,28 +130,41 @@ function WiseCard({ integration }: { integration: Integration }) {
   const [connected, setConnected] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [accountsLinked, setAccountsLinked] = useState<number>(0);
-  const [syncResult, setSyncResult] = useState<{ assets_created: number; assets_updated: number; transactions_imported: number; currencies: string[] } | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    assets_created: number;
+    assets_updated: number;
+    transactions_imported: number;
+    currencies: string[];
+    skipped_currencies?: string[];
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const root = integrationsRoot();
+    if (!root) return;
     const token = localStorage.getItem(WISE_TOKEN_KEY);
     const useSandbox = localStorage.getItem(WISE_SANDBOX_KEY) === "true";
     setSandbox(useSandbox);
     if (token) {
       setConnected(true);
       setApiToken(token);
-      fetch(`${INTEGRATIONS_BASE}/wise/balances`, {
+      fetch(`${root}/wise/balances`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ api_token: token, sandbox: useSandbox }),
       })
         .then((r) => r.ok ? r.json() : [])
         .then((balances) => {
-          if (Array.isArray(balances)) setAccountsLinked(balances.length);
+          if (Array.isArray(balances)) {
+            const cadUsd = balances.filter((b: { currency?: string }) =>
+              ["CAD", "USD"].includes((b.currency || "").toUpperCase()),
+            );
+            setAccountsLinked(cadUsd.length);
+          }
         })
         .catch(() => {});
     }
-    fetch(`${INTEGRATIONS_BASE}/wise/status`)
+    fetch(`${root}/wise/status`)
       .then((r) => r.json())
       .then((data) => {
         if (data.connected && !token) setConnected(true);
@@ -126,10 +174,15 @@ function WiseCard({ integration }: { integration: Integration }) {
 
   const handleConnect = async () => {
     if (!apiToken.trim()) return;
+    const root = integrationsRoot();
+    if (!root) {
+      setError(missingApiUrlMessage());
+      return;
+    }
     setIsConnecting(true);
     setError(null);
     try {
-      const res = await fetch(`${INTEGRATIONS_BASE}/wise/test-connection`, {
+      const res = await fetch(`${root}/wise/test-connection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ api_token: apiToken.trim(), sandbox }),
@@ -144,7 +197,7 @@ function WiseCard({ integration }: { integration: Integration }) {
       setAccountsLinked(1);
       setError(null);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Connection failed");
+      setError(integrationNetworkError(e));
       setConnected(false);
     } finally {
       setIsConnecting(false);
@@ -167,11 +220,16 @@ function WiseCard({ integration }: { integration: Integration }) {
       setError("No token. Connect first.");
       return;
     }
+    const root = integrationsRoot();
+    if (!root) {
+      setError(missingApiUrlMessage());
+      return;
+    }
     setIsSyncing(true);
     setError(null);
     setSyncResult(null);
     try {
-      const res = await fetch(`${INTEGRATIONS_BASE}/wise/sync`, {
+      const res = await fetch(`${root}/wise/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ api_token: token, sandbox, days: 90 }),
@@ -185,7 +243,7 @@ function WiseCard({ integration }: { integration: Integration }) {
       setLastSync(new Date().toLocaleString());
       setAccountsLinked(data.currencies?.length ?? 0);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Sync failed");
+      setError(integrationNetworkError(e));
     } finally {
       setIsSyncing(false);
     }
@@ -201,7 +259,7 @@ function WiseCard({ integration }: { integration: Integration }) {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-3xl">{integration.logo}</span>
+            <IntegrationMark id={integration.id} />
             <div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{integration.name}</h3>
               <p className="text-sm text-slate-600 dark:text-slate-400">{integration.description}</p>
@@ -214,7 +272,7 @@ function WiseCard({ integration }: { integration: Integration }) {
         </div>
         {connected && (
           <div className="mt-3 flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
-            <span>{accountsLinked} currency balance(s)</span>
+            <span>{accountsLinked} CAD/USD balance(s)</span>
             {lastSync && <span>Last sync: {lastSync}</span>}
             <button
               type="button"
@@ -289,8 +347,17 @@ function WiseCard({ integration }: { integration: Integration }) {
                 )}
 
                 {syncResult && (
-                  <div className="p-3 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg text-sm text-success-800 dark:text-success-300">
-                    Synced: {syncResult.assets_created} assets created, {syncResult.assets_updated} updated, {syncResult.transactions_imported} transactions imported ({syncResult.currencies?.join(", ") || ""}).
+                  <div className="space-y-2">
+                    <div className="p-3 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg text-sm text-success-800 dark:text-success-300">
+                      Synced: {syncResult.assets_created} assets created, {syncResult.assets_updated} updated,{" "}
+                      {syncResult.transactions_imported} transactions imported
+                      {syncResult.currencies?.length ? ` (${syncResult.currencies.join(", ")})` : ""}. Only CAD and USD Wise balances are stored; other pockets are ignored until FX is modeled.
+                    </div>
+                    {syncResult.skipped_currencies && syncResult.skipped_currencies.length > 0 ? (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Not imported: {syncResult.skipped_currencies.join(", ")}
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -323,10 +390,15 @@ function QuestradeCard({ integration }: { integration: Integration }) {
 
   const handleConnect = async () => {
     if (!refreshToken.trim()) return;
+    const root = integrationsRoot();
+    if (!root) {
+      setError(missingApiUrlMessage());
+      return;
+    }
     setIsConnecting(true);
     setError(null);
     try {
-      const res = await fetch(`${INTEGRATIONS_BASE}/questrade/test-connection`, {
+      const res = await fetch(`${root}/questrade/test-connection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refreshToken.trim() }),
@@ -345,7 +417,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
       setConnected(true);
       setAccounts(data.accounts || []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Connection failed");
+      setError(integrationNetworkError(e));
       setConnected(false);
     } finally {
       setIsConnecting(false);
@@ -363,11 +435,16 @@ function QuestradeCard({ integration }: { integration: Integration }) {
   const handleSync = async () => {
     const token = localStorage.getItem(QUESTRADE_TOKEN_KEY) || refreshToken;
     if (!token) { setError("No token. Connect first."); return; }
+    const root = integrationsRoot();
+    if (!root) {
+      setError(missingApiUrlMessage());
+      return;
+    }
     setIsSyncing(true);
     setError(null);
     setSyncResult(null);
     try {
-      const res = await fetch(`${INTEGRATIONS_BASE}/questrade/sync`, {
+      const res = await fetch(`${root}/questrade/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: token }),
@@ -379,7 +456,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
       const data = await res.json();
       setSyncResult(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Sync failed");
+      setError(integrationNetworkError(e));
     } finally {
       setIsSyncing(false);
     }
@@ -393,7 +470,7 @@ function QuestradeCard({ integration }: { integration: Integration }) {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-3xl">{integration.logo}</span>
+            <IntegrationMark id={integration.id} />
             <div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{integration.name}</h3>
               <p className="text-sm text-slate-600 dark:text-slate-400">{integration.description}</p>
@@ -504,7 +581,7 @@ function IntegrationCard({
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-3xl">{integration.logo}</span>
+            <IntegrationMark id={integration.id} />
             <div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                 {integration.name}
@@ -655,6 +732,28 @@ export default function Integrations() {
           </Link>
         }
       />
+
+      {!integrationsRoot() && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-medium text-amber-900 dark:text-amber-200">Backend URL not configured</h3>
+                  <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
+                    {missingApiUrlMessage()} Without it, the browser calls the wrong host and Questrade/Wise actions show &quot;Failed to fetch&quot;.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Info Banner */}
       <motion.div
