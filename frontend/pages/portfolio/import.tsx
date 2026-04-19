@@ -1,9 +1,35 @@
 import { useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Upload, CheckCircle, AlertCircle, X } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, X, ArrowRight } from "lucide-react";
 import Link from "next/link";
+
+// Mirrors backend/services/wealthsimple/filename_parser.py::is_wealthsimple_filename.
+// Keep in sync.
+const WS_PREFIXES = [
+  "Chequing-",
+  "credit-card-statement-",
+  "Portfolio line of credit-",
+  "Direct Indexing-",
+  "Crypto-",
+  "FHSA-",
+  "TFSA Long-",
+  "TFSA-",
+  "Retirement ",
+  "Emerging ",
+];
+
+function looksLikeWealthsimple(filename: string): boolean {
+  const base = filename.split("/").pop() ?? filename;
+  const stem = base.toLowerCase().endsWith(".csv")
+    ? base.slice(0, -4)
+    : base;
+  if (stem.includes("monthly-statement-transactions")) return true;
+  if (stem.startsWith("credit-card-statement-transactions")) return true;
+  return WS_PREFIXES.some((p) => stem.startsWith(p));
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -30,6 +56,7 @@ function formatSize(bytes: number): string {
 }
 
 export default function PortfolioImportPage() {
+  const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [replace, setReplace] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,6 +68,19 @@ export default function PortfolioImportPage() {
     const ok = results.filter((r) => r.success).length;
     return { ok, failed: results.length - ok, total: results.length };
   }, [results]);
+
+  const wsFileCount = useMemo(
+    () => files.filter((f) => looksLikeWealthsimple(f.name)).length,
+    [files]
+  );
+  const snapshotFiles = useMemo(
+    () => files.filter((f) => !looksLikeWealthsimple(f.name)),
+    [files]
+  );
+
+  const dropWealthsimpleFiles = () => {
+    setFiles((prev) => prev.filter((f) => !looksLikeWealthsimple(f.name)));
+  };
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
@@ -125,31 +165,86 @@ export default function PortfolioImportPage() {
               </p>
             </div>
 
+            {wsFileCount > 0 && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800/60 dark:bg-amber-950/40">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-amber-900 dark:text-amber-200">
+                      {wsFileCount === 1
+                        ? "This looks like a Wealthsimple monthly statement."
+                        : `${wsFileCount} of these look like Wealthsimple monthly statements.`}
+                    </div>
+                    <p className="mt-1 text-amber-800 dark:text-amber-300/90">
+                      {
+                        "This page is for CAD portfolio snapshots (private equity, real estate, DPSP). Wealthsimple statements belong in the Wealthsimple importer, where they\u2019re auto-classified into investments, cash, and debt."
+                      }
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        rightIcon={<ArrowRight className="w-4 h-4" />}
+                        onClick={() =>
+                          router.push("/portfolio/wealthsimple-import")
+                        }
+                      >
+                        Go to Wealthsimple importer
+                      </Button>
+                      {snapshotFiles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={dropWealthsimpleFiles}
+                        >
+                          Drop Wealthsimple files, keep the {snapshotFiles.length}{" "}
+                          snapshot file
+                          {snapshotFiles.length === 1 ? "" : "s"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {files.length > 0 && (
               <ul className="divide-y divide-slate-200 dark:divide-slate-800 rounded-md border border-slate-200 dark:border-slate-800">
-                {files.map((f, i) => (
-                  <li
-                    key={`${f.name}-${i}`}
-                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-slate-700 dark:text-slate-200">
-                        {f.name}
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-500">
-                        {formatSize(f.size)}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(i)}
-                      className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                      aria-label={`Remove ${f.name}`}
+                {files.map((f, i) => {
+                  const isWs = looksLikeWealthsimple(f.name);
+                  return (
+                    <li
+                      key={`${f.name}-${i}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </li>
-                ))}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-slate-700 dark:text-slate-200">
+                            {f.name}
+                          </span>
+                          {isWs && (
+                            <span className="shrink-0 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              Wealthsimple
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-500">
+                          {formatSize(f.size)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(i)}
+                        className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                        aria-label={`Remove ${f.name}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
 

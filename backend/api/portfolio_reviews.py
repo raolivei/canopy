@@ -35,6 +35,7 @@ from backend.services.portfolio_review_parser import (
     parse_portfolio_review_text,
     total_cad,
 )
+from backend.services.wealthsimple.filename_parser import is_wealthsimple_filename
 
 router = APIRouter(prefix="/v1/portfolio-reviews", tags=["portfolio-reviews"])
 
@@ -250,10 +251,22 @@ def _import_one(
     db,
     raw_bytes: bytes,
     *,
+    filename: Optional[str],
     label: Optional[str],
     replace: bool,
 ) -> PortfolioReview:
     """Persist a single portfolio-review CSV. Raises HTTPException on any error."""
+    if filename and is_wealthsimple_filename(filename):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"'{filename}' looks like a Wealthsimple monthly statement. "
+                "Upload it at /portfolio/wealthsimple-import instead \u2014 this "
+                "page is for CAD portfolio snapshots (private equity, real estate, "
+                "DPSP) that don't auto-sync."
+            ),
+        )
+
     try:
         text = raw_bytes.decode("utf-8")
     except UnicodeDecodeError as e:
@@ -317,7 +330,7 @@ async def import_review(
     ),
 ):
     raw = await file.read()
-    pr = _import_one(db, raw, label=label, replace=replace)
+    pr = _import_one(db, raw, filename=file.filename, label=label, replace=replace)
 
     r = db.execute(
         select(PortfolioReview)
@@ -357,7 +370,9 @@ async def import_reviews_batch(
         filename = f.filename or "upload.csv"
         try:
             raw = await f.read()
-            pr = _import_one(db, raw, label=label, replace=replace)
+            pr = _import_one(
+                db, raw, filename=filename, label=label, replace=replace
+            )
             results.append(
                 BatchImportFileResult(
                     filename=filename,

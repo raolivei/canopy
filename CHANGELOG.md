@@ -42,6 +42,7 @@ Simplify the product: Canopy is now a Canadian investment tracker, CAD only. Bra
 ### Fixed
 
 - **Wealthsimple DIV rows no longer blow up the importer.** `Dividend.dividend_type` column now uses `values_callable` so SQLAlchemy emits the enum **value** (`"cash"`) instead of the enum **name** (`"CASH"`), matching the lowercase values stored in the Postgres `dividendtype` enum. Same fix pattern as the earlier `AssetType` column. Previously, any file with a DIV transaction failed with `invalid input value for enum dividendtype: "CASH"`.
+- **Snapshot importer now guides Wealthsimple uploads to the right page.** Dropping files like `Chequing-monthly-statement-transactions-…`, `credit-card-statement-transactions-…`, or `TFSA-monthly-statement-transactions-…` on `/portfolio/import` returned a cryptic "No Canadian rows found" error. The frontend now detects these filename patterns at select-time and shows a banner with a one-click switch to `/portfolio/wealthsimple-import` (plus a "drop Wealthsimple files, keep the snapshots" shortcut); the backend mirrors the detection and returns an actionable error naming the correct importer if a Wealthsimple file still hits the snapshot endpoint.
 
 ---
 

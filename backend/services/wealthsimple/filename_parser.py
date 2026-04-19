@@ -110,6 +110,25 @@ _PREFIX_MAP: list[tuple[str, WsAccountKind, AccountClass]] = [
 ]
 
 
+def is_wealthsimple_filename(filename: str) -> bool:
+    """Return True if the filename matches a known Wealthsimple monthly-statement
+    pattern (prefix + ``-monthly-statement-``, or the credit-card variant).
+
+    Useful for routing: files that look like Wealthsimple statements belong in
+    the Wealthsimple importer, not the portfolio-review snapshot importer.
+    """
+    base = os.path.basename(filename)
+    stem = base[:-4] if base.lower().endswith(".csv") else base
+    if "monthly-statement-transactions" in stem:
+        return True
+    if stem.startswith("credit-card-statement-transactions"):
+        return True
+    for prefix, _kind, _cls in _PREFIX_MAP:
+        if stem.startswith(prefix):
+            return True
+    return False
+
+
 def parse_filename(filename: str) -> WsFileMeta:
     """Classify a Wealthsimple CSV filename.
 
