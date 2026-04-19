@@ -42,6 +42,12 @@ import {
   getAxisProps,
   isDarkMode as checkDarkMode,
 } from "@/utils/chartTheme";
+import { CurrencyViewToggle } from "@/components/CurrencyViewToggle";
+import {
+  CurrencyView,
+  useCurrencyView,
+  viewCurrency,
+} from "@/hooks/useCurrencyView";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const CAD = "CAD";
@@ -70,12 +76,26 @@ interface CompareResponse {
   pct_change: number | null;
 }
 
-interface NetWorthPoint {
-  date: string;
+interface NetWorthSlice {
   investments: string;
   cash: string;
   debt: string;
   net_worth: string;
+  currency: string;
+}
+
+interface NetWorthPoint {
+  date: string;
+  // Legacy CAD-native fields (kept for back-compat; equal to ``cad``).
+  investments: string;
+  cash: string;
+  debt: string;
+  net_worth: string;
+  cad: NetWorthSlice;
+  usd: NetWorthSlice;
+  combined_cad: NetWorthSlice;
+  combined_usd: NetWorthSlice;
+  fx_rate: string | null;
 }
 
 interface NetWorthResponse {
@@ -84,10 +104,49 @@ interface NetWorthResponse {
   latest_cash: string;
   latest_debt: string;
   latest_net_worth: string;
+  latest_cad: NetWorthSlice | null;
+  latest_usd: NetWorthSlice | null;
+  latest_combined_cad: NetWorthSlice | null;
+  latest_combined_usd: NetWorthSlice | null;
+  fx_rate: string | null;
+  fx_as_of_date: string | null;
+  fx_is_stale: boolean;
+}
+
+/** Pick the slice of a net-worth point that matches the selected view. */
+function pickSlice(point: NetWorthPoint, view: CurrencyView): NetWorthSlice {
+  switch (view) {
+    case "CAD":
+      return point.cad;
+    case "USD":
+      return point.usd;
+    case "COMBINED_CAD":
+      return point.combined_cad;
+    case "COMBINED_USD":
+      return point.combined_usd;
+  }
+}
+
+function pickLatestSlice(
+  response: NetWorthResponse,
+  view: CurrencyView,
+): NetWorthSlice | null {
+  switch (view) {
+    case "CAD":
+      return response.latest_cad;
+    case "USD":
+      return response.latest_usd;
+    case "COMBINED_CAD":
+      return response.latest_combined_cad;
+    case "COMBINED_USD":
+      return response.latest_combined_usd;
+  }
 }
 
 export default function Dashboard() {
   const router = useRouter();
+  const { view } = useCurrencyView();
+  const displayCurrency = viewCurrency(view);
   const [loading, setLoading] = useState(true);
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
   const [platformAlloc, setPlatformAlloc] = useState<AllocationResponse | null>(null);
@@ -164,14 +223,17 @@ export default function Dashboard() {
 
   const networthData = useMemo(
     () =>
-      (netWorth?.points ?? []).map((p) => ({
-        date: format(new Date(p.date), "MMM yyyy"),
-        investments: parseFloat(p.investments),
-        cash: parseFloat(p.cash),
-        debt: -Math.abs(parseFloat(p.debt)),
-        net_worth: parseFloat(p.net_worth),
-      })),
-    [netWorth]
+      (netWorth?.points ?? []).map((p) => {
+        const slice = pickSlice(p, view);
+        return {
+          date: format(new Date(p.date), "MMM yyyy"),
+          investments: parseFloat(slice.investments),
+          cash: parseFloat(slice.cash),
+          debt: -Math.abs(parseFloat(slice.debt)),
+          net_worth: parseFloat(slice.net_worth),
+        };
+      }),
+    [netWorth, view]
   );
 
   const latestTotal = latestId
@@ -196,19 +258,22 @@ export default function Dashboard() {
     );
   }
 
-  // Net-worth numbers (primary hero when available)
+  // Net-worth numbers (primary hero when available) — pick the slice
+  // that matches the currently-selected Questrade-style currency view.
   const hasNetWorth = !!netWorth;
-  const nwValue = hasNetWorth ? parseFloat(netWorth!.latest_net_worth) : 0;
-  const nwInvestments = hasNetWorth ? parseFloat(netWorth!.latest_investments) : 0;
-  const nwCash = hasNetWorth ? parseFloat(netWorth!.latest_cash) : 0;
-  const nwDebt = hasNetWorth ? parseFloat(netWorth!.latest_debt) : 0;
+  const latestSlice = hasNetWorth ? pickLatestSlice(netWorth!, view) : null;
+  const nwValue = latestSlice ? parseFloat(latestSlice.net_worth) : 0;
+  const nwInvestments = latestSlice ? parseFloat(latestSlice.investments) : 0;
+  const nwCash = latestSlice ? parseFloat(latestSlice.cash) : 0;
+  const nwDebt = latestSlice ? parseFloat(latestSlice.debt) : 0;
 
-  // Month-over-month delta for net worth (from last 2 timeline points)
+  // Month-over-month delta for net worth, computed in the selected
+  // view so a CAD-only switch shows a CAD-only delta.
   const nwDelta = (() => {
     const pts = netWorth?.points ?? [];
     if (pts.length < 2) return null;
-    const prev = parseFloat(pts[pts.length - 2].net_worth);
-    const now = parseFloat(pts[pts.length - 1].net_worth);
+    const prev = parseFloat(pickSlice(pts[pts.length - 2], view).net_worth);
+    const now = parseFloat(pickSlice(pts[pts.length - 1], view).net_worth);
     if (!isFinite(prev) || prev === 0) return null;
     const absDelta = now - prev;
     const pctDelta = (absDelta / Math.abs(prev)) * 100;
@@ -223,6 +288,7 @@ export default function Dashboard() {
       <BrandHeader
         actions={
           <>
+            <CurrencyViewToggle />
             <Button
               variant="primary"
               leftIcon={<UploadCloud className="w-4 h-4" />}
@@ -273,7 +339,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <h2 className="text-5xl lg:text-6xl font-semibold tracking-tight text-slate-900 dark:text-white mb-3">
-                    {formatCurrency(nwValue, CAD)}
+                    {formatCurrency(nwValue, displayCurrency)}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3">
                     {nwDelta && (
@@ -287,7 +353,7 @@ export default function Dashboard() {
                           <TrendingDown className="w-3 h-3 mr-1" />
                         )}
                         {nwDelta.abs >= 0 ? "+" : ""}
-                        {formatCurrency(nwDelta.abs, CAD)} ({nwDelta.pct >= 0 ? "+" : ""}
+                        {formatCurrency(nwDelta.abs, displayCurrency)} ({nwDelta.pct >= 0 ? "+" : ""}
                         {nwDelta.pct.toFixed(2)}%) vs last month
                       </Badge>
                     )}
@@ -307,12 +373,14 @@ export default function Dashboard() {
               value={nwInvestments}
               icon={<PiggyBank className="w-4 h-4" />}
               accent="primary"
+              currency={displayCurrency}
             />
             <NetWorthTile
               label="Cash"
               value={nwCash}
               icon={<Wallet className="w-4 h-4" />}
               accent="success"
+              currency={displayCurrency}
             />
             <NetWorthTile
               label="Debt"
@@ -320,6 +388,7 @@ export default function Dashboard() {
               icon={<CreditCard className="w-4 h-4" />}
               accent="danger"
               negative
+              currency={displayCurrency}
             />
           </div>
         </motion.div>
@@ -343,7 +412,7 @@ export default function Dashboard() {
                 <CardTitle>Net worth over time</CardTitle>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                   Built from Wealthsimple statement uploads (investments + cash
-                  minus debt)
+                  minus debt) — displayed in {displayCurrency}
                 </p>
               </CardHeader>
               <CardContent>
@@ -358,13 +427,13 @@ export default function Dashboard() {
                       <YAxis
                         {...getAxisProps(checkDarkMode())}
                         tickFormatter={(v) =>
-                          formatCurrency(v as number, CAD)
+                          formatCurrency(v as number, displayCurrency)
                         }
                       />
                       <Tooltip
                         contentStyle={getTooltipStyle(checkDarkMode())}
                         formatter={(v: number, name: string) => [
-                          formatCurrency(v, CAD),
+                          formatCurrency(v, displayCurrency),
                           name,
                         ]}
                       />
@@ -643,6 +712,7 @@ function NetWorthTile({
   accent = "neutral",
   emphasis = false,
   negative = false,
+  currency = "CAD",
 }: {
   label: string;
   value: number;
@@ -650,6 +720,7 @@ function NetWorthTile({
   accent?: TileAccent;
   emphasis?: boolean;
   negative?: boolean;
+  currency?: string;
 }) {
   const displayValue = negative ? -Math.abs(value) : value;
   const styles = ACCENT_STYLES[accent];
@@ -671,7 +742,7 @@ function NetWorthTile({
             emphasis ? "text-3xl" : "text-2xl"
           } ${negative ? styles.valueText : "text-slate-900 dark:text-white"}`}
         >
-          {formatCurrency(displayValue, "CAD")}
+          {formatCurrency(displayValue, currency)}
         </div>
       </CardContent>
     </Card>

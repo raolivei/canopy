@@ -2,18 +2,18 @@
 
 **Your Canadian investments. Under one canopy.**
 
-Canopy is a self-hosted Canadian-investment tracker built around **continuous net-worth tracking in CAD**:
+Canopy is a self-hosted Canadian-investment tracker built around **continuous net-worth tracking in CAD and USD**:
 
 - **Drop Wealthsimple statements** (any mix of TFSA / RRSP / FHSA / Crypto / Chequing / Credit Card / Line of Credit CSVs) — they're auto-classified into investments, cash, and debt and de-duplicated on re-import. Accounts are created automatically; they show up under Accounts (cash + credit + LOC) or Holdings (investments).
 - **Backfill from Monarch Money** — drop your full Monarch transaction export and Canopy autocreates any missing accounts, routes transactions to them, skips foreign-currency / pseudo accounts, and defers to Wealthsimple for any date where WS already owns the account (per-account cutover + canonical-hash backstop for cross-source dedup).
 - **Capture CAD-denominated holdings that don't auto-sync** (private equity, real estate, DPSP) as dated **portfolio review snapshots** — TSV/CSV in, history by as-of date out.
-- **See one net-worth number in CAD** on the dashboard (investments + cash − debt), with a combined timeline chart built from every statement drop and every review snapshot.
+- **Questrade-style currency views**: every balance surface — dashboard, Accounts, Holdings, net-worth timeline — reacts to a single global toggle: **CAD only**, **USD only**, **Combined CAD** (USD converted into CAD), or **Combined USD** (CAD converted into USD). Historical points use the FX rate as of that date; live totals use the latest Bank of Canada rate, cached locally in the `fx_rates` table.
 
 It is inspired by Monarch Money, Ghostfolio, and Firefly III, runs fully local on Raspberry Pi k3s clusters (accessed privately over Tailscale — never on the public internet), and stores all data locally without cloud dependencies.
 
 ## Project Objectives
 
-- A single dashboard for Canadian net-worth tracking — investments, cash, and debt in **CAD only**.
+- A single dashboard for Canadian net-worth tracking — investments, cash, and debt in **CAD and USD**, with a Questrade-style toggle for single-currency or combined views.
 - Drop-in Wealthsimple statement support; Questrade / Wise / RBC CSV next.
 - Store all data locally — no cloud dependencies.
 - Accounts page separates bank / credit / LOC from investment holdings.
@@ -32,8 +32,8 @@ Financial health requires seeing the big picture. Combining portfolio, budgeting
 - **Control:** You decide when and how to back up
 - **Compliance:** Meets data residency requirements
 
-**Why CAD Only?**
-Scope keeps the product simple and the UX uncluttered. Canopy is built for Canadians tracking Canadian-registered accounts (TFSA / RRSP / FHSA / DPSP) and CAD-denominated debt. Foreign-listed securities inside a Wealthsimple account are still imported — only the reporting currency is fixed.
+**Why CAD + USD Only?**
+Scope keeps the product simple and the UX uncluttered. Canopy is built for Canadians tracking Canadian-registered accounts (TFSA / RRSP / FHSA / DPSP) and CAD-denominated debt — with first-class support for the USD-denominated positions those accounts often hold (Wealthsimple USD cash balances, USD credit cards, Questrade / RBC USD sub-accounts). Other currencies (EUR / JPY / GBP / BRL / TRY) are skipped at import; the Questrade-style view toggle decides whether to show balances in CAD, in USD, or combined into either unit using the live Bank of Canada rate.
 
 **Why CSV/OFX Import?**
 Most banks don't offer APIs. CSV/OFX files are universal formats that allow users to import transaction history from any financial institution, making the tool truly platform-agnostic.
@@ -84,6 +84,17 @@ For users migrating from Monarch Money, Canopy ingests the full Monarch transact
 **Endpoints**: `POST /v1/monarch-import/preview` (savepoint-rollback dry run) and `POST /v1/monarch-import/commit`.
 
 **Relevant files**: `backend/services/monarch/{parser,accounts,importer}.py`, `backend/api/monarch_import.py`, `backend/services/canonical_hash.py`, `frontend/pages/portfolio/monarch-import.tsx`.
+
+### Multi-Currency Views (✅ Added in 0.10.0)
+
+Canopy mirrors the Questrade / Wealthsimple "show me one currency or the combined total" UX across every balance surface — dashboard, Accounts, Holdings, net-worth timeline.
+
+- **Four views**: `CAD`, `USD`, `Combined CAD`, `Combined USD`. State lives in `localStorage` (`canopy.currencyView`) and syncs across tabs via the `storage` event.
+- **Single-currency views** filter rows that don't match — a CAD-only dashboard hides USD cash/debt entirely.
+- **Combined views** convert the opposite side. Timelines apply the FX rate as of each historical point (falling back to the most recent prior observation for weekends / holidays); live totals use the latest rate.
+- **FX source**: Bank of Canada Valet API (`FX_USDCAD_DAILY`). Rates are cached in `fx_rates(pair, as_of_date, rate)` and refreshed on demand — no external calls at render time. `GET /v1/fx/usd-cad` returns the current rate plus a staleness flag; the `CurrencyViewToggle` surfaces an amber warning if the cached rate is older than 3 days.
+
+**Relevant files**: `backend/db/models/fx_rate.py`, `backend/services/fx.py`, `backend/api/fx.py`, `backend/alembic/versions/20260424_0012_add_fx_rates.py`, `frontend/hooks/useCurrencyView.ts`, `frontend/hooks/useFxRate.ts`, `frontend/components/CurrencyViewToggle.tsx`.
 
 ### Portfolio Review Snapshots (✅ Implemented in 0.7.0, CAD-only in 0.9.0)
 

@@ -57,6 +57,13 @@ try:
 except ImportError:
     HAS_ACCOUNTS_ROUTER = False
 
+try:
+    from backend.api import fx as fx_api
+
+    HAS_FX_ROUTER = True
+except ImportError:
+    HAS_FX_ROUTER = False
+
 # Import integrations router
 try:
     from backend.api import integrations
@@ -125,6 +132,9 @@ def create_app() -> FastAPI:
 
     if HAS_ACCOUNTS_ROUTER:
         app.include_router(accounts_api.router)
+
+    if HAS_FX_ROUTER:
+        app.include_router(fx_api.router)
 
     # Include integrations router if available
     if HAS_INTEGRATIONS_ROUTER:

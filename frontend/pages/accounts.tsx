@@ -17,6 +17,12 @@ import { motion } from "framer-motion";
 import { cn } from "@/utils/cn";
 import { formatCurrency } from "@/utils/currency";
 import { useRouter } from "next/router";
+import { CurrencyViewToggle } from "@/components/CurrencyViewToggle";
+import {
+  convertForView,
+  useCurrencyView,
+  viewCurrency,
+} from "@/hooks/useCurrencyView";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -41,6 +47,23 @@ interface Account {
   updated_at?: string | null;
 }
 
+interface CurrencyTotals {
+  cash: number;
+  debt: number;
+  net: number;
+}
+
+interface CombinedTotals extends CurrencyTotals {
+  currency: string;
+}
+
+interface FxInfo {
+  usd_cad_rate: number | null;
+  as_of_date: string | null;
+  source: string | null;
+  is_stale: boolean;
+}
+
 interface AccountsResponse {
   summary: {
     total_cash: number;
@@ -49,6 +72,9 @@ interface AccountsResponse {
     currency: string;
   };
   accounts: Account[];
+  totals_by_currency: Record<"CAD" | "USD", CurrencyTotals>;
+  totals_combined: Record<"CAD" | "USD", CombinedTotals>;
+  fx: FxInfo;
 }
 
 const accountTypeConfig: Record<
@@ -98,6 +124,7 @@ const isDebtKind = (kind: AccountKind) =>
 
 export default function Accounts() {
   const router = useRouter();
+  const { view } = useCurrencyView();
   const { data, isLoading, error } = useQuery<AccountsResponse>({
     queryKey: ["accounts"],
     queryFn: async () => {
@@ -108,8 +135,29 @@ export default function Accounts() {
   });
 
   const accounts = data?.accounts ?? [];
-  const summary = data?.summary;
   const hasAccounts = accounts.length > 0;
+  const totalsByCcy = data?.totals_by_currency;
+  const totalsCombined = data?.totals_combined;
+  const rate = data?.fx?.usd_cad_rate ?? null;
+
+  // Compute the summary triple for the currently-selected view. The
+  // backend already prepared all four buckets, so the frontend just
+  // picks whichever one matches.
+  const currentTotals: CurrencyTotals | undefined = (() => {
+    if (!totalsByCcy || !totalsCombined) return undefined;
+    switch (view) {
+      case "CAD":
+        return totalsByCcy.CAD;
+      case "USD":
+        return totalsByCcy.USD;
+      case "COMBINED_CAD":
+        return totalsCombined.CAD;
+      case "COMBINED_USD":
+        return totalsCombined.USD;
+    }
+  })();
+
+  const displayCurrency = viewCurrency(view);
 
   return (
     <PageLayout
@@ -120,13 +168,16 @@ export default function Accounts() {
         title="Accounts"
         description="Cash, credit, and loans — investments live on Holdings"
         actions={
-          <Button
-            variant="primary"
-            leftIcon={<UploadCloud className="w-4 h-4" />}
-            onClick={() => router.push("/portfolio/wealthsimple-import")}
-          >
-            Import statements
-          </Button>
+          <div className="flex items-start gap-4">
+            <CurrencyViewToggle />
+            <Button
+              variant="primary"
+              leftIcon={<UploadCloud className="w-4 h-4" />}
+              onClick={() => router.push("/portfolio/wealthsimple-import")}
+            >
+              Import statements
+            </Button>
+          </div>
         }
       />
 
@@ -146,7 +197,7 @@ export default function Accounts() {
         </Card>
       )}
 
-      {summary && (
+      {currentTotals && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -160,7 +211,7 @@ export default function Accounts() {
                     Total cash
                   </p>
                   <p className="text-2xl font-bold text-success-600 dark:text-success-400">
-                    {formatCurrency(summary.total_cash, "CAD")}
+                    {formatCurrency(currentTotals.cash, displayCurrency)}
                   </p>
                 </div>
                 <div>
@@ -168,7 +219,7 @@ export default function Accounts() {
                     Total debt
                   </p>
                   <p className="text-2xl font-bold text-danger-600 dark:text-danger-400">
-                    {formatCurrency(summary.total_debt, "CAD")}
+                    {formatCurrency(currentTotals.debt, displayCurrency)}
                   </p>
                 </div>
                 <div>
@@ -178,12 +229,12 @@ export default function Accounts() {
                   <p
                     className={cn(
                       "text-2xl font-bold",
-                      summary.net_cash >= 0
+                      currentTotals.net >= 0
                         ? "text-slate-900 dark:text-white"
                         : "text-danger-600 dark:text-danger-400",
                     )}
                   >
-                    {formatCurrency(summary.net_cash, "CAD")}
+                    {formatCurrency(currentTotals.net, displayCurrency)}
                   </p>
                 </div>
               </div>
@@ -231,12 +282,30 @@ export default function Accounts() {
             const config = accountTypeConfig[account.kind];
             const Icon = config.icon;
             const debt = isDebtKind(account.kind);
+            // Questrade-style: account cards always show the *native*
+            // balance in the account's own currency, with the currency
+            // code prominently displayed. The top-line summary is what
+            // rolls up to the selected view.
+            const native = account.currency || "CAD";
+            // When a single-currency view is active and the account is
+            // in the other currency, fade it so the user can see what's
+            // being excluded at a glance.
+            const excluded =
+              (view === "CAD" && native !== "CAD") ||
+              (view === "USD" && native !== "USD");
+            const viewedAmount = convertForView(
+              account.balance,
+              native,
+              view,
+              rate,
+            );
             return (
               <motion.div
                 key={account.id}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 + index * 0.03 }}
+                className={cn(excluded && "opacity-40")}
               >
                 <Card variant="interactive" className="h-full">
                   <CardContent className="p-6">
@@ -244,7 +313,10 @@ export default function Accounts() {
                       <div className={cn("p-3 rounded-xl", config.bgColor)}>
                         <Icon className={cn("w-6 h-6", config.iconColor)} />
                       </div>
-                      <Badge variant="secondary">{config.label}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{native}</Badge>
+                        <Badge variant="secondary">{config.label}</Badge>
+                      </div>
                     </div>
                     <h3 className="font-semibold text-slate-900 dark:text-white mb-1 truncate">
                       {account.name}
@@ -263,8 +335,18 @@ export default function Accounts() {
                       )}
                     >
                       {debt ? "-" : ""}
-                      {formatCurrency(account.balance, account.currency || "CAD")}
+                      {formatCurrency(account.balance, native)}
                     </p>
+                    {/* Show the converted figure below only when the
+                        view isn't already the native currency — keeps
+                        the card from repeating itself. */}
+                    {!excluded &&
+                      (view === "COMBINED_CAD" || view === "COMBINED_USD") &&
+                      displayCurrency !== native && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          ≈ {formatCurrency(viewedAmount, displayCurrency)} @ FX
+                        </p>
+                      )}
                     {account.source && (
                       <p className="text-xs text-slate-400 mt-2 capitalize">
                         Synced from {account.source}

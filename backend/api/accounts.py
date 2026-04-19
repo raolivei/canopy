@@ -1,11 +1,28 @@
 """Accounts API — cash + credit card + line of credit.
 
-Reads directly from the tables populated by the Wealthsimple (and future RBC)
-CSV importers so the Accounts page is always in sync with what was imported.
+Reads directly from the tables populated by the Wealthsimple (and future
+RBC) CSV importers so the Accounts page is always in sync with what was
+imported.
 
-Investments live on the Portfolio / Holdings pages and are intentionally not
-returned here. This endpoint is for "money you spend from" (bank accounts)
-and "money you owe" (credit cards, LOC, loans).
+Investments live on the Portfolio / Holdings pages and are intentionally
+not returned here. This endpoint is for "money you spend from" (bank
+accounts) and "money you owe" (credit cards, LOC, loans).
+
+Currency views
+--------------
+
+Canopy supports the Questrade-style four-way view toggle (CAD, USD,
+Combined CAD, Combined USD). The response always returns:
+
+* ``accounts[]`` — every account with its *native* balance + currency.
+* ``totals_by_currency`` — per-currency cash / debt / net roll-ups.
+* ``totals_combined`` — cross-currency roll-ups expressed in both CAD
+  and USD, so the UI can swap views without a second round trip.
+* ``fx`` — the USD/CAD rate used for the combined math, with an
+  ``is_stale`` flag for the frontend banner.
+
+The top-level ``summary`` field is kept for back-compat with older
+clients and mirrors the CAD-native section.
 """
 
 from datetime import datetime
@@ -19,6 +36,7 @@ from sqlalchemy import select
 from backend.db.models.asset import Asset, AssetType
 from backend.db.models.liability import Liability
 from backend.db.session import DbSession
+from backend.services import fx as fx_service
 
 router = APIRouter(prefix="/v1/accounts", tags=["accounts"])
 
@@ -53,6 +71,10 @@ _ASSET_KIND_MAP: dict[AssetType, AccountKind] = {
 }
 
 
+_CASH_KINDS: tuple[AccountKind, ...] = ("checking", "savings", "cash")
+_DEBT_KINDS: tuple[AccountKind, ...] = ("credit", "loan", "line_of_credit")
+
+
 class AccountResponse(BaseModel):
     """A single bank / credit / loan account shown on the Accounts page."""
 
@@ -68,8 +90,34 @@ class AccountResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class CurrencyTotals(BaseModel):
+    """Cash / debt / net triple for a single currency bucket."""
+
+    cash: float
+    debt: float
+    net: float
+
+
+class CombinedTotals(BaseModel):
+    """Cross-currency roll-up expressed in a single target currency."""
+
+    cash: float
+    debt: float
+    net: float
+    currency: str
+
+
+class FxInfo(BaseModel):
+    """USD/CAD rate metadata used for combined conversion."""
+
+    usd_cad_rate: Optional[float]
+    as_of_date: Optional[str]  # ISO date string
+    source: Optional[str]
+    is_stale: bool
+
+
 class AccountsSummary(BaseModel):
-    """Roll-up totals for the Accounts page header."""
+    """Roll-up totals for the Accounts page header (legacy CAD-native shape)."""
 
     total_cash: float
     total_debt: float
@@ -80,6 +128,9 @@ class AccountsSummary(BaseModel):
 class AccountsResponse(BaseModel):
     summary: AccountsSummary
     accounts: list[AccountResponse]
+    totals_by_currency: dict[str, CurrencyTotals]
+    totals_combined: dict[str, CombinedTotals]
+    fx: FxInfo
 
 
 def _asset_to_account(asset: Asset) -> AccountResponse:
@@ -89,7 +140,7 @@ def _asset_to_account(asset: Asset) -> AccountResponse:
         name=asset.name,
         kind=_ASSET_KIND_MAP.get(asset.asset_type, "cash"),
         balance=balance,
-        currency=asset.currency or "CAD",
+        currency=(asset.currency or "CAD").upper(),
         institution=asset.institution,
         external_account_id=asset.external_account_id,
         source=asset.sync_source,
@@ -104,13 +155,84 @@ def _liability_to_account(liab: Liability) -> AccountResponse:
         name=liab.name,
         kind=kind,
         balance=float(liab.current_balance or Decimal("0")),
-        currency=liab.currency or "CAD",
+        currency=(liab.currency or "CAD").upper(),
         institution=liab.institution,
         external_account_id=None,
         last4=liab.account_number_last4,
         source=None,
         updated_at=liab.balance_updated_at,
     )
+
+
+def _roll_up_by_currency(accounts: list[AccountResponse]) -> dict[str, CurrencyTotals]:
+    """Sum cash / debt per native currency.
+
+    Always returns at least ``CAD`` and ``USD`` entries (zero-filled) so
+    the frontend never needs to handle missing keys.
+    """
+    buckets: dict[str, dict[str, float]] = {
+        "CAD": {"cash": 0.0, "debt": 0.0},
+        "USD": {"cash": 0.0, "debt": 0.0},
+    }
+    for acc in accounts:
+        bucket = buckets.setdefault(acc.currency, {"cash": 0.0, "debt": 0.0})
+        if acc.kind in _CASH_KINDS:
+            bucket["cash"] += acc.balance
+        elif acc.kind in _DEBT_KINDS:
+            bucket["debt"] += acc.balance
+    return {
+        ccy: CurrencyTotals(
+            cash=vals["cash"],
+            debt=vals["debt"],
+            net=vals["cash"] - vals["debt"],
+        )
+        for ccy, vals in buckets.items()
+    }
+
+
+def _combine_totals(
+    per_ccy: dict[str, CurrencyTotals],
+    usd_cad_rate: Optional[Decimal],
+) -> dict[str, CombinedTotals]:
+    """Convert per-currency buckets into Combined CAD and Combined USD.
+
+    When ``usd_cad_rate`` is missing, USD balances contribute zero so
+    the response is still internally consistent; the frontend surfaces
+    the ``is_stale`` banner in that case.
+    """
+    cad_bucket = per_ccy.get("CAD") or CurrencyTotals(cash=0.0, debt=0.0, net=0.0)
+    usd_bucket = per_ccy.get("USD") or CurrencyTotals(cash=0.0, debt=0.0, net=0.0)
+
+    if usd_cad_rate is not None and usd_cad_rate != 0:
+        rate_f = float(usd_cad_rate)
+    else:
+        rate_f = None
+
+    # USD -> CAD multiplies; CAD -> USD divides.
+    usd_in_cad_cash = usd_bucket.cash * rate_f if rate_f else 0.0
+    usd_in_cad_debt = usd_bucket.debt * rate_f if rate_f else 0.0
+    cad_in_usd_cash = cad_bucket.cash / rate_f if rate_f else 0.0
+    cad_in_usd_debt = cad_bucket.debt / rate_f if rate_f else 0.0
+
+    combined_cad_cash = cad_bucket.cash + usd_in_cad_cash
+    combined_cad_debt = cad_bucket.debt + usd_in_cad_debt
+    combined_usd_cash = usd_bucket.cash + cad_in_usd_cash
+    combined_usd_debt = usd_bucket.debt + cad_in_usd_debt
+
+    return {
+        "CAD": CombinedTotals(
+            cash=combined_cad_cash,
+            debt=combined_cad_debt,
+            net=combined_cad_cash - combined_cad_debt,
+            currency="CAD",
+        ),
+        "USD": CombinedTotals(
+            cash=combined_usd_cash,
+            debt=combined_usd_debt,
+            net=combined_usd_cash - combined_usd_debt,
+            currency="USD",
+        ),
+    }
 
 
 @router.get("/", response_model=AccountsResponse)
@@ -138,16 +260,36 @@ async def list_accounts(db: DbSession) -> AccountsResponse:
     ]
     accounts.sort(key=lambda a: (a.institution or "", a.name))
 
-    total_cash = sum(a.balance for a in accounts if a.kind in ("checking", "savings", "cash"))
-    total_debt = sum(
-        a.balance for a in accounts if a.kind in ("credit", "loan", "line_of_credit")
+    # Warm the FX cache (no-op when today's rate is already cached) so
+    # first-load combined totals aren't forced to wait on a later page
+    # hit to populate the rate.
+    latest_rate = fx_service.ensure_latest_rate_cached(db)
+    db.commit()
+    rate_value = latest_rate.rate if latest_rate is not None else None
+
+    totals_by_currency = _roll_up_by_currency(accounts)
+    totals_combined = _combine_totals(totals_by_currency, rate_value)
+
+    cad_bucket = totals_by_currency["CAD"]
+    summary = AccountsSummary(
+        total_cash=cad_bucket.cash,
+        total_debt=cad_bucket.debt,
+        net_cash=cad_bucket.net,
+    )
+
+    fx_info = FxInfo(
+        usd_cad_rate=float(rate_value) if rate_value is not None else None,
+        as_of_date=(
+            latest_rate.as_of_date.isoformat() if latest_rate is not None else None
+        ),
+        source=latest_rate.source if latest_rate is not None else None,
+        is_stale=fx_service.is_stale(latest_rate),
     )
 
     return AccountsResponse(
-        summary=AccountsSummary(
-            total_cash=total_cash,
-            total_debt=total_debt,
-            net_cash=total_cash - total_debt,
-        ),
+        summary=summary,
         accounts=accounts,
+        totals_by_currency=totals_by_currency,
+        totals_combined=totals_combined,
+        fx=fx_info,
     )

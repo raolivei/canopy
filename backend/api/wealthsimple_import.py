@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import select
@@ -22,12 +23,15 @@ from backend.db.models.liability import Liability, LiabilityBalanceHistory
 from backend.db.session import DbSession
 from backend.models.wealthsimple_import_schemas import (
     NetWorthPoint,
+    NetWorthSlice,
     NetWorthTimelineResponse,
     WsAccountSummary,
     WsCommitResponse,
     WsFileClassification,
     WsPreviewResponse,
+    WsSubBalance,
 )
+from backend.services import fx as fx_service
 from backend.services.wealthsimple.importer import (
     FileReport,
     ImportSummary,
@@ -159,34 +163,83 @@ _CASH_TYPES = {
 
 @router.get("/accounts", response_model=list[WsAccountSummary])
 def list_accounts(db: DbSession) -> list[WsAccountSummary]:
+    """Return every Wealthsimple account with its CAD and USD sub-balances.
+
+    A single brokerage account often carries a CAD and a USD cash
+    sub-balance on the same statement end-date (e.g. a TFSA holding US
+    ETFs). We surface both via ``balances_by_currency`` so the Accounts
+    page can show dual figures Questrade-style; the legacy
+    ``current_balance`` field still returns the CAD side for
+    back-compat.
+    """
     summaries: list[WsAccountSummary] = []
 
-    assets = db.execute(select(Asset).where(Asset.sync_source == "wealthsimple")).scalars().all()
+    assets = (
+        db.execute(select(Asset).where(Asset.sync_source == "wealthsimple"))
+        .scalars()
+        .all()
+    )
     for asset in assets:
-        latest = db.execute(
-            select(AccountBalanceHistory)
-            .where(
-                AccountBalanceHistory.asset_id == asset.id,
-                AccountBalanceHistory.currency == "CAD",
+        # One row per currency: the latest observation for each.
+        per_ccy_rows = db.execute(
+            select(
+                AccountBalanceHistory.currency,
+                AccountBalanceHistory.balance,
+                AccountBalanceHistory.as_of_date,
             )
-            .order_by(AccountBalanceHistory.as_of_date.desc())
-            .limit(1)
-        ).scalar_one_or_none()
+            .where(AccountBalanceHistory.asset_id == asset.id)
+            .order_by(
+                AccountBalanceHistory.currency,
+                AccountBalanceHistory.as_of_date.desc(),
+            )
+        ).all()
+
+        seen: set[str] = set()
+        balances: list[WsSubBalance] = []
+        for ccy, balance, as_of in per_ccy_rows:
+            key = (ccy or "CAD").upper()
+            if key in seen:
+                continue
+            seen.add(key)
+            balances.append(
+                WsSubBalance(currency=key, balance=balance, as_of_date=as_of)
+            )
+
+        # Legacy field: pick the CAD entry if present, else the first
+        # balance we have.
+        cad_entry = next((b for b in balances if b.currency == "CAD"), None)
+        legacy_balance = cad_entry or (balances[0] if balances else None)
+
         summaries.append(
             WsAccountSummary(
                 kind="asset",
                 symbol_or_name=asset.symbol,
                 display_name=asset.name,
-                account_type=asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type),
+                account_type=(
+                    asset.asset_type.value
+                    if hasattr(asset.asset_type, "value")
+                    else str(asset.asset_type)
+                ),
                 institution=asset.institution or "Wealthsimple",
                 currency=asset.currency,
-                current_balance=latest.balance if latest else None,
-                balance_updated_at=latest.as_of_date if latest else None,
+                current_balance=legacy_balance.balance if legacy_balance else None,
+                balance_updated_at=(
+                    legacy_balance.as_of_date if legacy_balance else None
+                ),
+                balances_by_currency=balances,
             )
         )
 
-    liabilities = db.execute(select(Liability).where(Liability.institution == "Wealthsimple")).scalars().all()
+    liabilities = (
+        db.execute(select(Liability).where(Liability.institution == "Wealthsimple"))
+        .scalars()
+        .all()
+    )
     for liab in liabilities:
+        liab_balance = liab.current_balance or Decimal("0")
+        liab_as_of = (
+            liab.balance_updated_at.date() if liab.balance_updated_at is not None else None
+        )
         summaries.append(
             WsAccountSummary(
                 kind="liability",
@@ -195,8 +248,15 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
                 account_type=liab.liability_type,
                 institution=liab.institution,
                 currency=liab.currency,
-                current_balance=liab.current_balance,
-                balance_updated_at=(liab.balance_updated_at.date() if liab.balance_updated_at is not None else None),
+                current_balance=liab_balance,
+                balance_updated_at=liab_as_of,
+                balances_by_currency=[
+                    WsSubBalance(
+                        currency=(liab.currency or "CAD").upper(),
+                        balance=liab_balance,
+                        as_of_date=liab_as_of,
+                    )
+                ],
             )
         )
     return summaries
@@ -204,25 +264,41 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
 
 @router.get("/networth-timeline", response_model=NetWorthTimelineResponse)
 def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
-    """Aggregate investments/cash/debt over time.
+    """Aggregate investments/cash/debt over time, by currency.
 
-    Strategy: collect every ``AccountBalanceHistory`` and
-    ``LiabilityBalanceHistory`` row, group by date, and carry forward the
-    most recent balance per account so each date produces a full snapshot.
+    Strategy:
+
+    1. Pull every ``AccountBalanceHistory`` row (all currencies) and
+       every ``LiabilityBalanceHistory`` row (currency from the parent
+       ``Liability``).
+    2. Group by (date, currency) and carry forward the most recent
+       balance per account per currency so each date produces a full
+       snapshot.
+    3. For each date, produce four slices — CAD-only, USD-only, and
+       two cross-currency combinations converted at the FX rate for
+       that date (fallback: most-recent prior). The CAD slice is
+       mirrored into the legacy top-level fields for back-compat.
+
+    No data is filtered out any more: a USD sub-balance on a CAD TFSA
+    shows up in the USD and Combined views, even when the underlying
+    account is in Canada.
     """
-    # Snapshot balance-per-asset and classify by investment vs cash.
-    # CAD-only at the aggregation layer: non-CAD sub-balances (e.g. USD cash
-    # in a TFSA holding US stocks) are preserved on-disk but excluded from
-    # net-worth totals to avoid mixing units.
+    from collections import defaultdict
+    from bisect import bisect_right
+
+    from backend.db.models.fx_rate import FxRate
+
+    # Load balances. Per-row currency lives on ``AccountBalanceHistory``;
+    # for liabilities we use the parent ``Liability.currency`` since
+    # ``LiabilityBalanceHistory`` has no currency column of its own.
     asset_rows = db.execute(
         select(
             AccountBalanceHistory.as_of_date,
             AccountBalanceHistory.asset_id,
             AccountBalanceHistory.balance,
+            AccountBalanceHistory.currency,
             Asset.asset_type,
-        )
-        .join(Asset, Asset.id == AccountBalanceHistory.asset_id)
-        .where(AccountBalanceHistory.currency == "CAD")
+        ).join(Asset, Asset.id == AccountBalanceHistory.asset_id)
     ).all()
 
     liab_rows = db.execute(
@@ -230,50 +306,159 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
             LiabilityBalanceHistory.recorded_at,
             LiabilityBalanceHistory.liability_id,
             LiabilityBalanceHistory.balance,
-        )
+            Liability.currency,
+        ).join(Liability, Liability.id == LiabilityBalanceHistory.liability_id)
     ).all()
 
-    # Build per-date dictionaries of {asset_id: balance} and {liab_id: balance}
-    # sorted chronologically, then carry forward.
-    from collections import defaultdict
+    # Key = (currency, account_id). That lets the same underlying Asset
+    # contribute to both the CAD and USD running totals when a statement
+    # has both CAD and USD sub-balances for it.
+    events: dict[date, dict[str, dict[tuple[str, int], Decimal]]] = defaultdict(
+        lambda: {"inv": {}, "cash": {}, "debt": {}}
+    )
 
-    events: dict[date, dict[str, dict[int, Decimal]]] = defaultdict(lambda: {"inv": {}, "cash": {}, "debt": {}})
-
-    for as_of, asset_id, balance, asset_type in asset_rows:
+    for as_of, asset_id, balance, ccy, asset_type in asset_rows:
         if as_of is None:
             continue
+        currency = (ccy or "CAD").upper()
+        if currency not in {"CAD", "USD"}:
+            # Defensive: the schema only allows CAD/USD today, but a
+            # mislabelled row shouldn't poison the aggregation.
+            continue
         bucket = "cash" if asset_type in _CASH_TYPES else "inv"
-        events[as_of][bucket][asset_id] = Decimal(balance or 0)
+        events[as_of][bucket][(currency, asset_id)] = Decimal(balance or 0)
 
-    for recorded_at, liab_id, balance in liab_rows:
+    for recorded_at, liab_id, balance, ccy in liab_rows:
         if recorded_at is None:
             continue
         d = recorded_at.date() if hasattr(recorded_at, "date") else recorded_at
-        events[d]["debt"][liab_id] = Decimal(balance or 0)
+        currency = (ccy or "CAD").upper()
+        if currency not in {"CAD", "USD"}:
+            continue
+        events[d]["debt"][(currency, liab_id)] = Decimal(balance or 0)
+
+    # Pre-load FX rates for the whole window so per-point conversion is
+    # O(log n) rather than n DB queries.
+    fx_rows = (
+        db.execute(
+            select(FxRate.as_of_date, FxRate.rate)
+            .where(FxRate.pair == "USDCAD")
+            .order_by(FxRate.as_of_date)
+        )
+        .all()
+    )
+    fx_dates = [row[0] for row in fx_rows]
+    fx_values = [row[1] for row in fx_rows]
+
+    def _rate_on(d: date) -> Optional[Decimal]:
+        if not fx_dates:
+            return None
+        idx = bisect_right(fx_dates, d)
+        if idx == 0:
+            # ``d`` is earlier than the first rate we know about. Use
+            # the oldest observation rather than returning None — the
+            # conversion will be approximate but non-zero, which is
+            # what a user scrolling back through history expects.
+            return fx_values[0]
+        return fx_values[idx - 1]
 
     if not events:
         return NetWorthTimelineResponse(points=[])
 
+    latest_rate_row = fx_service.get_latest_rate(db)
+
     sorted_dates = sorted(events.keys())
-    running_inv: dict[int, Decimal] = {}
-    running_cash: dict[int, Decimal] = {}
-    running_debt: dict[int, Decimal] = {}
+    # (currency, account_id) -> Decimal
+    running_inv: dict[tuple[str, int], Decimal] = {}
+    running_cash: dict[tuple[str, int], Decimal] = {}
+    running_debt: dict[tuple[str, int], Decimal] = {}
 
     points: list[NetWorthPoint] = []
     for d in sorted_dates:
         running_inv.update(events[d]["inv"])
         running_cash.update(events[d]["cash"])
         running_debt.update(events[d]["debt"])
-        investments = sum(running_inv.values(), Decimal("0"))
-        cash = sum(running_cash.values(), Decimal("0"))
-        debt = sum(running_debt.values(), Decimal("0"))
+
+        def _sum_ccy(bag: dict[tuple[str, int], Decimal], ccy: str) -> Decimal:
+            return sum(
+                (v for (c, _aid), v in bag.items() if c == ccy), start=Decimal("0")
+            )
+
+        cad_inv = _sum_ccy(running_inv, "CAD")
+        cad_cash = _sum_ccy(running_cash, "CAD")
+        cad_debt = _sum_ccy(running_debt, "CAD")
+        usd_inv = _sum_ccy(running_inv, "USD")
+        usd_cash = _sum_ccy(running_cash, "USD")
+        usd_debt = _sum_ccy(running_debt, "USD")
+
+        rate = _rate_on(d)
+
+        def _combine_cad(
+            cad_amt: Decimal, usd_amt: Decimal, r: Optional[Decimal]
+        ) -> Decimal:
+            if r is None or r == 0:
+                # Without FX we can't mix; fall back to the CAD slice
+                # alone rather than pretending USD is zero'd at 1.0.
+                return cad_amt
+            return cad_amt + (usd_amt * r)
+
+        def _combine_usd(
+            cad_amt: Decimal, usd_amt: Decimal, r: Optional[Decimal]
+        ) -> Decimal:
+            if r is None or r == 0:
+                return usd_amt
+            return usd_amt + (cad_amt / r)
+
+        cad_slice = NetWorthSlice(
+            investments=cad_inv,
+            cash=cad_cash,
+            debt=cad_debt,
+            net_worth=cad_inv + cad_cash - cad_debt,
+            currency="CAD",
+        )
+        usd_slice = NetWorthSlice(
+            investments=usd_inv,
+            cash=usd_cash,
+            debt=usd_debt,
+            net_worth=usd_inv + usd_cash - usd_debt,
+            currency="USD",
+        )
+        combined_cad_inv = _combine_cad(cad_inv, usd_inv, rate)
+        combined_cad_cash = _combine_cad(cad_cash, usd_cash, rate)
+        combined_cad_debt = _combine_cad(cad_debt, usd_debt, rate)
+        combined_usd_inv = _combine_usd(cad_inv, usd_inv, rate)
+        combined_usd_cash = _combine_usd(cad_cash, usd_cash, rate)
+        combined_usd_debt = _combine_usd(cad_debt, usd_debt, rate)
+
+        combined_cad_slice = NetWorthSlice(
+            investments=combined_cad_inv,
+            cash=combined_cad_cash,
+            debt=combined_cad_debt,
+            net_worth=combined_cad_inv + combined_cad_cash - combined_cad_debt,
+            currency="CAD",
+        )
+        combined_usd_slice = NetWorthSlice(
+            investments=combined_usd_inv,
+            cash=combined_usd_cash,
+            debt=combined_usd_debt,
+            net_worth=combined_usd_inv + combined_usd_cash - combined_usd_debt,
+            currency="USD",
+        )
+
         points.append(
             NetWorthPoint(
                 date=d,
-                investments=investments,
-                cash=cash,
-                debt=debt,
-                net_worth=investments + cash - debt,
+                # Legacy top-level fields mirror the CAD-native slice,
+                # keeping the pre-multi-currency API contract.
+                investments=cad_slice.investments,
+                cash=cad_slice.cash,
+                debt=cad_slice.debt,
+                net_worth=cad_slice.net_worth,
+                cad=cad_slice,
+                usd=usd_slice,
+                combined_cad=combined_cad_slice,
+                combined_usd=combined_usd_slice,
+                fx_rate=rate,
             )
         )
 
@@ -284,4 +469,13 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
         latest_cash=last.cash,
         latest_debt=last.debt,
         latest_net_worth=last.net_worth,
+        latest_cad=last.cad,
+        latest_usd=last.usd,
+        latest_combined_cad=last.combined_cad,
+        latest_combined_usd=last.combined_usd,
+        fx_rate=latest_rate_row.rate if latest_rate_row is not None else None,
+        fx_as_of_date=(
+            latest_rate_row.as_of_date if latest_rate_row is not None else None
+        ),
+        fx_is_stale=fx_service.is_stale(latest_rate_row),
     )

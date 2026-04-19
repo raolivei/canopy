@@ -46,6 +46,20 @@ class WsCommitResponse(BaseModel):
     duplicates_skipped: int
 
 
+class WsSubBalance(BaseModel):
+    """Currency-specific balance for a single Wealthsimple account.
+
+    A CAD TFSA that holds US equities will typically show one CAD
+    sub-balance (cash + settlement) and one USD sub-balance (holdings +
+    USD cash). We surface both so the frontend can render
+    Questrade-style dual balances on each account card.
+    """
+
+    currency: str
+    balance: Decimal
+    as_of_date: Optional[date] = None
+
+
 class WsAccountSummary(BaseModel):
     kind: str  # "asset" | "liability"
     symbol_or_name: str
@@ -53,16 +67,49 @@ class WsAccountSummary(BaseModel):
     account_type: str
     institution: str
     currency: str
+    # Legacy CAD-native balance, kept for back-compat with older
+    # frontends. Mirrors ``balances_by_currency["CAD"]`` when present.
     current_balance: Optional[Decimal] = None
     balance_updated_at: Optional[date] = None
+    balances_by_currency: list[WsSubBalance] = []
+
+
+class NetWorthSlice(BaseModel):
+    """One currency slice of a net-worth point.
+
+    ``currency`` is the target unit (CAD, USD). The three headline
+    figures follow the same sign convention as :class:`NetWorthPoint`:
+    ``debt`` is positive (amount owed), ``net_worth = investments +
+    cash - debt``.
+    """
+
+    investments: Decimal
+    cash: Decimal
+    debt: Decimal
+    net_worth: Decimal
+    currency: str
 
 
 class NetWorthPoint(BaseModel):
+    """A single point on the net-worth timeline.
+
+    The legacy top-level fields (``investments``, ``cash``, ``debt``,
+    ``net_worth``) mirror ``cad`` so existing clients continue to work
+    without modification. New clients should read the ``cad`` / ``usd``
+    / ``combined_cad`` / ``combined_usd`` slices directly based on the
+    selected currency view.
+    """
+
     date: date
     investments: Decimal
     cash: Decimal
     debt: Decimal
     net_worth: Decimal
+    cad: NetWorthSlice
+    usd: NetWorthSlice
+    combined_cad: NetWorthSlice
+    combined_usd: NetWorthSlice
+    fx_rate: Optional[Decimal] = None
 
 
 class NetWorthTimelineResponse(BaseModel):
@@ -71,3 +118,10 @@ class NetWorthTimelineResponse(BaseModel):
     latest_cash: Decimal = Decimal("0")
     latest_debt: Decimal = Decimal("0")
     latest_net_worth: Decimal = Decimal("0")
+    latest_cad: Optional[NetWorthSlice] = None
+    latest_usd: Optional[NetWorthSlice] = None
+    latest_combined_cad: Optional[NetWorthSlice] = None
+    latest_combined_usd: Optional[NetWorthSlice] = None
+    fx_rate: Optional[Decimal] = None
+    fx_as_of_date: Optional[date] = None
+    fx_is_stale: bool = True

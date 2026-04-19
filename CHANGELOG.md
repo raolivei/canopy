@@ -9,6 +9,39 @@ All notable changes to this project will be documented in this file.
 - **0.x.x**: Development versions - features are being built and tested
 - **1.0.0**: First stable release - will be tagged when feature-complete and production-ready
 
+## [0.10.0] - 2026-04-18 — Questrade-style multi-currency views
+
+Canopy now mirrors the Questrade / Wealthsimple "show me one currency or the combined total" UX. Every balance surface — dashboard hero, net-worth timeline, Accounts, and Holdings — respects a single global toggle: **CAD only**, **USD only**, **Combined CAD** (USD converted into CAD), or **Combined USD** (CAD converted into USD). Historical points use the FX rate as of that date; live totals use the latest Bank of Canada rate.
+
+### Added
+
+- **FX rate store**: new `fx_rates(pair, as_of_date, rate, source)` table with a unique `(pair, as_of_date)` constraint (Alembic `20260424_0012`). Seeds and writes `USDCAD` observations from the Bank of Canada Valet API.
+- **`backend/services/fx.py`**: central FX helper — `get_latest_rate`, `get_rate_on` (exact match, else most-recent prior observation, else None), `convert(amount, from_ccy, to_ccy, on_date)`, `ensure_latest_rate_cached` (no-op if the cache is fresh, fetches otherwise), and `backfill_range` for bulk historical warm-ups. Stale threshold is 3 days.
+- **`GET /v1/fx/usd-cad`**: returns `{ rate, as_of_date, is_stale, source }`. Warms the cache on request so the first page load after a cold start self-heals.
+- **`POST /v1/fx/backfill?from=YYYY-MM-DD&to=YYYY-MM-DD`**: admin-style endpoint for seeding historical rates in one call.
+- **`useCurrencyView` hook** (`frontend/hooks/useCurrencyView.ts`): SSR-safe React hook that persists the selected view in `localStorage` (`canopy.currencyView`), broadcasts changes across tabs via the `storage` event, and exposes `view`, `setView`, `viewCurrency(view)`, `viewLabel(view)`, `isSingleCurrencyView(view)`, and `convertForView(amount, fromCurrency, view, usdCadRate)`. `convertForView` filters single-currency views to zero for mismatched rows and applies the supplied FX rate for combined views.
+- **`useFxRate` hook** (`frontend/hooks/useFxRate.ts`): React-Query wrapper around `/v1/fx/usd-cad` with a 10-minute stale time; exposes `rate`, `as_of_date`, and `is_stale`.
+- **`CurrencyViewToggle` component** (`frontend/components/CurrencyViewToggle.tsx`): Questrade-style four-way segmented control — CAD / USD / Combined CAD / Combined USD — with a live `1 USD = X.XXXX CAD (as of YYYY-MM-DD)` caption. When the rate is stale the caption flips to amber and surfaces a warning.
+
+### Changed
+
+- **`GET /v1/accounts`** now returns, in addition to the existing per-account list:
+  - `totals_by_currency`: `{ CAD: { cash, debt, net }, USD: { cash, debt, net } }` computed from the native balances on each account (no conversion).
+  - `totals_combined`: `{ CAD: { cash, debt, net }, USD: { cash, debt, net } }` with the opposite-currency side converted at the latest USDCAD rate, so the "Combined CAD" button renders `CAD_cash + USD_cash * rate` etc.
+  - `fx`: `{ pair, rate, as_of_date, is_stale }`.
+  The endpoint warms the FX cache before aggregating so combined totals are never based on a cold cache.
+- **`GET /v1/wealthsimple-import/networth-timeline`** now returns, per point, four slices — `cad`, `usd`, `combined_cad`, `combined_usd` — each with `investments / cash / debt / net_worth`, plus the per-date `fx_rate` used. Combined slices apply the FX rate for that specific date (falling back to the most recent prior observation for weekends / holidays); if no FX rate exists at all for a date, only the native slices are populated and the combined ones mirror the native side. The response also exposes `latest_slices` and `fx` metadata so the frontend can default to today's values without re-querying.
+- **`GET /v1/wealthsimple-import/accounts`**: each Wealthsimple account now carries `balances_by_currency: { CAD, USD }` sub-balances, derived from the most recent `AccountBalanceHistory` rows per currency. Drives the native-currency badge + faded-in-excluded-views UX on the Accounts page.
+- **Dashboard hero and timeline** (`pages/index.tsx`): consume the new timeline payload directly. Hero KPIs, the deltas strip, and the multi-line timeline chart all reformat to `displayCurrency` and pick the matching slice for every data point.
+- **Accounts page** (`pages/accounts.tsx`): summary metrics (Cash / Debt / Net) read from `totals_by_currency` (single-currency views) or `totals_combined` (combined views). Individual account cards keep their native-currency label; in a single-currency view mismatched cards are faded, and in combined views they show an `≈` approximation in the view's target currency.
+- **Holdings page** (`pages/portfolio.tsx`): total-portfolio-value hero, holdings table, and the "Allocation by Currency" panel all react to the global toggle. The legacy `EXCHANGE_RATES = { USD: { CAD: 1.35 } }` constant and the per-page currency dropdown are deleted — conversions go through `convertForView` / `useFxRate` and inherit the live BoC rate.
+
+### Tests
+
+- `backend/tests/test_fx_service.py`: exact-date hit, closest-prior-observation fallback, empty-store → None, latest fetch, `is_stale` threshold, `convert` arithmetic, and `ensure_latest_rate_cached` against a mocked Valet response (refresh path, cache-hit path, simulated outage path).
+- `backend/tests/test_accounts_multi_currency.py`: `_roll_up_by_currency` buckets cash / debt per currency; `_combine_totals` cross-currency arithmetic with a known rate; graceful degradation when FX is missing.
+- `backend/tests/test_networth_timeline_multi_currency.py`: end-to-end — seeds CAD+USD balances and `fx_rates` rows, asserts each point's four slices are correct with the per-date rate, and asserts fallback to the prior-observation rate when the exact date has no FX row.
+
 ## [0.9.0] - 2026-04-18 — Canadian investments focus, CAD + USD
 
 Simplify the product: Canopy is a Canadian investment tracker scoped to **CAD + USD**. Brazil and all other non-Canadian / non-USD plumbing is removed. The Accounts page is wired to a dedicated endpoint that only shows cash / credit / LOC — investments stay on Holdings.

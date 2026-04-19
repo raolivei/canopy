@@ -3,6 +3,7 @@
 from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.asset import Asset, AssetType, SyncSource
 from backend.db.models.dividend import Dividend, DividendType
+from backend.db.models.fx_rate import FxRate
 from backend.db.models.imported_event import ImportedEvent
 from backend.db.models.liability import (
     Liability,
@@ -61,4 +62,6 @@ __all__ = [
     # CSV auto-import
     "ImportedEvent",
     "AccountBalanceHistory",
+    # Foreign exchange (CAD <-> USD)
+    "FxRate",
 ]
