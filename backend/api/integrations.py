@@ -1,6 +1,6 @@
-"""API endpoints for third-party integrations (Wise, etc.)."""
+"""API endpoints for third-party integrations (Wise, Questrade, etc.)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from backend.app.config import get_settings
-from backend.db.models.asset import Asset, AssetType
+from backend.db.models.asset import Asset, AssetType, SyncSource
+from backend.db.models.lot import Lot
 from backend.db.models.transaction import Transaction as TransactionModel
 from backend.db.session import DbSession
 from backend.services.wise_integration import WISE_SYNC_CURRENCIES
@@ -278,7 +279,7 @@ async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
 
 
 class QuestradeConnectRequest(BaseModel):
-    """Request to connect Questrade account."""
+    """Request to connect Questrade (manual authorization token from API Centre)."""
 
     refresh_token: str
 
@@ -287,32 +288,31 @@ class QuestradeAccountResponse(BaseModel):
     number: str
     type: str
     status: str
+    is_primary: bool = False
+    is_billing: bool = False
+    client_account_type: str = ""
 
 
 class QuestradePositionResponse(BaseModel):
+    symbol_id: int
     symbol: str
-    quantity: float
-    market_value: Optional[float] = None
-    current_price: Optional[float] = None
-    avg_entry_price: Optional[float] = None
-    open_pnl: Optional[float] = None
-
-
-class QuestradeBalanceResponse(BaseModel):
-    currency: str
-    cash: float
-    market_value: float
-    total_equity: float
+    open_quantity: Decimal
+    current_market_value: Optional[Decimal] = None
+    current_price: Optional[Decimal] = None
+    average_entry_price: Optional[Decimal] = None
+    open_pnl: Optional[Decimal] = None
+    closed_pnl: Optional[Decimal] = None
 
 
 class QuestradeSyncResponse(BaseModel):
+    """Summary after syncing Questrade into assets and lots."""
+
     accounts_synced: int
     assets_created: int
     assets_updated: int
     positions_synced: int
-
-
-QUESTRADE_TOKEN_KEY = "questrade_refresh_token"
+    created_lots: int = 0
+    updated_lots: int = 0
 
 
 @router.post("/questrade/test-connection")
@@ -325,9 +325,23 @@ async def test_questrade_connection(request: QuestradeConnectRequest):
             accounts = qt.get_accounts()
             if not accounts:
                 raise HTTPException(status_code=400, detail="No accounts found")
+            primary = next((a for a in accounts if a.is_primary), accounts[0])
             return {
                 "status": "connected",
-                "accounts": [QuestradeAccountResponse(number=a.number, type=a.type, status=a.status) for a in accounts],
+                "accounts": [
+                    QuestradeAccountResponse(
+                        number=a.number,
+                        type=a.type,
+                        status=a.status,
+                        is_primary=a.is_primary,
+                        is_billing=a.is_billing,
+                        client_account_type=a.client_account_type,
+                    )
+                    for a in accounts
+                ],
+                "accounts_count": len(accounts),
+                "primary_account": primary.number,
+                "primary_type": primary.type,
                 "new_refresh_token": qt.refresh_token,
             }
     except HTTPException:
@@ -350,7 +364,17 @@ async def get_questrade_accounts(request: QuestradeConnectRequest):
 
         with QuestradeIntegrationService(request.refresh_token) as qt:
             accounts = qt.get_accounts()
-            return [QuestradeAccountResponse(number=a.number, type=a.type, status=a.status) for a in accounts]
+            return [
+                QuestradeAccountResponse(
+                    number=a.number,
+                    type=a.type,
+                    status=a.status,
+                    is_primary=a.is_primary,
+                    is_billing=a.is_billing,
+                    client_account_type=a.client_account_type,
+                )
+                for a in accounts
+            ]
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -360,7 +384,7 @@ async def get_questrade_positions(
     request: QuestradeConnectRequest,
     account_number: str = Query(..., description="Questrade account number"),
 ):
-    """Fetch positions for a Questrade account."""
+    """Fetch positions for a Questrade account (account number as query param)."""
     try:
         from backend.services.questrade_integration import QuestradeIntegrationService
 
@@ -368,12 +392,14 @@ async def get_questrade_positions(
             positions = qt.get_positions(account_number)
             return [
                 QuestradePositionResponse(
+                    symbol_id=p.symbol_id,
                     symbol=p.symbol,
-                    quantity=float(p.open_quantity),
-                    market_value=float(p.current_market_value) if p.current_market_value else None,
-                    current_price=float(p.current_price) if p.current_price else None,
-                    avg_entry_price=float(p.average_entry_price) if p.average_entry_price else None,
-                    open_pnl=float(p.open_pnl) if p.open_pnl else None,
+                    open_quantity=p.open_quantity,
+                    current_market_value=p.current_market_value,
+                    current_price=p.current_price,
+                    average_entry_price=p.average_entry_price,
+                    open_pnl=p.open_pnl,
+                    closed_pnl=p.closed_pnl,
                 )
                 for p in positions
             ]
@@ -383,49 +409,76 @@ async def get_questrade_positions(
 
 @router.post("/questrade/sync", response_model=QuestradeSyncResponse)
 async def sync_questrade(request: QuestradeConnectRequest, db: DbSession):
-    """Sync Questrade accounts and positions into Canopy portfolio."""
+    """Sync Questrade accounts and positions into Canopy assets and lots (per-account lots)."""
     from backend.services.questrade_integration import QuestradeIntegrationService
 
-    assets_created = 0
-    assets_updated = 0
-    positions_synced = 0
+    created_assets = 0
+    created_lots = 0
+    updated_lots = 0
 
     with QuestradeIntegrationService(request.refresh_token) as qt:
         accounts = qt.get_accounts()
 
-        for account in accounts:
-            positions = qt.get_positions(account.number)
+        for acc in accounts:
+            positions = qt.get_positions(acc.number)
             for pos in positions:
-                symbol = pos.symbol
-                existing = db.execute(
-                    select(Asset).where(Asset.symbol == symbol, Asset.sync_source == "QUESTRADE")
-                ).scalar_one_or_none()
+                symbol = (pos.symbol or "").strip().upper()
+                if not symbol:
+                    continue
+                price = pos.average_entry_price or pos.current_price or Decimal("0")
+                if price <= 0:
+                    price = Decimal("0.01")
 
-                if existing:
-                    assets_updated += 1
-                else:
+                asset = db.execute(select(Asset).where(Asset.symbol == symbol)).scalar_one_or_none()
+                if not asset:
                     asset = Asset(
                         symbol=symbol,
                         name=symbol,
                         asset_type=AssetType.STOCK,
                         currency="CAD",
                         institution="Questrade",
-                        sync_source="QUESTRADE",
+                        country="CA",
+                        sync_source=SyncSource.QUESTRADE.value,
+                        external_account_id=acc.number,
                     )
                     db.add(asset)
                     db.flush()
-                    existing = asset
-                    assets_created += 1
+                    created_assets += 1
 
-                positions_synced += 1
+                account_label = f"Questrade-{acc.number}"
+                lot = db.execute(
+                    select(Lot)
+                    .where(Lot.asset_id == asset.id)
+                    .where(Lot.account == account_label)
+                ).scalar_one_or_none()
+
+                if lot:
+                    lot.quantity = pos.open_quantity
+                    lot.price_per_unit = price
+                    updated_lots += 1
+                else:
+                    db.add(
+                        Lot(
+                            asset_id=asset.id,
+                            quantity=pos.open_quantity,
+                            price_per_unit=price,
+                            fees=Decimal("0"),
+                            purchase_date=date.today(),
+                            account=account_label,
+                            notes=f"Synced from Questrade {acc.type}",
+                        )
+                    )
+                    created_lots += 1
 
         db.commit()
 
     return QuestradeSyncResponse(
         accounts_synced=len(accounts),
-        assets_created=assets_created,
-        assets_updated=assets_updated,
-        positions_synced=positions_synced,
+        assets_created=created_assets,
+        assets_updated=updated_lots,
+        positions_synced=created_lots + updated_lots,
+        created_lots=created_lots,
+        updated_lots=updated_lots,
     )
 
 

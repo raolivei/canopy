@@ -377,7 +377,14 @@ function QuestradeCard({ integration }: { integration: Integration }) {
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [accounts, setAccounts] = useState<{ number: string; type: string; status: string }[]>([]);
-  const [syncResult, setSyncResult] = useState<{ accounts_synced: number; assets_created: number; assets_updated: number; positions_synced: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    accounts_synced: number;
+    assets_created: number;
+    assets_updated: number;
+    positions_synced: number;
+    created_lots?: number;
+    updated_lots?: number;
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -545,7 +552,9 @@ function QuestradeCard({ integration }: { integration: Integration }) {
 
                 {syncResult && (
                   <div className="p-3 bg-success-50 dark:bg-success-900/20 rounded-lg text-sm text-success-700 dark:text-success-300">
-                    Synced {syncResult.accounts_synced} account(s): {syncResult.assets_created} assets created, {syncResult.assets_updated} updated, {syncResult.positions_synced} positions synced
+                    Synced {syncResult.accounts_synced} account(s): {syncResult.assets_created} new assets,{" "}
+                    {syncResult.created_lots ?? 0} new lots, {syncResult.updated_lots ?? 0} lots updated (
+                    {syncResult.positions_synced} position rows).
                   </div>
                 )}
 

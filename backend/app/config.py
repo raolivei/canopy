@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"  # Overridden by REDIS_URL env var in production
     secret_key: str = "change-me"  # Overridden by SECRET_KEY env var from Vault in production
     environment: str = "development"
+    questrade_refresh_token: Optional[str] = None  # For Celery background sync; use Vault in production
 
     # Optional integration tokens (can be set via env / Vault; UI can also send token per request)
     wise_api_token: Optional[str] = None  # WISE_API_TOKEN
