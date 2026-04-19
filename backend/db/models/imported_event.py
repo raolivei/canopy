@@ -1,9 +1,16 @@
 """ImportedEvent model: dedup ledger for any CSV-imported row.
 
-Every BUY/SELL/DIV/cash-flow/credit-card row we ingest is hashed and
-recorded here so re-importing the same file is a no-op. The hash is
-content-based (source + account + date + transaction code + amount +
-description) and does not depend on the target table.
+Two hashes are recorded per event:
+
+* ``hash`` - per-source fingerprint, captures source-specific fields like
+  the raw transaction code or the full bank description. Catches re-uploads
+  of the same file from the same source.
+* ``canonical_hash`` - source-agnostic fingerprint of the *real-world*
+  transaction (``entity_key`` + date + signed amount). Catches the same
+  transaction being imported from two different sources (Wealthsimple +
+  Monarch, for example).
+
+Both are nullable to allow lazy backfill for pre-existing rows.
 """
 
 from datetime import datetime
@@ -22,6 +29,7 @@ class ImportedEvent(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    canonical_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     source: Mapped[str] = mapped_column(String(50))
     target_table: Mapped[str] = mapped_column(String(50))
     target_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

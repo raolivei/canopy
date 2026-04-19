@@ -228,10 +228,17 @@ export default function Dashboard() {
               leftIcon={<UploadCloud className="w-4 h-4" />}
               onClick={() => router.push("/portfolio/wealthsimple-import")}
             >
-              Wealthsimple import
+              Wealthsimple
             </Button>
             <Button
               variant="secondary"
+              leftIcon={<UploadCloud className="w-4 h-4" />}
+              onClick={() => router.push("/portfolio/monarch-import")}
+            >
+              Monarch
+            </Button>
+            <Button
+              variant="ghost"
               leftIcon={<Upload className="w-4 h-4" />}
               onClick={() => router.push("/portfolio/import")}
             >
@@ -417,8 +424,9 @@ export default function Dashboard() {
               </h2>
               <p className="text-slate-600 dark:text-slate-400 max-w-lg mx-auto mb-8">
                 One number for your net worth, built from every account you own.
-                Start by dropping a Wealthsimple monthly statement, or import a
-                dated portfolio snapshot for holdings that don't auto-sync.
+                Start with Wealthsimple monthly statements, backfill history
+                from Monarch Money, or import a dated portfolio snapshot for
+                holdings that don&rsquo;t auto-sync.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <Button
@@ -432,10 +440,18 @@ export default function Dashboard() {
                 <Button
                   variant="secondary"
                   size="lg"
+                  leftIcon={<UploadCloud className="w-4 h-4" />}
+                  onClick={() => router.push("/portfolio/monarch-import")}
+                >
+                  Import from Monarch
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
                   leftIcon={<Upload className="w-4 h-4" />}
                   onClick={() => router.push("/portfolio/import")}
                 >
-                  Import snapshot
+                  Portfolio snapshot
                 </Button>
               </div>
             </div>

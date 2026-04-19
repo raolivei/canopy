@@ -31,6 +31,16 @@ function looksLikeWealthsimple(filename: string): boolean {
   return WS_PREFIXES.some((p) => stem.startsWith(p));
 }
 
+// Mirrors backend/services/monarch/parser.py::is_monarch_filename.
+function looksLikeMonarch(filename: string): boolean {
+  const base = (filename.split("/").pop() ?? filename).toLowerCase();
+  if (!base.endsWith(".csv")) return false;
+  return (
+    base.startsWith("monarch-transactions") ||
+    base.startsWith("monarch_transactions")
+  );
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface FileResult {
@@ -73,13 +83,23 @@ export default function PortfolioImportPage() {
     () => files.filter((f) => looksLikeWealthsimple(f.name)).length,
     [files]
   );
+  const monarchFileCount = useMemo(
+    () => files.filter((f) => looksLikeMonarch(f.name)).length,
+    [files]
+  );
   const snapshotFiles = useMemo(
-    () => files.filter((f) => !looksLikeWealthsimple(f.name)),
+    () =>
+      files.filter(
+        (f) => !looksLikeWealthsimple(f.name) && !looksLikeMonarch(f.name)
+      ),
     [files]
   );
 
   const dropWealthsimpleFiles = () => {
     setFiles((prev) => prev.filter((f) => !looksLikeWealthsimple(f.name)));
+  };
+  const dropMonarchFiles = () => {
+    setFiles((prev) => prev.filter((f) => !looksLikeMonarch(f.name)));
   };
 
   const onSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,6 +185,49 @@ export default function PortfolioImportPage() {
               </p>
             </div>
 
+            {monarchFileCount > 0 && (
+              <div className="rounded-md border border-sky-300 bg-sky-50 p-4 text-sm dark:border-sky-800/60 dark:bg-sky-950/40">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-sky-600 dark:text-sky-400" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sky-900 dark:text-sky-200">
+                      {monarchFileCount === 1
+                        ? "This looks like a Monarch Money export."
+                        : `${monarchFileCount} of these look like Monarch Money exports.`}
+                    </div>
+                    <p className="mt-1 text-sky-800 dark:text-sky-300/90">
+                      Monarch exports are transaction backfills. This page
+                      writes <b>portfolio snapshots</b> (total CAD value per
+                      holding on a single date). Use the Monarch importer for
+                      transaction data.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        rightIcon={<ArrowRight className="w-4 h-4" />}
+                        onClick={() => router.push("/portfolio/monarch-import")}
+                      >
+                        Go to Monarch importer
+                      </Button>
+                      {snapshotFiles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={dropMonarchFiles}
+                        >
+                          Drop Monarch files, keep the {snapshotFiles.length}{" "}
+                          snapshot file{snapshotFiles.length === 1 ? "" : "s"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {wsFileCount > 0 && (
               <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800/60 dark:bg-amber-950/40">
                 <div className="flex items-start gap-3">
@@ -214,6 +277,7 @@ export default function PortfolioImportPage() {
               <ul className="divide-y divide-slate-200 dark:divide-slate-800 rounded-md border border-slate-200 dark:border-slate-800">
                 {files.map((f, i) => {
                   const isWs = looksLikeWealthsimple(f.name);
+                  const isMonarch = looksLikeMonarch(f.name);
                   return (
                     <li
                       key={`${f.name}-${i}`}
@@ -227,6 +291,11 @@ export default function PortfolioImportPage() {
                           {isWs && (
                             <span className="shrink-0 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
                               Wealthsimple
+                            </span>
+                          )}
+                          {isMonarch && (
+                            <span className="shrink-0 rounded-full border border-sky-300 bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-sky-800 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                              Monarch
                             </span>
                           )}
                         </div>

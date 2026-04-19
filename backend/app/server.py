@@ -37,6 +37,13 @@ except ImportError:
     HAS_WEALTHSIMPLE_IMPORT_ROUTER = False
 
 try:
+    from backend.api import monarch_import
+
+    HAS_MONARCH_IMPORT_ROUTER = True
+except ImportError:
+    HAS_MONARCH_IMPORT_ROUTER = False
+
+try:
     from backend.api import admin as admin_api
 
     HAS_ADMIN_ROUTER = True
@@ -109,6 +116,9 @@ def create_app() -> FastAPI:
 
     if HAS_WEALTHSIMPLE_IMPORT_ROUTER:
         app.include_router(wealthsimple_import.router)
+
+    if HAS_MONARCH_IMPORT_ROUTER:
+        app.include_router(monarch_import.router)
 
     if HAS_ADMIN_ROUTER:
         app.include_router(admin_api.router)

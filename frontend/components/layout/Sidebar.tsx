@@ -25,6 +25,7 @@ import { cn } from "@/utils/cn";
 const primaryNavigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Wealthsimple import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
+  { name: "Monarch import", href: "/portfolio/monarch-import", icon: UploadCloud },
   { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },

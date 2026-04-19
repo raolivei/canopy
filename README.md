@@ -5,6 +5,7 @@
 Canopy is a self-hosted Canadian-investment tracker built around **continuous net-worth tracking in CAD**:
 
 - **Drop Wealthsimple statements** (any mix of TFSA / RRSP / FHSA / Crypto / Chequing / Credit Card / Line of Credit CSVs) — they're auto-classified into investments, cash, and debt and de-duplicated on re-import. Accounts are created automatically; they show up under Accounts (cash + credit + LOC) or Holdings (investments).
+- **Backfill from Monarch Money** — drop your full Monarch transaction export and Canopy autocreates any missing accounts, routes transactions to them, skips foreign-currency / pseudo accounts, and defers to Wealthsimple for any date where WS already owns the account (per-account cutover + canonical-hash backstop for cross-source dedup).
 - **Capture CAD-denominated holdings that don't auto-sync** (private equity, real estate, DPSP) as dated **portfolio review snapshots** — TSV/CSV in, history by as-of date out.
 - **See one net-worth number in CAD** on the dashboard (investments + cash − debt), with a combined timeline chart built from every statement drop and every review snapshot.
 
@@ -67,6 +68,22 @@ Canopy ingests Wealthsimple monthly-statement CSV exports end-to-end so net wort
 - Frontend: `frontend/pages/portfolio/wealthsimple-import.tsx`, `frontend/pages/index.tsx` (net-worth hero)
 - Migration: `backend/alembic/versions/20260419_0007_add_liability_opening_balance.py`
 - Tests: `backend/tests/test_wealthsimple_{filename_parser,description_parser,importer}.py` (30 tests)
+
+### Monarch Money CSV Importer (✅ Added in 0.9.0)
+
+For users migrating from Monarch Money, Canopy ingests the full Monarch transaction export to backfill historical activity without double-counting anything Wealthsimple already owns.
+
+- Upload at `/portfolio/monarch-import`. Accepts the default Monarch export (`monarch-transactions-*.csv`).
+- **Auto-classification**: each account label is routed to investment / cash / debt. Monarch's pseudo-accounts (`Transfer`, `Income`, `Uncategorized`) and foreign-currency accounts (USD/EUR/JPY/...) are skipped with per-file counters.
+- **Autocreate**: unseen accounts are materialised as new `Asset` / `Liability` rows (CAD, Canada), with type inferred from keywords (`tfsa`, `rrsp`, `fhsa`, `dpsp`, `chequing`, `savings`, `visa`, `credit line`, ...). Existing entities are matched by exact name or by trailing account last-4.
+- **Two-layer dedup**:
+    1. **Per-account Wealthsimple cutover** - once WS owns an account from date `X` onward, Monarch rows for that account on or after `X` are dropped. WS is authoritative for its window.
+    2. **Canonical-hash backstop** - a source-agnostic `sha256(entity_key | date | amount)` fingerprint is recorded in `imported_events.canonical_hash` and checked on every insert, catching cross-source duplicates that slip through the cutover.
+- Re-uploading the same Monarch CSV is a no-op (per-source hash match).
+
+**Endpoints**: `POST /v1/monarch-import/preview` (savepoint-rollback dry run) and `POST /v1/monarch-import/commit`.
+
+**Relevant files**: `backend/services/monarch/{parser,accounts,importer}.py`, `backend/api/monarch_import.py`, `backend/services/canonical_hash.py`, `frontend/pages/portfolio/monarch-import.tsx`.
 
 ### Portfolio Review Snapshots (✅ Implemented in 0.7.0, CAD-only in 0.9.0)
 

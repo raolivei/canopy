@@ -34,6 +34,11 @@ from backend.db.models.liability import (
 )
 from backend.db.models.lot import Lot
 from backend.db.models.transaction import Transaction, TransactionType
+from backend.services.canonical_hash import (
+    canonical_event_hash,
+    entity_key_for_asset,
+    entity_key_for_liability,
+)
 from backend.services.wealthsimple.description_parser import (
     parse_buy,
     parse_direct_deposit,
@@ -213,6 +218,7 @@ class WealthsimpleImporter:
         self.db = db
         self.dry_run = dry_run
         self._event_cache: set[str] = set()
+        self._canonical_cache: set[str] = set()
 
     def ingest(self, files: Iterable[tuple[str, str]]) -> ImportSummary:
         summary = ImportSummary()
@@ -295,6 +301,14 @@ class WealthsimpleImporter:
             liability = self._upsert_liability(meta)
             summary.liabilities_touched.add(liability.name)
 
+        # Compute the cross-source entity key once per file - every row in
+        # the same statement resolves to the same Canopy entity.
+        entity_key: Optional[str] = None
+        if asset is not None:
+            entity_key = entity_key_for_asset(asset.id)
+        elif liability is not None:
+            entity_key = entity_key_for_liability(liability.id)
+
         # Write rows
         for parsed in parsed_rows:
             hashed = _hash_event(
@@ -308,7 +322,18 @@ class WealthsimpleImporter:
                 report.rows_duplicate += 1
                 summary.duplicates_skipped += 1
                 continue
+
+            canonical = (
+                canonical_event_hash(entity_key, parsed.occurred_on, parsed.amount) if entity_key is not None else None
+            )
+            if canonical is not None and (canonical in self._canonical_cache or self._canonical_exists(canonical)):
+                report.rows_duplicate += 1
+                summary.duplicates_skipped += 1
+                continue
+
             self._event_cache.add(hashed)
+            if canonical is not None:
+                self._canonical_cache.add(canonical)
 
             report.bump_kind(parsed.kind)
 
@@ -319,6 +344,7 @@ class WealthsimpleImporter:
                     row=parsed,
                     summary=summary,
                     event_hash=hashed,
+                    canonical_hash=canonical,
                     filename=meta.filename,
                 )
             elif liability is not None:
@@ -328,6 +354,7 @@ class WealthsimpleImporter:
                     row=parsed,
                     summary=summary,
                     event_hash=hashed,
+                    canonical_hash=canonical,
                     filename=meta.filename,
                 )
             report.rows_imported += 1
@@ -479,6 +506,7 @@ class WealthsimpleImporter:
         row: ParsedRow,
         summary: ImportSummary,
         event_hash: str,
+        canonical_hash: Optional[str],
         filename: str,
     ) -> None:
         # Always write a Transaction
@@ -488,6 +516,7 @@ class WealthsimpleImporter:
         summary.transactions_added += 1
         self._record_event(
             hashed=event_hash,
+            canonical=canonical_hash,
             target_table="transactions",
             target_id=tx.id,
             filename=filename,
@@ -555,6 +584,7 @@ class WealthsimpleImporter:
         row: ParsedRow,
         summary: ImportSummary,
         event_hash: str,
+        canonical_hash: Optional[str],
         filename: str,
     ) -> None:
         tx = self._create_transaction(row=row, account_label=liability.name)
@@ -563,6 +593,7 @@ class WealthsimpleImporter:
         summary.transactions_added += 1
         self._record_event(
             hashed=event_hash,
+            canonical=canonical_hash,
             target_table="transactions",
             target_id=tx.id,
             filename=filename,
@@ -646,9 +677,18 @@ class WealthsimpleImporter:
             is not None
         )
 
+    def _canonical_exists(self, canonical: str) -> bool:
+        return (
+            self.db.execute(
+                select(ImportedEvent.id).where(ImportedEvent.canonical_hash == canonical)
+            ).scalar_one_or_none()
+            is not None
+        )
+
     def _record_event(
         self,
         hashed: str,
+        canonical: Optional[str],
         target_table: str,
         target_id: Optional[int],
         filename: str,
@@ -656,6 +696,7 @@ class WealthsimpleImporter:
         self.db.add(
             ImportedEvent(
                 hash=hashed,
+                canonical_hash=canonical,
                 source=SOURCE,
                 target_table=target_table,
                 target_id=target_id,
