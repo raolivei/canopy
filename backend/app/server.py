@@ -1,5 +1,7 @@
 """FastAPI application factory."""
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -81,6 +83,24 @@ except ImportError:
     HAS_INSIGHTS_ROUTER = False
 
 
+def _cors_allow_origins() -> list[str]:
+    """Origins allowed for browser clients (dev + optional CORS_ALLOW_ORIGINS)."""
+    base = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ]
+    extra = os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
+    if not extra:
+        return base
+    for o in extra.split(","):
+        u = o.strip()
+        if u and u not in base:
+            base.append(u)
+    return base
+
+
 def create_app() -> FastAPI:
     """Instantiate and configure the FastAPI application."""
 
@@ -95,12 +115,7 @@ def create_app() -> FastAPI:
     # Add CORS middleware for frontend communication
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:3001",
-            "http://127.0.0.1:3001",
-        ],
+        allow_origins=_cors_allow_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

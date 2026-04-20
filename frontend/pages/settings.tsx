@@ -28,7 +28,7 @@ import {
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
 
 interface RowCounts {
   counts: Record<string, number>;
@@ -51,7 +51,9 @@ export default function Settings() {
   const rowCountsQuery = useQuery<RowCounts>({
     queryKey: ["admin", "row-counts"],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/v1/admin/row-counts`);
+      const res = await fetch(`${API_URL}/v1/admin/row-counts`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to load row counts");
       return res.json();
     },
@@ -64,6 +66,7 @@ export default function Settings() {
     mutationFn: async () => {
       const res = await fetch(`${API_URL}/v1/admin/reset-data`, {
         method: "POST",
+        credentials: "include",
         headers: { "X-Confirm-Reset": RESET_CONFIRM_PHRASE },
       });
       if (!res.ok) {
