@@ -12,6 +12,11 @@ RUN npm install --legacy-peer-deps
 # Copy source code
 COPY . .
 
+# Baked into the client bundle at build time. Use empty for same-origin `/v1` (production ingress);
+# do not set cluster service URLs (e.g. http://canopy-api:8000) — they are not valid in the browser.
+ARG NEXT_PUBLIC_API_URL=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build application
 RUN npm run build
 
