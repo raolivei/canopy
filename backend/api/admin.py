@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func, select
 
 from backend.db.models import (
     AccountBalanceHistory,
@@ -75,10 +76,16 @@ _COUNT_MODELS = [
 ]
 
 
+def _count_rows(db: DbSession, model: type) -> int:
+    """COUNT(*) without ORM entity load — avoids errors when the DB lags models (missing columns)."""
+    stmt = select(func.count()).select_from(model.__table__)
+    return int(db.execute(stmt).scalar_one())
+
+
 @router.get("/row-counts", response_model=RowCountsResponse)
 def row_counts(db: DbSession) -> RowCountsResponse:
     """Return a row count per table for the Settings danger-zone UI."""
-    counts = {label: int(db.query(model).count()) for label, model in _COUNT_MODELS}
+    counts = {label: _count_rows(db, model) for label, model in _COUNT_MODELS}
     return RowCountsResponse(counts=counts, total=sum(counts.values()))
 
 

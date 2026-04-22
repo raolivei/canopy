@@ -36,6 +36,21 @@ docker-compose up
 
 Set **`NEXT_PUBLIC_API_URL`** (e.g. `http://localhost:8001`) so the browser can reach the API from the Next dev server.
 
+**Database migrations** (required whenever the API image includes new Alembic revisions):
+
+```bash
+docker compose exec api sh /app/backend/scripts/migrate.sh
+# or: docker compose exec api sh -c "cd /app/backend && alembic upgrade head"
+```
+
+**Kubernetes** (after deploying a new API image):
+
+```bash
+kubectl -n canopy exec deploy/canopy-api -- sh /app/backend/scripts/migrate.sh
+```
+
+If migrations are not applied, you will see errors such as missing tables (`portfolio_reviews`, `fx_rates`) or columns (`liabilities.opening_balance`).
+
 Local fallback without Docker: `backend` → uvicorn on 8001; `frontend` → `npm run dev` (port from `package.json` / env).
 
 ## Repo layout
