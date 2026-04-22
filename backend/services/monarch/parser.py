@@ -154,6 +154,12 @@ def parse_monarch_csv(text: str) -> ParseResult:
 _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 # "(...2003)", "(...DqRQ)", "(...-5g0)", "(....8120)"
 _LAST4_RE = re.compile(r"\(\.\.\.\.?([A-Za-z0-9\-]+)\)$")
+# TD-style chequing: "Individual (...1234)" — no "Chequing" in the label.
+# Must not match "Individual Investing (...)" (handled by ``inv_markers``).
+_RETAIL_INDIVIDUAL_OR_JOINT = re.compile(
+    r"^(individual|joint)\s*\(\.\.\.",
+    re.IGNORECASE,
+)
 
 # Account-label prefixes that denote non-CAD / non-USD currencies.
 # Canopy is CAD + USD only; any other prefix -> FOREIGN -> skipped.
@@ -292,6 +298,9 @@ def _classify_account(label: str) -> AccountClass:
         "eq bank",
     )
     if any(m in lower for m in cash_markers):
+        return AccountClass.CASH
+
+    if _RETAIL_INDIVIDUAL_OR_JOINT.match(lower):
         return AccountClass.CASH
 
     return AccountClass.UNKNOWN

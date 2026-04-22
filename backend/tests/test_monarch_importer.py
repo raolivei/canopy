@@ -54,6 +54,20 @@ def _file(*rows: str, filename: str = "monarch-transactions-x.csv") -> tuple[str
 # ---------------------------------------------------------------------------
 
 
+def test_individual_td_style_label_creates_cash_asset(db: Session) -> None:
+    """``Individual (...last4)`` must resolve so /v1/accounts can show it."""
+    f = _file("2024-01-05,Store,Groceries,Individual (...52003),RAW,,-10.00,")
+    summary = MonarchImporter(db).ingest([f])
+    db.commit()
+
+    assert summary.transactions_added == 1
+    rep = summary.files[0]
+    assert rep.skipped_unknown_account == 0
+    assets = db.execute(select(Asset)).scalars().all()
+    assert len(assets) == 1
+    assert assets[0].asset_type == AssetType.CASH
+
+
 def test_autocreates_assets_and_liabilities_and_writes_transactions(db: Session) -> None:
     f = _file(
         "2024-01-05,No Frills,Groceries,Scotia Momentum VISA Infinite (...5011),raw,,-50.00,",
@@ -236,9 +250,7 @@ def test_usd_accounts_autocreate_with_usd_currency(db: Session) -> None:
     assert summary.transactions_added == 2
     usd_asset = db.execute(select(Asset).where(Asset.name == "USD account (...2015)")).scalar_one()
     assert usd_asset.currency == "USD"
-    usd_liab = db.execute(
-        select(Liability).where(Liability.name == "Credit Card USA (...5305)")
-    ).scalar_one()
+    usd_liab = db.execute(select(Liability).where(Liability.name == "Credit Card USA (...5305)")).scalar_one()
     assert usd_liab.currency == "USD"
 
     # Written transactions carry the same currency.

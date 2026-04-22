@@ -95,12 +95,25 @@ def test_usd_accounts_are_imported_as_cad_peers() -> None:
 def test_individual_without_investing_keyword_is_not_investment() -> None:
     # Regression: bare "individual" in inv_markers misclassified many bank
     # labels (e.g. credit/cash) as INVESTMENT → Assets hidden from /v1/accounts.
+    # Removing that substring left "Individual (...)" as UNKNOWN, which the
+    # importer skips entirely — also empty Accounts. Treat (...)-style labels
+    # as cash.
     text = _csv(
         "2025-12-01,Store,Shopping,Individual (...52003),RAW,,-10.00,",
     )
     result = parse_monarch_csv(text)
     assert result.header_ok and len(result.rows) == 1
-    assert result.rows[0].account_class != AccountClass.INVESTMENT
+    assert result.rows[0].account_class == AccountClass.CASH
+
+
+def test_individual_investing_stays_investment() -> None:
+    # "Individual Investing (...)" must not match the Individual-(... chequing heuristic.
+    text = _csv(
+        "2025-12-01,Buy,Transfer,Individual Investing (...2015),raw,,100.00,",
+    )
+    result = parse_monarch_csv(text)
+    assert len(result.rows) == 1
+    assert result.rows[0].account_class == AccountClass.INVESTMENT
 
 
 def test_amex_label_classified_as_debt() -> None:
