@@ -253,10 +253,17 @@ def _classify_account(label: str) -> AccountClass:
         "mortgage",
         "mastercard",
         "visa",
+        "american express",
+        "amex",
+        "discover",
     )
     if any(kw in lower for kw in debt_markers):
         return AccountClass.DEBT
 
+    # Do not use the bare substring "individual" — bank labels like
+    # "Individual (...5203)" are common for chequing/credit and were
+    # misclassified as INVESTMENT, creating Asset rows that the Accounts
+    # page intentionally excludes (non-bank asset types).
     inv_markers = (
         "tfsa",
         "rrsp",
@@ -266,7 +273,9 @@ def _classify_account(label: str) -> AccountClass:
         "self_directed_",
         "direct_index",
         "crypto",
-        "individual",
+        "individual investing",
+        "individual brokerage",
+        "brokerage",
     )
     if any(m in lower for m in inv_markers):
         return AccountClass.INVESTMENT

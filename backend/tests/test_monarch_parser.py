@@ -92,6 +92,26 @@ def test_usd_accounts_are_imported_as_cad_peers() -> None:
     assert by_label["USA Checking (...4321)"].currency == "USD"
 
 
+def test_individual_without_investing_keyword_is_not_investment() -> None:
+    # Regression: bare "individual" in inv_markers misclassified many bank
+    # labels (e.g. credit/cash) as INVESTMENT → Assets hidden from /v1/accounts.
+    text = _csv(
+        "2025-12-01,Store,Shopping,Individual (...52003),RAW,,-10.00,",
+    )
+    result = parse_monarch_csv(text)
+    assert result.header_ok and len(result.rows) == 1
+    assert result.rows[0].account_class != AccountClass.INVESTMENT
+
+
+def test_amex_label_classified_as_debt() -> None:
+    text = _csv(
+        "2025-12-01,Store,Shopping,American Express (...1001),RAW,,-12.34,",
+    )
+    result = parse_monarch_csv(text)
+    assert len(result.rows) == 1
+    assert result.rows[0].account_class == AccountClass.DEBT
+
+
 def test_classifies_account_families() -> None:
     text = _csv(
         "2025-05-06,A,x,RBC Day to Day Banking (...8813),raw,,-10.00,",
