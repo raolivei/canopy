@@ -45,10 +45,9 @@ def upgrade() -> None:
         _delete_where_in(conn, "lots", "asset_id", br_asset_ids)
         _delete_where_in(conn, "dividends", "asset_id", br_asset_ids)
         _delete_where_in(conn, "price_history", "asset_id", br_asset_ids)
-        # portfolio_snapshot_holdings may or may not exist depending on
-        # when the DB was first created. Guard against missing table.
-        if _has_table(conn, "portfolio_snapshot_holdings"):
-            _delete_where_in(conn, "portfolio_snapshot_holdings", "asset_id", br_asset_ids)
+        # Legacy typo checked "portfolio_snapshot_holdings"; real table is snapshot_holdings.
+        if _has_table(conn, "snapshot_holdings"):
+            _delete_where_in(conn, "snapshot_holdings", "asset_id", br_asset_ids)
         _delete_where_in(conn, "assets", "id", br_asset_ids)
 
     # --- Liability side: wipe BR-scoped liabilities and their children ----

@@ -8,6 +8,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [0.10.4] - 2026-04-19
 
+- **Alembic `20260423_0011`:** purge migration now deletes **`snapshot_holdings`** (was wrongly checking **`portfolio_snapshot_holdings`**) before removing BR-scoped **`assets`**, avoiding FK failures on `snapshot_holdings_asset_id_fkey` when upgrading old databases.
 - **Admin row counts / migrations:** `GET /v1/admin/row-counts` uses **`COUNT(*)`** per table (not ORM `.count()`) so liabilities counts work when the table exists but a newer column is not migrated yet. **`backend/scripts/migrate.sh`** documents **`alembic upgrade head`** for Compose and k8s; production still requires migrations for tables such as **`fx_rates`** and **`portfolio_reviews`**.
 - **Settings danger zone / production:** API **CORS** accepts **`CORS_ALLOW_ORIGINS`** (Helm: `canopy.eldertree.xyz` + `.local`). Settings admin fetches use **`credentials: 'include'`**. Frontend image **`NEXT_PUBLIC_API_URL`** defaults empty at build (same-origin `/v1`); removed invalid cluster-only URL from sample k8s. **Do not** set `NEXT_PUBLIC_API_URL` to in-cluster service names in Kubernetes — they are not reachable from the browser.
 - **Transactions page:** list/create/delete now call **`NEXT_PUBLIC_API_URL`** (same as Accounts / imports), so Monarch- and Wise-imported rows appear instead of failing silently when the frontend and API run on different origins.
