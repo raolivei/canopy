@@ -22,6 +22,13 @@ description: >-
 - Change only what the task requires; match existing style and abstractions.
 - Do not add unsolicited markdown guides or expand scope with drive-by refactors.
 
+## Testing (before push)
+
+- **Always run local tests (or lint) before committing or pushing**—do not rely on CI as the first signal.
+- **Backend** (from repo root, Docker Compose): `docker compose exec api pytest` (or a scoped path, e.g. `pytest tests/test_monarch_parser.py -q`).
+- **Frontend**: `cd frontend && npm run lint` and `npm test` when you changed `frontend/`.
+- If Docker is not running, use the project **`backend/.venv`** with `pytest` installed, or say explicitly that tests were not run and why.
+
 ## Git / PR
 
 - Work on **`feat/*`** (or `fix/*`, etc.); avoid committing directly to `main`.

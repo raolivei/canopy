@@ -17,9 +17,10 @@ source ../workspace-config/ports/.env.ports
 docker-compose up                    # Start all services
 docker-compose up -d                 # Start detached
 
-# Testing
-docker-compose exec api pytest       # Run backend tests
-cd frontend && npm test              # Run frontend tests
+# Testing (run locally before commit/push—CI is not the first gate)
+docker-compose exec api pytest       # Backend (scoped: pytest tests/test_monarch_parser.py -q)
+cd frontend && npm test              # Frontend tests
+cd frontend && npm run lint          # Also run when touching frontend/
 
 # Database
 docker-compose exec api alembic upgrade head           # Run migrations
@@ -34,7 +35,7 @@ cd frontend && npm run lint                   # TypeScript
 ## Workflow
 
 1. Always lint/format after code changes
-2. Run tests before committing
+2. **Always run local tests (or scoped pytest / lint) before commit or push**—see `.cursor/skills/canopy-agent-conventions/SKILL.md`
 3. Update CHANGELOG.md for all changes
 4. Never run git commands at workspace root
 

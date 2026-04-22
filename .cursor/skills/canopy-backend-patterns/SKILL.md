@@ -7,6 +7,10 @@ description: >-
 
 # Backend patterns
 
+## Local tests
+
+- After changing **`backend/`** (API, services, models, Alembic, tests): run **`pytest`** locally before push—see **canopy-agent-conventions** for Compose vs venv commands. Prefer a **narrow path** when the change is isolated (e.g. `pytest tests/test_monarch_parser.py`).
+
 ## Balance-based vs traded assets
 
 - **`BALANCE_BASED_ASSET_TYPES`** in `portfolio_calculator.py` (bank, retirement shells, cash, etc.): **`current_price`** is the **total balance**, not per-share price.

@@ -8,6 +8,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [0.10.4] - 2026-04-19
 
+- **Agent / workflow:** `.cursorrules` + **Cursor skills** (`canopy-agent-conventions`, `canopy-backend-patterns`) require **local pytest / lint before push**, not CI as the first signal.
 - **Monarch parser:** Dropped the loose **`individual`** investment substring (it matched everyday bank labels like **`Individual (...)`** and routed them to **INVESTMENT**, so `/v1/accounts` stayed empty while `/v1/transactions` showed rows). Tightened markers to **`individual investing`**, **`individual brokerage`**, **`brokerage`**; added **Amex / Discover** debt hints.
 - **Alembic `20260423_0011`:** purge migration now deletes **`snapshot_holdings`** (was wrongly checking **`portfolio_snapshot_holdings`**) before removing BR-scoped **`assets`**, avoiding FK failures on `snapshot_holdings_asset_id_fkey` when upgrading old databases.
 - **Admin row counts / migrations:** `GET /v1/admin/row-counts` uses **`COUNT(*)`** per table (not ORM `.count()`) so liabilities counts work when the table exists but a newer column is not migrated yet. **`backend/scripts/migrate.sh`** documents **`alembic upgrade head`** for Compose and k8s; production still requires migrations for tables such as **`fx_rates`** and **`portfolio_reviews`**.
