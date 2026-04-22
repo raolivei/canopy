@@ -39,6 +39,7 @@ from backend.db.models.liability import Liability
 from backend.db.session import DbSession
 from backend.services import fx as fx_service
 from backend.services.fx import DISPLAY_FALLBACK_USDCAD
+from backend.services.monarch.parser import AccountClass, classify_monarch_account_label
 
 router = APIRouter(prefix="/v1/accounts", tags=["accounts"])
 
@@ -165,9 +166,7 @@ def _asset_to_account(
     )
 
 
-def _latest_balances_by_asset(
-    db, asset_ids: list[int]
-) -> dict[int, tuple[Decimal, datetime]]:
+def _latest_balances_by_asset(db, asset_ids: list[int]) -> dict[int, tuple[Decimal, datetime]]:
     """Return ``{asset_id: (balance, as_of_date)}`` for the latest row.
 
     We pick the most recent ``AccountBalanceHistory`` row where the row
@@ -259,11 +258,7 @@ def _combine_totals(
     cad_bucket = per_ccy.get("CAD") or CurrencyTotals(cash=0.0, debt=0.0, net=0.0)
     usd_bucket = per_ccy.get("USD") or CurrencyTotals(cash=0.0, debt=0.0, net=0.0)
 
-    effective = (
-        usd_cad_rate
-        if usd_cad_rate is not None and usd_cad_rate != 0
-        else DISPLAY_FALLBACK_USDCAD
-    )
+    effective = usd_cad_rate if usd_cad_rate is not None and usd_cad_rate != 0 else DISPLAY_FALLBACK_USDCAD
     rate_f = float(effective)
 
     # USD -> CAD multiplies; CAD -> USD divides.
@@ -296,28 +291,43 @@ def _combine_totals(
 @router.get("/", response_model=AccountsResponse)
 async def list_accounts(db: DbSession) -> AccountsResponse:
     """Return every bank / credit / loan account known to the app."""
-    cash_assets = (
+    cash_assets = list(
+        db.execute(select(Asset).where(Asset.is_liability.is_(False)).where(Asset.asset_type.in_(_CASH_ASSET_TYPES)))
+        .scalars()
+        .all()
+    )
+
+    # Monarch mis-imports used to persist ``asset_type=other`` for labels that
+    # are now classified as cash (e.g. ``Individual (...`` with Unicode
+    # ellipsis, or pre-parser-regression rows). Those rows never match the
+    # cash-type filter above — include them when the current classifier says
+    # CASH so the Accounts page heals without a destructive re-import.
+    seen_ids = {a.id for a in cash_assets}
+    monarch_repair = (
         db.execute(
-            select(Asset)
-            .where(Asset.is_liability.is_(False))
-            .where(Asset.asset_type.in_(_CASH_ASSET_TYPES))
+            select(Asset).where(
+                Asset.is_liability.is_(False),
+                Asset.asset_type == AssetType.OTHER,
+                Asset.sync_source == "csv_import",
+            )
         )
         .scalars()
         .all()
     )
+    for a in monarch_repair:
+        if a.id in seen_ids:
+            continue
+        if classify_monarch_account_label(a.name or "") != AccountClass.CASH:
+            continue
+        cash_assets.append(a)
+        seen_ids.add(a.id)
 
     # Pre-fetch the latest balance per cash asset so the Accounts page
     # reflects the real ``AccountBalanceHistory`` value rather than the
     # (almost always empty) ``Asset.current_price`` column.
-    latest_balances = _latest_balances_by_asset(
-        db, [a.id for a in cash_assets]
-    )
+    latest_balances = _latest_balances_by_asset(db, [a.id for a in cash_assets])
 
-    liabilities = (
-        db.execute(select(Liability).where(Liability.status == "active"))
-        .scalars()
-        .all()
-    )
+    liabilities = db.execute(select(Liability).where(Liability.status == "active")).scalars().all()
 
     accounts: list[AccountResponse] = [
         *(
@@ -353,16 +363,13 @@ async def list_accounts(db: DbSession) -> AccountsResponse:
     display_rate = rate_value if rate_value is not None else DISPLAY_FALLBACK_USDCAD
     fx_info = FxInfo(
         usd_cad_rate=float(display_rate),
-        as_of_date=(
-            latest_rate.as_of_date.isoformat() if latest_rate is not None else None
-        ),
+        as_of_date=(latest_rate.as_of_date.isoformat() if latest_rate is not None else None),
         source=(
             "display_fallback_usdcad"
             if used_rate_fallback
             else (latest_rate.source if latest_rate is not None else None)
         ),
-        is_stale=used_rate_fallback
-        or (fx_service.is_stale(latest_rate) if latest_rate is not None else True),
+        is_stale=used_rate_fallback or (fx_service.is_stale(latest_rate) if latest_rate is not None else True),
     )
 
     return AccountsResponse(

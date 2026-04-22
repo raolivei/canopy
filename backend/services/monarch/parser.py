@@ -151,13 +151,25 @@ def parse_monarch_csv(text: str) -> ParseResult:
 # ---------------------------------------------------------------------------
 
 
+def normalize_monarch_account_label(label: str) -> str:
+    """Normalise Monarch account labels before classification.
+
+    Exports use a Unicode ellipsis (``…``, U+2026) instead of three ASCII
+    dots in ``(...last4)`` masks; without normalising, ``(…`` would not match
+    ``(...`` heuristics and the account would fall through as UNKNOWN.
+    """
+    return (label or "").replace("\u2026", "...")
+
+
 _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
-# "(...2003)", "(...DqRQ)", "(...-5g0)", "(....8120)"
+# "(...2003)", "(...DqRQ)", "(...-5g0)", "(....8120)" — label should be
+# normalised first so ``…`` has become ``...``.
 _LAST4_RE = re.compile(r"\(\.\.\.\.?([A-Za-z0-9\-]+)\)$")
 # TD-style chequing: "Individual (...1234)" — no "Chequing" in the label.
 # Must not match "Individual Investing (...)" (handled by ``inv_markers``).
+# Allow optional spaces after ``(`` (some exports add a space).
 _RETAIL_INDIVIDUAL_OR_JOINT = re.compile(
-    r"^(individual|joint)\s*\(\.\.\.",
+    r"^(individual|joint)\s*\(\s*\.\.\.",
     re.IGNORECASE,
 )
 
@@ -205,7 +217,7 @@ def _normalise_row(
         out.unknown_amount_rows += 1
         return None
 
-    account_label = (raw.get("Account") or "").strip()
+    account_label = normalize_monarch_account_label((raw.get("Account") or "").strip())
     if account_label in PSEUDO_ACCOUNTS:
         account_class = AccountClass.PSEUDO
         currency = "CAD"
@@ -231,6 +243,15 @@ def _normalise_row(
         currency=currency,
         account_last4=last4,
     )
+
+
+def classify_monarch_account_label(label: str) -> AccountClass:
+    """Public classifier for a raw Monarch ``Account`` column value.
+
+    Used by the CSV importer and by the Accounts API to surface legacy rows
+    stored with ``asset_type=other`` before parser fixes.
+    """
+    return _classify_account(normalize_monarch_account_label(label.strip()))
 
 
 def _classify_account(label: str) -> AccountClass:
@@ -296,6 +317,11 @@ def _classify_account(label: str) -> AccountClass:
         "cad account",
         "usd account",
         "eq bank",
+        # TD / big-bank product names that omit "Chequing" / "Savings"
+        "banking plan",
+        "all-inclusive",
+        "borderless",
+        "minimum balance",
     )
     if any(m in lower for m in cash_markers):
         return AccountClass.CASH

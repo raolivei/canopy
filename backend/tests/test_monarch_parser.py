@@ -106,6 +106,17 @@ def test_individual_without_investing_keyword_is_not_investment() -> None:
     assert result.rows[0].account_class == AccountClass.CASH
 
 
+def test_individual_with_unicode_ellipsis_is_cash() -> None:
+    # Monarch sometimes uses U+2026 instead of three ASCII dots.
+    text = _csv(
+        "2025-12-01,Store,Shopping,Individual (\u202652003),RAW,,-10.00,",
+    )
+    result = parse_monarch_csv(text)
+    assert len(result.rows) == 1
+    assert result.rows[0].account_class == AccountClass.CASH
+    assert result.rows[0].account_label == "Individual (...52003)"
+
+
 def test_individual_investing_stays_investment() -> None:
     # "Individual Investing (...)" must not match the Individual-(... chequing heuristic.
     text = _csv(
