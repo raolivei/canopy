@@ -86,7 +86,7 @@ export default function ImportHub() {
             Import Your Financial Data
           </h1>
           <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            Choose how you'd like to import your data. We support multiple formats to make it easy.
+            Choose how you&apos;d like to import your data. We support multiple formats to make it easy.
           </p>
         </div>
 
