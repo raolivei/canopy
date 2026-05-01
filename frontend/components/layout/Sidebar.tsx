@@ -30,17 +30,11 @@ const primaryNavigation = [
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Import", href: "/import", icon: UploadCloud },
   { name: "Insights", href: "/insights", icon: Target },
   { name: "Annual Report", href: "/report", icon: BarChart2 },
   { name: "Integrations", href: "/settings/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },
-];
-
-const importNavigation = [
-  { name: "Wealthsimple import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
-  { name: "Monarch import", href: "/portfolio/monarch-import", icon: UploadCloud },
-  { name: "Bank CSV import", href: "/import", icon: Upload },
-  { name: "Import snapshot", href: "/portfolio/import", icon: Upload },
 ];
 
 interface NavItem {
@@ -59,76 +53,6 @@ function navItemIsActive(pathname: string, href: string): boolean {
   return pathname.startsWith(prefix);
 }
 
-interface RenderSectionArgs {
-  title: string;
-  items: NavItem[];
-  open: boolean;
-  setOpen: (next: boolean) => void;
-  isCollapsed: boolean;
-  router: ReturnType<typeof useRouter>;
-}
-
-// Shared rendering for the collapsible Import section.
-function renderSection({
-  title,
-  items,
-  open,
-  setOpen,
-  isCollapsed,
-  router,
-}: RenderSectionArgs) {
-  return (
-    <>
-      {!isCollapsed && (
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="w-full flex items-center gap-2 px-3 py-2 mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
-        >
-          <ChevronDown
-            className={cn("w-4 h-4 transition-transform", open ? "rotate-180" : "")}
-          />
-          {title}
-        </button>
-      )}
-
-      {(open || isCollapsed) &&
-        items.map((item) => {
-          const isActive = navItemIsActive(router.pathname, item.href);
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  : "text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-800 dark:hover:text-slate-200"
-              )}
-              title={isCollapsed ? item.name : undefined}
-            >
-              <Icon className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500" />
-              <AnimatePresence mode="wait">
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: "auto" }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="truncate"
-                  >
-                    {item.name}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Link>
-          );
-        })}
-    </>
-  );
-}
 
 interface SidebarProps {
   onCommandPaletteOpen?: () => void;
@@ -139,7 +63,6 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [importOpen, setImportOpen] = useState(true);
   const { privacyMode, togglePrivacyMode, hydrated: privacyHydrated } = usePrivacyMode();
 
   useEffect(() => {
@@ -317,15 +240,6 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                 </AnimatePresence>
               </Link>
             );
-          })}
-
-          {renderSection({
-            title: "Import",
-            items: importNavigation,
-            open: importOpen,
-            setOpen: setImportOpen,
-            isCollapsed,
-            router,
           })}
         </nav>
 

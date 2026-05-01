@@ -36,6 +36,8 @@ import { format } from "date-fns";
 import { useMoney } from "@/hooks/useMoney";
 import { motion } from "framer-motion";
 import { useRouter } from "next/router";
+import { PeriodSelector } from "@/components/ui/PeriodSelector";
+import { filterByPeriod, TimePeriod } from "@/utils/dateFiltering";
 import {
   CHART_COLORS,
   CHART_PALETTE,
@@ -156,6 +158,7 @@ export default function Dashboard() {
   const [compare, setCompare] = useState<CompareResponse | null>(null);
   const [netWorth, setNetWorth] = useState<NetWorthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [networthPeriod, setNetworthPeriod] = useState<TimePeriod>("all");
 
   const latestId = timeline.length ? timeline[timeline.length - 1].id : null;
 
@@ -224,21 +227,26 @@ export default function Dashboard() {
     [timeline]
   );
 
-  const networthData = useMemo(
-    () =>
-      (netWorth?.points ?? []).map((p) => {
-        const slice = pickSlice(p, view);
-        return {
-          date: format(new Date(p.date), "MMM yyyy"),
-          investments: parseFloat(slice.investments),
-          cash: parseFloat(slice.cash),
-          /** Debt magnitude (positive) — shown on its own axis vs. asset stack. */
-          debt_abs: Math.abs(parseFloat(slice.debt)),
-          net_worth: parseFloat(slice.net_worth),
-        };
-      }),
-    [netWorth, view]
-  );
+  const networthData = useMemo(() => {
+    if (!netWorth) return [];
+
+    // First, map to chart format
+    const mapped = (netWorth.points ?? []).map((p) => {
+      const slice = pickSlice(p, view);
+      return {
+        date: format(new Date(p.date), "MMM yyyy"),
+        rawDate: p.date, // Keep original date for filtering
+        investments: parseFloat(slice.investments),
+        cash: parseFloat(slice.cash),
+        /** Debt magnitude (positive) — shown on its own axis vs. asset stack. */
+        debt_abs: Math.abs(parseFloat(slice.debt)),
+        net_worth: parseFloat(slice.net_worth),
+      };
+    });
+
+    // Then, filter by period
+    return filterByPeriod(mapped, (item) => item.rawDate, networthPeriod);
+  }, [netWorth, view, networthPeriod]);
 
   const latestTotal = latestId
     ? timeline.find((t) => t.id === latestId)?.total_value_cad
@@ -412,8 +420,6 @@ export default function Dashboard() {
           transition={{ delay: 0.03 }}
           className="mb-8"
         >
-
-          {networthData.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Net worth over time</CardTitle>
@@ -423,9 +429,23 @@ export default function Dashboard() {
                   Wealthsimple uploads — {displayCurrency}
                 </p>
               </CardHeader>
+
+              {/* Period Selector */}
+              <div className="px-6 pb-4">
+                <PeriodSelector
+                  selectedPeriod={networthPeriod}
+                  onPeriodChange={setNetworthPeriod}
+                />
+              </div>
+
               <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
+                {networthData.length === 0 ? (
+                  <div className="h-80 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                    No data available for selected period
+                  </div>
+                ) : (
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={networthData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                       <CartesianGrid {...getGridProps(checkDarkMode())} />
                       <XAxis
@@ -494,9 +514,9 @@ export default function Dashboard() {
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
+                )}
               </CardContent>
             </Card>
-          )}
         </motion.div>
       )}
 

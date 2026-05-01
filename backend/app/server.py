@@ -82,6 +82,14 @@ try:
 except ImportError:
     HAS_INSIGHTS_ROUTER = False
 
+# Import assistant router
+try:
+    from backend.api import assistant
+
+    HAS_ASSISTANT_ROUTER = True
+except ImportError:
+    HAS_ASSISTANT_ROUTER = False
+
 
 def _cors_allow_origins() -> list[str]:
     """Origins allowed for browser clients (dev + optional CORS_ALLOW_ORIGINS)."""
@@ -158,6 +166,10 @@ def create_app() -> FastAPI:
     # Include insights router if available
     if HAS_INSIGHTS_ROUTER:
         app.include_router(insights.router)
+
+    # Include assistant router if available
+    if HAS_ASSISTANT_ROUTER:
+        app.include_router(assistant.router)
 
     return app
 

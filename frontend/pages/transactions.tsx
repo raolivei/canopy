@@ -173,9 +173,10 @@ export default function Transactions() {
   };
 
   const { totalIncome, totalExpenses, net } = useMemo(() => {
-    const income = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
-    const expenses = transactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
-    return { totalIncome: income, totalExpenses: expenses, net: income - expenses };
+    // Calculate based on amount sign, not transaction type (includes buy/sell/transfer)
+    const income = transactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+    const expenses = transactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + t.amount, 0);
+    return { totalIncome: income, totalExpenses: expenses, net: income + expenses };
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {

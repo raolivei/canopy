@@ -1,17 +1,21 @@
+# Canopy Development Guide
+
+Self-hosted Canadian investment tracker (CAD only). Runs on **eldertree** k3s cluster. The app ingests Wealthsimple monthly statements and optional CAD portfolio snapshots; all dashboard numbers are CAD.
+
 ## Workspace
 
-See `../workspace-config/docs/PROJECT_CONVENTIONS.md` for shared conventions (git workflow, CHANGELOG, Docker/GHCR, K8s, security).
+See \`../workspace-config/docs/PROJECT_CONVENTIONS.md\` for shared conventions (git workflow, CHANGELOG, Docker/GHCR, K8s, security).
 
-**Ports** (from `../workspace-config/ports/.env.ports`):
+**Ports** (from \`../workspace-config/ports/.env.ports\`):
 
-- Frontend: `3001`
-- API: `8001`
-- PostgreSQL: `5433`
-- Redis: `6380`
+- Frontend: \`3001\`
+- API: \`8001\`
+- PostgreSQL: \`5433\`
+- Redis: \`6380\`
 
 ## Commands
 
-```bash
+\`\`\`bash
 # Development (Docker Compose - recommended)
 source ../workspace-config/ports/.env.ports
 docker-compose up                    # Start all services
@@ -30,20 +34,18 @@ docker-compose exec postgres psql -U postgres -d canopy  # PostgreSQL shell
 # Linting (run after changes)
 cd backend && ruff check . && ruff format .  # Python
 cd frontend && npm run lint                   # TypeScript
-```
+\`\`\`
 
 ## Workflow
 
 1. Always lint/format after code changes
-2. **Always run local tests (or scoped pytest / lint) before commit or push**—see `.cursor/skills/canopy-agent-conventions/SKILL.md`
+2. **Always run local tests (or scoped pytest / lint) before commit or push**
 3. Update CHANGELOG.md for all changes
 4. Never run git commands at workspace root
 
 ## Project Overview
 
-Self-hosted Canadian investment tracker (CAD only). Runs on **eldertree** k3s cluster. The app ingests Wealthsimple monthly statements and optional CAD portfolio snapshots; all dashboard numbers are CAD. When adding features, assume CAD is the only reporting currency and that the Accounts page is for cash / credit / LOC while Holdings is for investments.
-
-```
+\`\`\`
 canopy/
 ├── backend/           # FastAPI (Python)
 │   ├── api/          # API endpoints
@@ -56,37 +58,37 @@ canopy/
 │   ├── pages/        # Next.js pages
 │   └── utils/        # Utilities
 └── k8s/              # Kubernetes manifests
-```
+\`\`\`
 
 ## Code Style
 
-**Python**: See `backend/api/transactions.py` for route patterns, `backend/models/transaction.py` for Pydantic models.
+**Python**: See \`backend/api/transactions.py\` for route patterns, \`backend/models/transaction.py\` for Pydantic models.
 
-**TypeScript**: See `frontend/components/` for component patterns. Use Tailwind CSS.
+**TypeScript**: See \`frontend/components/\` for component patterns. Use Tailwind CSS.
 
 ## Common Tasks
 
 ### Adding API Endpoint
 
-1. Add route in `backend/api/`
-2. Add Pydantic model in `backend/models/`
+1. Add route in \`backend/api/\`
+2. Add Pydantic model in \`backend/models/\`
 3. Update API docs (auto-generated)
 
 ### Adding CSV Import Format
 
-1. Add parser in `backend/ingest/csv_parsers.py`
-2. Add example CSV in `examples/`
+1. Add parser in \`backend/ingest/csv_parsers.py\`
+2. Add example CSV in \`examples/\`
 
 ### Adding Frontend Component
 
-1. Create in `frontend/components/`
+1. Create in \`frontend/components/\`
 2. Use Tailwind for styling
 3. Follow existing patterns
 
 ## Docker Images
 
-- API: `ghcr.io/raolivei/canopy-api:<tag>`
-- Frontend: `ghcr.io/raolivei/canopy-frontend:<tag>`
+- API: \`ghcr.io/raolivei/canopy-api:<tag>\`
+- Frontend: \`ghcr.io/raolivei/canopy-frontend:<tag>\`
 
 ## Key Design Decisions
 
@@ -95,3 +97,29 @@ canopy/
 - **CAD only**: Canadian investments focus — no multi-currency FX plumbing
 - **Wealthsimple-first**: Importer auto-creates accounts (cash → Accounts page, investments → Holdings, debt → Accounts page)
 - **Raspberry Pi optimized**: Low-power hardware
+
+## AI Assistant
+
+The app includes an AI assistant for natural language queries about financial data (e.g., "How much did I spend on gas at Costco this month?").
+
+**Supported Providers:**
+- **OpenClaw** (cluster-hosted, preferred when available) - Set `ASSISTANT_PROVIDER=openclaw` and `OPENCLAW_URL=http://openclaw.cluster.local`
+- **Ollama** (local fallback) - Set `ASSISTANT_PROVIDER=ollama` and `OLLAMA_HOST=http://localhost:11434`
+
+**Setup:**
+```bash
+# Option 1: Use OpenClaw (cluster)
+ASSISTANT_PROVIDER=openclaw
+OPENCLAW_URL=http://openclaw.eldertree.local:8080
+OPENCLAW_MODEL=llama3.1:70b
+
+# Option 2: Use Ollama (local)
+ASSISTANT_PROVIDER=ollama
+OLLAMA_HOST=http://localhost:11434
+ollama pull llama3.1:8b
+```
+
+**Features:**
+- Query transactions, spending summaries, portfolio holdings
+- Conversation history stored in PostgreSQL
+- Function calling for data access (text-to-SQL)

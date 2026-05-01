@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     wise_api_token: Optional[str] = None  # WISE_API_TOKEN
     questrade_refresh_token: Optional[str] = None  # QUESTRADE_REFRESH_TOKEN
 
+    # AI Assistant configuration
+    assistant_provider: str = "ollama"  # "ollama" or "openclaw"
+    openclaw_url: Optional[str] = None  # e.g., "http://openclaw.eldertree.local:8080/v1"
+    openclaw_model: str = "llama3.1:70b"
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "llama3.1:8b"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
