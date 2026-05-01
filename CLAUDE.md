@@ -123,3 +123,44 @@ ollama pull llama3.1:8b
 - Query transactions, spending summaries, portfolio holdings
 - Conversation history stored in PostgreSQL
 - Function calling for data access (text-to-SQL)
+
+## UI Patterns
+
+### Time Period Controls
+
+Use `PeriodSelector` component + `dateFiltering` utilities for time-series filtering.
+
+**Available periods**: 5D, 1M, 3M, 6M, 1Y, YTD, All
+
+**Example** (see `frontend/pages/index.tsx`):
+```typescript
+import { PeriodSelector } from "@/components/ui/PeriodSelector";
+import { filterByPeriod, TimePeriod } from "@/utils/dateFiltering";
+
+const [period, setPeriod] = useState<TimePeriod>("all");
+
+const filteredData = useMemo(() => {
+  const mapped = data.map((item) => ({
+    ...item,
+    rawDate: item.date, // Keep ISO date for filtering
+  }));
+  return filterByPeriod(mapped, (item) => item.rawDate, period);
+}, [data, period]);
+
+<PeriodSelector selectedPeriod={period} onPeriodChange={setPeriod} />
+```
+
+### Reusable UI Components
+
+Located in `frontend/components/ui/`:
+- `Button.tsx` - Multiple variants (primary, secondary, ghost) and sizes
+- `Card.tsx` - Container components
+- `Input.tsx`, `Select.tsx` - Form controls
+- `PeriodSelector.tsx` - Time period button group
+- `Badge.tsx`, `Modal.tsx`, `Skeleton.tsx` - Common UI elements
+
+### ESLint Rules
+
+- Escape apostrophes in JSX text: use `&apos;` not `'`
+- Run `npm run lint` before committing frontend changes
+- CI enforces all ESLint rules (no warnings = errors in build)
