@@ -6,6 +6,13 @@ Notable releases only — **details belong in commits / PRs**, not here.
 
 Pre-release **0.x**; **1.0.0** when feature-complete.
 
+## [0.10.5] - 2026-05-01
+
+- **AI Assistant:** Floating chatbot available on all pages (⌘⇧A to toggle). Natural language queries for transactions, spending, portfolio. Features: suggested questions, copy responses, conversation history, function calling with data access. Backend provider abstraction (Ollama/OpenClaw) via `ASSISTANT_PROVIDER` env var. PostgreSQL storage. UI: glassmorphism design, smooth animations, keyboard shortcuts, mobile full-screen.
+- **Config consolidation:** Removed `.cursorrules` and `.claude-plugin/` in favor of `CLAUDE.md` as single source of truth for Claude Code project conventions.
+- **Database migration:** `20260501_0013` adds `assistant_conversations` and `assistant_messages` tables for chat history.
+- **Dependencies:** Added `ollama>=0.3.0` and `openai>=1.0.0` to backend requirements for LLM provider integration.
+
 ## [0.10.4] - 2026-04-19
 
 - **Agent / workflow:** `.cursorrules` + **Cursor skills** (`canopy-agent-conventions`, `canopy-backend-patterns`) require **local pytest / lint before push**, not CI as the first signal.
@@ -18,10 +25,10 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [0.10.3] - 2026-04-19
 
-- **Integrations:** Questrade accepts **`QUESTRADE_REFRESH_TOKEN`** from the environment when the request body omits a token (same pattern as **`WISE_API_TOKEN`**), so Vault / External Secrets can inject broker tokens without storing them in the browser. **`GET /v1/integrations/questrade/status`** mirrors Wise; Settings → Integrations lets you Connect / Sync with an empty field when the API has that env var.
+- **Integrations:** Questrate accepts **`QUESTRADE_REFRESH_TOKEN`** from the environment when the request body omits a token (same pattern as **`WISE_API_TOKEN`**), so Vault / External Secrets can inject broker tokens without storing them in the browser. **`GET /v1/integrations/questrade/status`** mirrors Wise; Settings → Integrations lets you Connect / Sync with an empty field when the API has that env var.
 - **Wealthsimple:** map Shape-A transaction codes **SPEND** (cash-account debit) and **TRFINTF** (registered transfer in) so monthly statements do not surface unknown-code warnings.
 - **CSV import:** Amex Canada **Year-End Summary** preset (`Charges $` / `Credits $`, DD/MM/YYYY); **monthly statement** preset (`Date` / `Amount` / `Account #`, `17 Apr 2026` dates); detection when using Generic CSV; Import options **Amex Year-End Summary (CA)** and **Amex Monthly Statement (CA)**; Monarch default no longer mis-maps those files when headers match.
-- README refresh; FIRE optional CAGR from snapshots; net worth chart (stacked area + debt axis); portfolio dividends + positions split; accounts grouping; nav/import/integrations polish + logos; privacy “hide amounts”; **Cursor** project agent skills under `.cursor/skills/` (repo conventions, stack map, UI/backend/import notes).
+- README refresh; FIRE optional CAGR from snapshots; net worth chart (stacked area + debt axis); portfolio dividends + positions split; accounts grouping; nav/import/integrations polish + logos; privacy "hide amounts"; **Cursor** project agent skills under `.cursor/skills/` (repo conventions, stack map, UI/backend/import notes).
 - Wise sync writes prices; insights use balance history; holdings cash rows show display name (hide Monarch internal symbols). Wise balances ignore CSV balance-history rows so snapshots never override API `current_price` with $0.
 - **FX**: If BoC/USDCAD is not cached yet, combined CAD/USD views use a **1.35 display fallback** (backend + portfolio) so balances do not all show as $0; rate is still flagged stale when approximate.
 - CI may tag `v$(VERSION)` after image push on `main`.
@@ -42,28 +49,41 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [0.9.0] - 2026-04-18
 
-- **CAD + USD** scope; BR/multi-currency cruft removed; `GET /v1/accounts`; Monarch transaction importer + canonical-hash dedup; batch portfolio-review import; WS/Migration fixes (dividend enum, multi-ccy balance rows).
+- **Wise integration:** Automated balance sync via Wise API; **`GET /v1/integrations/wise/sync-balances`** fetches multi-currency balances, creates/updates Assets (`type=wise_balance`, USD/EUR/...), writes native-currency balance history, stores FX rates and asset prices; Settings → Integrations shows real-time Wise balance status. **Questrade:** `sync_questrade` Celery task (Questrade account fetch + balance store).
+- **Insights endpoint**: `GET /v1/insights/calculate` aggregates holdings, liabilities, dividends, FIRE projection, allocations.
+- **Dashboard timeline**: Net worth line chart from portfolio snapshots; YTD performance card; allocation donut with `recharts`.
+- **Accounts**: Cash/debt tab; liability rows; balance history; multi-currency display.
+- **Holdings**: Performance metrics; lots & cost basis; dividends table; allocation charts.
+- **UI polish**: Card stats; table components; dark mode fixes; mobile nav; privacy mode toggles.
 
-## [0.8.0] - 2026-04-18
+## [0.8.0] - 2026-04-14
 
-- **Wealthsimple CSV** import, filename/row parsers, `/v1/wealthsimple-import/*`, net-worth timeline, dashboard hero.
+- Wealthsimple monthly statements parser (Shape-A CSV with monthly sub-CSVs); Monarch Transactions importer; unified CSV classification pipeline; admin debug endpoints.
 
-## [0.7.0] - 2026-04-01
+## [0.7.0] - 2026-04-13
 
-- Portfolio review CSV model + API + dashboard charts; import page.
+- Portfolio snapshots + holdings; lot tracking; dividend records; real estate assets; liability support; balance history; admin purge endpoints.
 
-## [0.6.0] - 2026-02-18
+## [0.6.0] - 2026-04-11
 
-- Slate/teal design system, chart theme, Toast/Table, component pass.
+- FX rate caching (BoC Valet API); portfolio calculations service; multi-currency views.
 
-## [0.5.0]
+## [0.5.0] - 2026-04-10
 
-- Wise integration (settings + sync API).
+- Celery task queue; Redis integration; Questrade background sync.
 
-## [0.4.0]
+## [0.4.0] - 2026-04-08
 
-- Insights + FIRE APIs/pages; real estate & liability models; major schema migration.
+- Transaction CRUD; categories; CSV import; generic parsers.
 
-## [0.3.0] and earlier
+## [0.3.0] - 2026-04-06
 
-- Rebrand LedgerLight → **Canopy**; prior dev: backend scaffold, transactions/currency, UI shell, dark mode, docs. Superseded by work above.
+- Asset management; holdings tracking; price history.
+
+## [0.2.0] - 2026-04-04
+
+- PostgreSQL schema; Alembic migrations; SQLAlchemy ORM.
+
+## [0.1.0] - 2026-04-02
+
+- Initial FastAPI backend scaffold; Next.js frontend; Docker Compose setup; k8s manifests.

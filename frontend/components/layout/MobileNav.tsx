@@ -11,12 +11,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 
-// The primary mobile slot points at the Wealthsimple importer now that
-// portfolio-snapshot CSVs live under Legacy. Reachable from the
-// command palette / sidebar when needed.
 const mobileNavItems = [
   { name: "Home", href: "/", icon: Home },
-  { name: "Import", href: "/portfolio/wealthsimple-import", icon: UploadCloud },
+  { name: "Import", href: "/import", icon: UploadCloud },
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Txns", href: "/transactions", icon: DollarSign },
   { name: "Accounts", href: "/accounts", icon: Wallet },
@@ -27,11 +24,6 @@ export default function MobileNav() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
 
-  // Render nothing on the server / first client paint. Browser
-  // extensions (e.g. Dark Reader) inject attributes like
-  // ``data-darkreader-inline-stroke`` onto lucide SVG icons before
-  // hydration, producing "Extra attributes from the server" warnings.
-  // Gating renders on ``isMounted`` mirrors what Sidebar already does.
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -46,19 +38,19 @@ export default function MobileNav() {
           const isActive =
             item.name === "Import"
               ? (
+                  path === "/import" ||
                   path === "/portfolio/wealthsimple-import" ||
                   path === "/portfolio/monarch-import" ||
                   path === "/portfolio/import" ||
                   path.startsWith("/portfolio/import/") ||
-                  path === "/import" ||
                   path.startsWith("/import/")
                 )
               : item.href === "/transactions"
                 ? path === "/transactions"
-              : item.href === "/settings"
-                ? path === "/settings" || path.startsWith("/settings/")
-                : path === item.href ||
-                  (item.href !== "/" && path.startsWith(`${item.href}/`));
+                : item.href === "/settings"
+                  ? path === "/settings" || path.startsWith("/settings/")
+                  : path === item.href ||
+                    (item.href !== "/" && path.startsWith(`${item.href}/`));
           const Icon = item.icon;
 
           return (

@@ -44,6 +44,10 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/canopy
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
+      # AI Assistant
+      ASSISTANT_PROVIDER: ollama
+      OLLAMA_HOST: http://192.168.2.107:11434
+      OLLAMA_MODEL: llama3.1:8b
     ports:
       - "${CANOPY_API_PORT:-8001}:8000"
     depends_on:
@@ -82,4 +86,3 @@ services:
 
 volumes:
   postgres_data:
-
