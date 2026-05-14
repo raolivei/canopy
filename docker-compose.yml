@@ -45,9 +45,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       # AI Assistant
-      ASSISTANT_PROVIDER: ollama
-      OLLAMA_HOST: http://192.168.2.107:11434
-      OLLAMA_MODEL: llama3.1:8b
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-openclaw}
+      OPENCLAW_URL: ${OPENCLAW_URL:-https://openclaw.eldertree.local/v1}
+      OPENCLAW_MODEL: ${OPENCLAW_MODEL:-llama3.1:70b}
+      OPENCLAW_API_KEY: ${OPENCLAW_API_KEY}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://192.168.2.107:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
     ports:
       - "${CANOPY_API_PORT:-8001}:8000"
     depends_on:

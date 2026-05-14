@@ -23,6 +23,7 @@ def _get_assistant_service(db: DbSession) -> AssistantService:
         provider_type=settings.assistant_provider,
         openclaw_url=settings.openclaw_url,
         openclaw_model=settings.openclaw_model,
+        openclaw_api_key=settings.openclaw_api_key,
         ollama_host=settings.ollama_host,
         ollama_model=settings.ollama_model,
     )

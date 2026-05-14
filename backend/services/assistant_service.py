@@ -28,9 +28,9 @@ class LLMProvider(ABC):
 
 class OpenClawProvider(LLMProvider):
     """OpenClaw provider (OpenAI-compatible API)."""
-    
-    def __init__(self, base_url: str, model: str, api_key: str = "not-needed"):
-        self.client = OpenAI(base_url=base_url, api_key=api_key)
+
+    def __init__(self, base_url: str, model: str, api_key: Optional[str] = None):
+        self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed")
         self.model = model
     
     def chat(self, messages: list[dict], tools: list[dict]) -> dict:
@@ -178,18 +178,19 @@ Available data:
         provider_type: str = "ollama",
         openclaw_url: Optional[str] = None,
         openclaw_model: str = "llama3.1:70b",
+        openclaw_api_key: Optional[str] = None,
         ollama_host: str = "http://localhost:11434",
         ollama_model: str = "llama3.1:8b"
     ):
         """Initialize assistant service."""
         self.db = db
         self.portfolio_calc = PortfolioCalculator(db)
-        
+
         # Initialize LLM provider
         if provider_type == "openclaw":
             if not openclaw_url:
                 raise ValueError("openclaw_url required when provider_type=openclaw")
-            self.provider = OpenClawProvider(openclaw_url, openclaw_model)
+            self.provider = OpenClawProvider(openclaw_url, openclaw_model, openclaw_api_key)
         elif provider_type == "ollama":
             self.provider = OllamaProvider(ollama_host, ollama_model)
         else:

@@ -31,8 +31,9 @@ class Settings(BaseSettings):
 
     # AI Assistant configuration
     assistant_provider: str = "ollama"  # "ollama" or "openclaw"
-    openclaw_url: Optional[str] = None  # e.g., "http://openclaw.eldertree.local:8080/v1"
+    openclaw_url: Optional[str] = None  # e.g., "https://openclaw.eldertree.local/v1"
     openclaw_model: str = "llama3.1:70b"
+    openclaw_api_key: Optional[str] = None  # OPENCLAW_API_KEY (gateway token from Vault)
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
 

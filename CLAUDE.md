@@ -1,5 +1,7 @@
 # Canopy - AI Assistant Context
 
+> **Note**: This file works with Claude Code's memory system. Core Canopy patterns are stored in `~/.claude/projects/-Users-roliveira-WORKSPACE-raolivei/memory/` and automatically loaded. See workspace [CLAUDE.md](../CLAUDE.md) for workspace-wide conventions.
+
 ## Quick Reference
 
 - **Project Type**: Self-hosted personal finance tracker (private/proprietary)
