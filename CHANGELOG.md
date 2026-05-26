@@ -6,6 +6,10 @@ Notable releases only — **details belong in commits / PRs**, not here.
 
 Pre-release **0.x**; **1.0.0** when feature-complete.
 
+## [0.10.4] - 2026-05-26
+
+- **Workspace config adoption:** Extend shared Ruff config from workspace-config/python/ruff.toml; symlink ESLint config for Next.js frontend; add Dependabot for automated dependency updates.
+
 ## [0.10.5] - 2026-05-01
 
 - **AI Assistant:** Floating chatbot available on all pages (⌘⇧A to toggle). Natural language queries for transactions, spending, portfolio. Features: suggested questions, copy responses, conversation history, function calling with data access. Backend provider abstraction (Ollama/OpenClaw) via `ASSISTANT_PROVIDER` env var. PostgreSQL storage. UI: glassmorphism design, smooth animations, keyboard shortcuts, mobile full-screen.
