@@ -1,0 +1,64 @@
+# Shared Dependabot configuration template for raolivei projects
+# Copy to .github/dependabot.yml and uncomment relevant package ecosystems
+
+version: 2
+updates:
+  # GitHub Actions - Enable for all projects with workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      time: "10:00"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Docker - Enable for projects with Dockerfile
+  # - package-ecosystem: "docker"
+      directory: "/frontend"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "saturday"
+  #     time: "10:00"
+  #   open-pull-requests-limit: 10
+  #   commit-message:
+  #     prefix: "chore"
+  #     include: "scope"
+  #   labels:
+  #     - "dependencies"
+  #     - "docker"
+
+  # npm - Enable for Node.js/TypeScript projects
+    - package-ecosystem: "npm"
+      directory: "/frontend"  # or "/frontend" for monorepo
+  schedule:
+    interval: "weekly"
+    day: "saturday"
+    time: "10:00"
+  open-pull-requests-limit: 10
+  commit-message:
+    prefix: "chore"
+    include: "scope"
+  labels:
+    - "dependencies"
+    - "javascript"
+
+  # pip - Enable for Python projects with requirements.txt
+  # - package-ecosystem: "pip"
+      directory: "/frontend"  # or "/backend" for monorepo
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "saturday"
+  #     time: "10:00"
+  #   open-pull-requests-limit: 10
+  #   commit-message:
+  #     prefix: "chore"
+  #     include: "scope"
+  #   labels:
+  #     - "dependencies"
+  #     - "python"
