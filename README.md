@@ -1,5 +1,12 @@
 # Canopy
 
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Node](https://img.shields.io/badge/node-18+-green.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)
+![Next.js](https://img.shields.io/badge/Next.js-14.0-black.svg)
+![PR Checks](https://github.com/raolivei/canopy/actions/workflows/pr.yml/badge.svg)
+![Build](https://github.com/raolivei/canopy/actions/workflows/build-and-push.yml/badge.svg)
+
 **Canadian net worth and investments — self-hosted.**
 
 Canopy is a personal finance app for **CAD + USD**: Wealthsimple and Monarch CSV imports, optional **Wise** (CAD/USD balances) and **Questrade** integrations, portfolio holdings, cash/credit accounts, insights, and a **FIRE calculator**. Data stays on your infrastructure (e.g. k3s at home, Tailscale access).
