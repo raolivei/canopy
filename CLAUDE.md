@@ -6,6 +6,13 @@ Self-hosted Canadian investment tracker (CAD only). Runs on **eldertree** k3s cl
 
 See \`../workspace-config/docs/PROJECT_CONVENTIONS.md\` for shared conventions (git workflow, CHANGELOG, Docker/GHCR, K8s, security).
 
+## Observability (Eldertree)
+
+Metrics and Grafana are **centralized in pi-fleet** (DRY). See \`../workspace-config/docs/OBSERVABILITY_STANDARDS.md\`.
+
+- Expose \`/metrics\` from the API; add \`prometheus.io/scrape\` on the K8s Service in \`pi-fleet/clusters/eldertree/canopy/\` (not yet wired — use generic K8s dashboards until added).
+- Production dashboards: \`pi-fleet/helm/monitoring-stack/dashboards/\` only.
+
 **Ports** (from \`../workspace-config/ports/.env.ports\`):
 
 - Frontend: \`3001\`
