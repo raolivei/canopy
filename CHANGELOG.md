@@ -29,6 +29,17 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
   - Pydantic models already defined in `backend/models/assistant.py`
   - Function definitions already in `AssistantService.FUNCTION_DEFINITIONS`
 
+- **Golden Questions Regression Suite (issue #76):** Parity testing framework comparing Canopy vs Monarch MCP oracle:
+  - Backend endpoint: `POST /v1/assistant/golden-questions/run` - Execute all 10 golden questions, compare results
+  - 10 regression questions: net worth, monthly spending, top categories, budget overages, subscriptions, savings rate, merchants, asset allocation, FIRE goal, anomalies
+  - Service: `GoldenQuestionsService` in `backend/services/golden_questions.py` - Calls both Canopy APIs and mock Monarch MCP functions
+  - Comparison logic: numerical delta (< 1% pass threshold), categorical match (list overlap 80%+), confidence scoring
+  - Response: run ID, pass/fail rates, detailed per-question results with delta, match type, confidence
+  - Pydantic models: `GoldenQuestionsRunRequest`, `GoldenQuestionsRunResponse`, `GoldenQuestionResult` in `backend/models/golden_questions.py`
+  - Unit tests: 19 tests (`backend/tests/test_golden_questions.py`) covering all 10 questions, comparison logic, numeric/categorical matching, batch runs with verbose/stop-on-failure options
+  - API endpoint registered in `backend/api/assistant.py` with error handling
+  - All tests pass (19/19), syntax validated
+
 - **[EPIC] Monarch Money Parity Roadmap (issue #47):** Comprehensive 23-issue work plan to achieve feature parity with Monarch Money by 2027, enabling subscription cancellation. Strategic arc spans three phases (Learn/Parallel/Cutover) across P0-P3 priorities:
   - **P0 (2 issues #48-49):** Stable deployment foundation (database migrations, Vault secrets integration)
   - **P1 (14 issues #61-74):** Core PFM features (budgets, cashflow, recurring detection, transaction rules, Monarch API sync) and category taxonomy

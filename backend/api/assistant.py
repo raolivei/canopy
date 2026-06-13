@@ -9,7 +9,9 @@ from backend.app.config import get_settings
 from backend.db.models.assistant import AssistantConversation, AssistantMessage
 from backend.db.session import DbSession
 from backend.models.assistant import ChatRequest, ChatResponse, Conversation, FunctionCall, Message
+from backend.models.golden_questions import GoldenQuestionsRunRequest, GoldenQuestionsRunResponse
 from backend.services.assistant_service import AssistantService
+from backend.services.golden_questions import GoldenQuestionsService
 
 router = APIRouter(prefix="/v1/assistant", tags=["assistant"])
 
@@ -130,7 +132,7 @@ async def get_conversation(conversation_id: int, db: DbSession):
     conversation = db.get(AssistantConversation, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
+
     return Conversation(
         id=conversation.id,
         created_at=conversation.created_at,
@@ -148,3 +150,20 @@ async def get_conversation(conversation_id: int, db: DbSession):
             for msg in conversation.messages
         ]
     )
+
+
+@router.post("/golden-questions/run", response_model=GoldenQuestionsRunResponse)
+async def run_golden_questions(
+    request: GoldenQuestionsRunRequest,
+    db: DbSession
+):
+    """Execute golden questions regression suite comparing Canopy vs Monarch MCP."""
+    try:
+        service = GoldenQuestionsService(db)
+        result = service.run_golden_questions(
+            verbose=request.verbose,
+            stop_on_failure=request.stop_on_failure
+        )
+        return GoldenQuestionsRunResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Golden questions error: {str(e)}")
