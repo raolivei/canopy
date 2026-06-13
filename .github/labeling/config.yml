@@ -1,0 +1,135 @@
+# Auto-labeling configuration for Canopy
+# Used by raolivei/github-workflows/.github/workflows/auto-label.yml
+
+# Project-specific patterns
+project_patterns:
+  monarch-parity:
+    - monarch
+    - budget
+    - cashflow
+    - recurring
+    - transaction rule
+    - category taxonomy
+    - parity
+
+# Area patterns
+area_patterns:
+  backend:
+    - backend
+    - api
+    - service
+    - python
+    - fastapi
+
+  frontend:
+    - frontend
+    - ui
+    - component
+    - react
+    - next.js
+    - page
+
+  infrastructure:
+    - k8s
+    - kubernetes
+    - docker
+    - deploy
+    - helm
+    - deployment
+    - ingress
+
+  database:
+    - database
+    - migration
+    - schema
+    - alembic
+    - model
+    - postgres
+
+  ci-cd:
+    - github actions
+    - workflow
+    - ci/cd
+    - build
+
+  testing:
+    - test
+    - pytest
+    - jest
+    - testing
+
+  import:
+    - import
+    - csv
+    - parser
+    - wealthsimple
+    - wise
+    - questrade
+
+  assistant:
+    - assistant
+    - ai
+    - llm
+    - chat
+    - openclaw
+    - ollama
+
+  integrations:
+    - integration
+    - api client
+    - sync
+
+# File-based PR labeling (for actions/labeler)
+backend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'backend/**'
+      - '**/*.py'
+
+frontend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'frontend/**'
+      - '**/*.tsx'
+      - '**/*.jsx'
+      - '**/*.ts'
+      - '**/*.js'
+
+infrastructure:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'k8s/**'
+      - '**/Dockerfile'
+      - 'docker-compose.yml'
+      - 'helm/**'
+
+database:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'backend/alembic/**'
+      - 'backend/db/models/**'
+
+ci-cd:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/workflows/**'
+
+testing:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'backend/tests/**'
+      - 'frontend/**/*.test.tsx'
+      - 'frontend/**/*.test.ts'
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.md'
+      - 'docs/**'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'backend/requirements.txt'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
