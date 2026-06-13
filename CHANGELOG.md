@@ -6,6 +6,27 @@ Notable releases only — **details belong in commits / PRs**, not here.
 
 Pre-release **0.x**; **1.0.0** when feature-complete.
 
+## [Unreleased]
+
+- **Assistant high-value tools (6 new):** Expanded `AssistantService` with 6 high-value tools for Monarch parity. Added tools: `get_accounts()` (all account types, balances, currency), `get_budget_status()` (current month budget vs actuals by category), `get_recurring_summary()` (detected recurring transactions with confidence), `get_cashflow_analysis()` (monthly income/expenses/savings trend), `analyze_spending_patterns()` (top merchants/categories, trends), `get_merchant_insights()` (spending history per merchant). Each tool callable via LLM function calling; returns structured JSON. Full unit test coverage (25+ tests) in `test_assistant_tools.py` with SQLite in-memory DB fixtures. Tools integrate with `RecurringService` (pattern detection), `BudgetService` (budget tracking), and transaction queries for data-driven assistant responses.
+- **Transaction rules engine:** Auto-categorization, tagging, and splitting system for transaction automation. Models: `Rule` (metadata, priority), `RuleCondition` (field, operator, value), `RuleAction` (action_type, config). Supports 7 match operators (equals, contains, regex, starts_with, ends_with, greater_than, less_than) and 3 action types (set_category, add_tag, split). Service: `RuleService` with rule creation/update/delete, condition evaluation (AND logic), action application, and batch processing. Priority-based rule ordering. Comprehensive test suite with 25+ test cases covering condition matching, action application, and CRUD operations. Migration `20260613_0015` creates rules, rule_conditions, rule_actions tables.
+- **Category taxonomy:** Formalized transaction categories with hierarchy support for Monarch parity. New `categories` table with parent-child relationships, Monarch category name preservation, and UI metadata (color, icon). Models: `Category` with hierarchy methods (`get_path()`, `get_children()`, `get_descendants()`, `is_root()`, `is_leaf()`). Transactions now have `category_id` FK while preserving legacy `category` string for backwards compatibility. Seeded default categories: Income, Expenses (with subcategories: Groceries, Dining Out, Utilities, Transportation, Shopping, Entertainment, Healthcare, Fees), Transfers, Investments, Debt. Migration `20260613_0016` creates schema; `20260613_0017` populates existing transactions by matching category strings to formal records. Supports future category filtering in budgets, rules, and cashflow analysis.
+
+## [0.11.0] - 2026-06-12
+
+- **Cashflow service:** Added `CashflowService` for monthly cashflow analysis. Methods: `get_monthly_metrics()` returns monthly income/expenses/savings/rate + top categories; `get_cashflow_trend(months)` returns last N months of metrics; `get_cashflow_summary(start_date, end_date)` calculates aggregate totals and trend direction. Handles edge cases: zero income (savings_rate=0), uncategorized transactions, and trend calculation via first/second-half savings rate comparison. Full unit test coverage with SQLite in-memory database.
+- **Budget models:** Added `Budget`, `BudgetCategory`, and `BudgetTracking` models for Monarch parity P1 feature. Supports recurring budget periods (MONTHLY, QUARTERLY, ANNUAL), rollover behavior, and budget tracking history. Database migration `20260612_0014` creates `budgets`, `budget_categories`, and `budget_tracking` tables with appropriate indexes for fast lookups and period-based queries.
+- **Budget API endpoints:** Added `/v1/budgets/*` REST endpoints for CRUD operations and tracking:
+  - `GET /v1/budgets/` - List all budgets (with `active_only` filter)
+  - `POST /v1/budgets/` - Create new budget
+  - `GET /v1/budgets/{budget_id}` - Get budget with all categories
+  - `PUT /v1/budgets/{budget_id}` - Update budget metadata (name, description, is_active)
+  - `DELETE /v1/budgets/{budget_id}` - Delete budget and all categories
+  - `POST /v1/budgets/{budget_id}/categories` - Add category to budget with limit
+  - `GET /v1/budgets/{budget_id}/tracking` - Get budget vs actuals for date range
+  - All endpoints include comprehensive error handling (404, 400) and auto-generated Swagger docs.
+- **Navigation:** Added sidebar links for new Monarch parity features: Budgets (PieChart icon), Cashflow (TrendingDown icon), and Recurring (Repeat icon). Placeholder pages created at `/budgets`, `/cashflow`, and `/recurring` for P2 feature development. Mobile navigation via Settings menu.
+
 ## [0.10.4] - 2026-05-26
 
 - **Workspace config adoption:** Extend shared Ruff config from workspace-config/python/ruff.toml; symlink ESLint config for Next.js frontend; add Dependabot for automated dependency updates.

@@ -20,6 +20,9 @@ import {
   UploadCloud,
   Eye,
   EyeOff,
+  PieChart,
+  TrendingDown,
+  Repeat,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
@@ -30,6 +33,9 @@ const primaryNavigation = [
   { name: "Holdings", href: "/portfolio", icon: TrendingUp },
   { name: "Accounts", href: "/accounts", icon: Wallet },
   { name: "Transactions", href: "/transactions", icon: DollarSign },
+  { name: "Budgets", href: "/budgets", icon: PieChart },
+  { name: "Cashflow", href: "/cashflow", icon: TrendingDown },
+  { name: "Recurring", href: "/recurring", icon: Repeat },
   { name: "Import", href: "/import", icon: UploadCloud },
   { name: "Insights", href: "/insights", icon: Target },
   { name: "Annual Report", href: "/report", icon: BarChart2 },

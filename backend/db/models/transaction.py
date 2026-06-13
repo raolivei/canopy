@@ -6,13 +6,17 @@ Canopy - Personal Finance Platform
 import enum
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+from uuid import UUID
 
-from sqlalchemy import DateTime, Index, Numeric, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.base import Base
+
+if TYPE_CHECKING:
+    from backend.db.models.category import Category
 
 
 class TransactionType(str, enum.Enum):
@@ -39,8 +43,11 @@ class Transaction(Base):
     type: Mapped[str] = mapped_column(String(20), default="expense")
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    # Categorization
+    # Categorization (keeping category string for backwards compatibility, adding category_id FK)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    category_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     account: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     # Merchant info (from Monarch/bank data)
@@ -65,6 +72,11 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    category_obj: Mapped[Optional["Category"]] = relationship(
+        "Category", back_populates="transactions", foreign_keys=[category_id]
     )
 
     # Indexes for common queries

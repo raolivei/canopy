@@ -90,6 +90,34 @@ try:
 except ImportError:
     HAS_ASSISTANT_ROUTER = False
 
+try:
+    from backend.api import budgets as budgets_api
+
+    HAS_BUDGETS_ROUTER = True
+except ImportError:
+    HAS_BUDGETS_ROUTER = False
+
+try:
+    from backend.api import cashflow as cashflow_api
+
+    HAS_CASHFLOW_ROUTER = True
+except ImportError:
+    HAS_CASHFLOW_ROUTER = False
+
+try:
+    from backend.api import recurring_patterns as recurring_patterns_api
+
+    HAS_RECURRING_PATTERNS_ROUTER = True
+except ImportError:
+    HAS_RECURRING_PATTERNS_ROUTER = False
+
+try:
+    from backend.api import rules as rules_api
+
+    HAS_RULES_ROUTER = True
+except ImportError:
+    HAS_RULES_ROUTER = False
+
 
 def _cors_allow_origins() -> list[str]:
     """Origins allowed for browser clients (dev + optional CORS_ALLOW_ORIGINS)."""
@@ -170,6 +198,22 @@ def create_app() -> FastAPI:
     # Include assistant router if available
     if HAS_ASSISTANT_ROUTER:
         app.include_router(assistant.router)
+
+    # Include budgets router if available
+    if HAS_BUDGETS_ROUTER:
+        app.include_router(budgets_api.router)
+
+    # Include cashflow router if available
+    if HAS_CASHFLOW_ROUTER:
+        app.include_router(cashflow_api.router)
+
+    # Include recurring patterns router if available
+    if HAS_RECURRING_PATTERNS_ROUTER:
+        app.include_router(recurring_patterns_api.router)
+
+    # Include rules router if available
+    if HAS_RULES_ROUTER:
+        app.include_router(rules_api.router)
 
     return app
 

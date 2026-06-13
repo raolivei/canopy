@@ -2,6 +2,8 @@
 
 from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.asset import Asset, AssetType, SyncSource
+from backend.db.models.budget import Budget, BudgetCategory, BudgetTracking, PeriodType
+from backend.db.models.category import Category
 from backend.db.models.dividend import Dividend, DividendType
 from backend.db.models.fx_rate import FxRate
 from backend.db.models.imported_event import ImportedEvent
@@ -27,7 +29,16 @@ from backend.db.models.real_estate import (
     RealEstatePaymentSeries,
     RealEstateProperty,
 )
+from backend.db.models.rule import (
+    Rule,
+    RuleCondition,
+    RuleAction,
+    RuleConditionField,
+    RuleConditionOperator,
+    RuleActionType,
+)
 from backend.db.models.transaction import Transaction, TransactionType
+from backend.db.models.recurring_pattern import RecurringPattern, RecurringFrequency
 
 __all__ = [
     # Core assets
@@ -55,6 +66,20 @@ __all__ = [
     # Transactions
     "Transaction",
     "TransactionType",
+    # Categories
+    "Category",
+    # Rules
+    "Rule",
+    "RuleCondition",
+    "RuleAction",
+    "RuleConditionField",
+    "RuleConditionOperator",
+    "RuleActionType",
+    # Budgets
+    "Budget",
+    "BudgetCategory",
+    "PeriodType",
+    "BudgetTracking",
     # Portfolio review (CAD-only snapshots for holdings that don't auto-sync)
     "PortfolioReview",
     "PortfolioReviewLine",
@@ -64,4 +89,7 @@ __all__ = [
     "AccountBalanceHistory",
     # Foreign exchange (CAD <-> USD)
     "FxRate",
+    # Recurring patterns
+    "RecurringPattern",
+    "RecurringFrequency",
 ]
