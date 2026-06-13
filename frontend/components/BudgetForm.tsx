@@ -68,6 +68,7 @@ export default function BudgetForm({
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveredState);
+  const [showSuccess, setShowSuccess] = useState(false);
   const { addToast } = useToast();
 
   // Auto-save form state whenever it changes
@@ -192,6 +193,9 @@ export default function BudgetForm({
       };
 
       await onSubmit(payload);
+      // Show success state briefly
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 1500);
       // Clear saved form state on successful submission
       clearFormState();
       setShowRecoveryNotice(false);
@@ -363,7 +367,14 @@ export default function BudgetForm({
         >
           Cancel
         </Button>
-        <Button type="submit" variant="primary" loading={loading}>
+        <Button
+          type="submit"
+          variant="primary"
+          loading={loading}
+          loadingText={budgetId ? "Updating..." : "Creating..."}
+          successText={budgetId ? "Updated ✓" : "Created ✓"}
+          showSuccess={showSuccess && !loading}
+        >
           {budgetId ? "Update Budget" : "Create Budget"}
         </Button>
       </div>
