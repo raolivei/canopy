@@ -17,6 +17,7 @@ import {
   CreditCard,
   Sparkles,
 } from "lucide-react";
+import DarkModeToggle from "@/components/DarkModeToggle";
 import {
   ComposedChart,
   Area,
@@ -301,6 +302,7 @@ export default function Dashboard() {
         actions={
           <>
             <CurrencyViewToggle />
+            <DarkModeToggle />
             <Button
               variant="primary"
               leftIcon={<UploadCloud className="w-4 h-4" />}
