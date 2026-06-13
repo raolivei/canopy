@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import BudgetForm from "@/components/BudgetForm";
 import BudgetList, { Budget } from "@/components/BudgetList";
 import { BudgetStatsSkeleton } from "@/components/ui/Skeleton";
+import QueryErrorBoundary from "@/components/QueryErrorBoundary";
 import {
   BarChart3,
   Plus,
@@ -35,7 +36,12 @@ export default function BudgetsPage() {
   const router = useRouter();
 
   // Fetch budget stats
-  const { data: stats } = useQuery<BudgetStats>({
+  const {
+    data: stats,
+    error: statsError,
+    refetch: refetchStats,
+    isLoading: statsLoading,
+  } = useQuery<BudgetStats>({
     queryKey: ["budget-stats"],
     queryFn: async () => {
       const res = await fetch(`${API_URL}/v1/budgets/stats`, {
@@ -44,7 +50,7 @@ export default function BudgetsPage() {
       if (!res.ok) throw new Error("Failed to load stats");
       return res.json();
     },
-    retry: 1,
+    retry: 2,
   });
 
   // Create budget mutation
@@ -163,11 +169,16 @@ export default function BudgetsPage() {
         }
       />
 
-      {/* Stats Cards */}
-      {!stats ? (
-        <BudgetStatsSkeleton />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-8">
+      {/* Stats Cards with Error Recovery */}
+      <QueryErrorBoundary
+        error={statsError ?? null}
+        isLoading={statsLoading}
+        onRetry={() => refetchStats()}
+      >
+        {!stats ? (
+          <BudgetStatsSkeleton />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-8">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -225,8 +236,9 @@ export default function BudgetsPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
+          </div>
+        )}
+      </QueryErrorBoundary>
 
       {/* Budget List Section */}
       <div>

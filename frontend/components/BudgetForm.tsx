@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { useFormState } from "@/hooks/useFormState";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
 
@@ -45,15 +46,40 @@ export default function BudgetForm({
   onCancel,
   loading = false,
 }: BudgetFormProps) {
-  const [name, setName] = useState(initialData?.name || "");
-  const [currency, setCurrency] = useState(initialData?.currency || "CAD");
-  const [description, setDescription] = useState(initialData?.description || "");
-  const [isActive, setIsActive] = useState(initialData?.isActive !== false);
+  const formKey = budgetId ? `budget_edit_${budgetId}` : "budget_create";
+  const { getRecoveredState, saveFormState, clearFormState } =
+    useFormState<any>(formKey, null);
+
+  // Try to recover form state from sessionStorage first
+  const recoveredState = getRecoveredState();
+
+  const [name, setName] = useState(recoveredState?.name ?? initialData?.name ?? "");
+  const [currency, setCurrency] = useState(
+    recoveredState?.currency ?? initialData?.currency ?? "CAD"
+  );
+  const [description, setDescription] = useState(
+    recoveredState?.description ?? initialData?.description ?? ""
+  );
+  const [isActive, setIsActive] = useState(
+    recoveredState?.isActive ?? initialData?.isActive !== false
+  );
   const [categoryRows, setCategoryRows] = useState<BudgetCategoryRow[]>(
-    initialData?.categories || []
+    recoveredState?.categoryRows ?? initialData?.categories ?? []
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveredState);
   const { addToast } = useToast();
+
+  // Auto-save form state whenever it changes
+  useEffect(() => {
+    saveFormState({
+      name,
+      currency,
+      description,
+      isActive,
+      categoryRows,
+    });
+  }, [name, currency, description, isActive, categoryRows, saveFormState]);
 
   // Fetch available categories
   const { data: categories = [] } = useQuery<Category[]>({
@@ -166,13 +192,33 @@ export default function BudgetForm({
       };
 
       await onSubmit(payload);
+      // Clear saved form state on successful submission
+      clearFormState();
+      setShowRecoveryNotice(false);
     } catch (err) {
       console.error("Error submitting budget:", err);
+      // Form state remains saved for recovery on retry
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Recovery Notice */}
+      {showRecoveryNotice && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            <span className="font-semibold">✓ Recovered</span> Your previous form data has been restored.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowRecoveryNotice(false)}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-200 text-sm"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Basic Info */}
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-slate-900 dark:text-white">
