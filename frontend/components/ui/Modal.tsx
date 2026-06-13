@@ -53,15 +53,15 @@ export function Modal({
   if (!isOpen) return null;
 
   const sizes = {
-    sm: "max-w-sm",
-    md: "max-w-md",
-    lg: "max-w-lg",
-    xl: "max-w-xl",
-    full: "max-w-4xl",
+    sm: "sm:max-w-sm max-w-xs",
+    md: "sm:max-w-md max-w-sm",
+    lg: "sm:max-w-lg max-w-md",
+    xl: "sm:max-w-xl max-w-lg",
+    full: "sm:max-w-4xl max-w-xl",
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 p-2">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
@@ -78,18 +78,18 @@ export function Modal({
         className={cn(
           "relative w-full bg-white dark:bg-slate-900 rounded-xl shadow-xl",
           "border border-slate-200 dark:border-slate-800",
-          "animate-scale-in",
+          "animate-scale-in max-h-[90vh] sm:max-h-[calc(100vh-100px)] flex flex-col",
           sizes[size]
         )}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <div>
+          <div className="flex items-start justify-between sm:px-6 sm:py-4 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+            <div className="min-w-0 flex-1">
               {title && (
                 <h2
                   id="modal-title"
-                  className="text-lg font-semibold text-slate-900 dark:text-white"
+                  className="sm:text-lg text-base font-semibold text-slate-900 dark:text-white truncate"
                 >
                   {title}
                 </h2>
@@ -97,7 +97,7 @@ export function Modal({
               {description && (
                 <p
                   id="modal-description"
-                  className="text-sm text-slate-500 dark:text-slate-400 mt-1"
+                  className="sm:text-sm text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2"
                 >
                   {description}
                 </p>
@@ -106,7 +106,7 @@ export function Modal({
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="p-1 -mr-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="sm:p-1 sm:-mr-1 p-0.5 -mr-0.5 ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5" />
@@ -116,13 +116,13 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-auto">
+        <div className="sm:px-6 sm:py-4 px-4 py-3 overflow-auto flex-1 min-h-0">
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-xl">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 sm:px-6 sm:py-4 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-xl flex-shrink-0 flex-wrap">
             {footer}
           </div>
         )}

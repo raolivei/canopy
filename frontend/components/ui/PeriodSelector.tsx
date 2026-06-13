@@ -21,7 +21,7 @@ export function PeriodSelector({
   return (
     <div
       className={cn(
-        "flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit",
+        "flex gap-1 sm:gap-1.5 sm:p-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit overflow-x-auto",
         className
       )}
       role="group"
@@ -32,7 +32,7 @@ export function PeriodSelector({
           key={period.value}
           onClick={() => onPeriodChange(period.value)}
           className={cn(
-            "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+            "sm:px-3 sm:py-1.5 px-2.5 py-1 sm:text-sm text-xs font-medium rounded-md transition-colors whitespace-nowrap",
             selectedPeriod === period.value
               ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"

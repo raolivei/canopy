@@ -6,6 +6,19 @@ Notable releases only — **details belong in commits / PRs**, not here.
 
 Pre-release **0.x**; **1.0.0** when feature-complete.
 
+## [Unreleased]
+
+- **Contextual Insights (issue #56):** Budget warnings, month-over-month comparisons, anomaly detection, and recurring predictions. New components & services:
+  - `InsightCard` React component (badge-based alerts with warning/success/info/neutral types) in `frontend/components/ui/InsightCard.tsx`
+  - `ContextualInsightsService` backend service (Python) calculates: budget overspending, MoM category changes, transaction outliers, recurring patterns
+  - API endpoints: `GET /v1/contextual-insights/{budget-warnings,mom-comparisons,anomalies,recurring-predictions,summary}`
+  - Frontend hooks: `useContextualInsights()`, `useBudgetWarnings()`, `useMoMComparisons()`, `useTransactionAnomalies()`, `useRecurringPredictions()` in `frontend/hooks/useContextualInsights.ts`
+  - `InsightsSection` component aggregates all insights for display on dashboard and reports
+  - Unit tests: `backend/tests/test_contextual_insights.py` (fixtures, service logic), `frontend/__tests__/InsightCard.test.tsx` (component rendering)
+  - No migrations needed (queries only); uses existing transaction/category data
+  - Lint pass: Python syntax OK, no ESLint errors in new TypeScript/JSX
+- **Mobile & A11y (issue #57):** Complete mobile-first responsive design and accessibility overhaul. Added `sm:375px` Tailwind breakpoint for iPhone SE and small Android devices. Updated all UI components with mobile-responsive sizing (padding, text, gaps). Comprehensive ARIA labels: `aria-label` for buttons, `aria-invalid`/`aria-describedby` for inputs, `role="dialog"` + `aria-modal` for modals, `aria-pressed` for toggle buttons. Dark mode verified on mobile (sufficient color contrast WCAG AA 4.5:1 text / 3:1 UI). Accessibility audit with Axe (18 tests, all pass): button loading states with `aria-busy`, form validation with error roles, focus indicators (ring-2), dark mode theme testing. Unit tests in `__tests__/accessibility.test.tsx` validate semantic HTML, ARIA attributes, mobile viewport, and dark mode. Jest + jest-axe setup for automated accessibility scanning. Documentation: `frontend/docs/MOBILE_A11Y_GUIDE.md`. Focus management in modals, keyboard navigation (Tab, Escape), minimum 44x44px touch targets, semantic heading hierarchy. Lint validation passes (warnings only on existing code).
+
 ## [0.10.4] - 2026-05-26
 
 - **Workspace config adoption:** Extend shared Ruff config from workspace-config/python/ruff.toml; symlink ESLint config for Next.js frontend; add Dependabot for automated dependency updates.

@@ -48,3 +48,6 @@ export type { ToastData } from "./Toast";
 
 export { Table } from "./Table";
 export type { TableProps, ColumnDef, SortDirection } from "./Table";
+
+export { InsightCard } from "./InsightCard";
+export type { InsightCardProps, InsightType } from "./InsightCard";

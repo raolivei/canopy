@@ -7,8 +7,10 @@ export interface ButtonProps
   variant?: "primary" | "secondary" | "ghost" | "danger" | "success";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
+  loadingText?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  ariaLabel?: string;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -18,9 +20,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       variant = "primary",
       size = "md",
       loading = false,
+      loadingText,
       leftIcon,
       rightIcon,
       disabled,
+      ariaLabel,
       children,
       ...props
     },
@@ -43,9 +47,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     const sizes = {
-      sm: "px-3 py-1.5 text-sm",
-      md: "px-4 py-2 text-sm",
-      lg: "px-6 py-3 text-base",
+      sm: "sm:px-2.5 sm:py-1 px-3 py-1.5 text-xs sm:text-sm",
+      md: "sm:px-3.5 sm:py-1.5 px-4 py-2 text-sm sm:text-base",
+      lg: "sm:px-5 sm:py-2.5 px-6 py-3 text-base sm:text-lg",
     };
 
     return (
@@ -53,15 +57,17 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
         disabled={disabled || loading}
+        aria-label={ariaLabel}
+        aria-busy={loading}
         {...props}
       >
         {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" aria-hidden="true" />
         ) : (
-          leftIcon && <span className="shrink-0">{leftIcon}</span>
+          leftIcon && <span className="shrink-0" aria-hidden="true">{leftIcon}</span>
         )}
-        {children}
-        {!loading && rightIcon && <span className="shrink-0">{rightIcon}</span>}
+        {loading && loadingText ? loadingText : children}
+        {!loading && rightIcon && <span className="shrink-0" aria-hidden="true">{rightIcon}</span>}
       </button>
     );
   }
