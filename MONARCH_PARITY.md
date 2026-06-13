@@ -44,6 +44,56 @@ docker-compose up
 # API: http://localhost:8001
 ```
 
+### Live Development with Hot Reload (Watch in Browser)
+
+For real-time feedback as agents make changes:
+
+**Option 1: Local Hot Reload (Fastest)**
+```bash
+# Terminal 1: Backend with auto-reload
+cd backend
+source .venv/bin/activate  # or use direnv
+uvicorn backend.app.server:app --reload --host 0.0.0.0 --port 8001
+
+# Terminal 2: Frontend with Next.js hot reload
+cd frontend
+npm run dev  # Starts on port 3001 with hot module replacement
+
+# Open browser: http://localhost:3001
+# Any file change auto-reloads in ~100ms
+```
+
+**Option 2: Remote Hot Reload (Deploy-on-Save)**
+```bash
+# Setup file watcher that builds & deploys on save
+cd canopy
+./scripts/watch-and-deploy.sh monarch-dev
+
+# This script:
+# 1. Watches backend/ and frontend/ for changes
+# 2. Rebuilds Docker images on file save
+# 3. Pushes to ghcr.io/raolivei/*:monarch-dev
+# 4. Triggers rollout restart in canopy-monarch namespace
+# 5. Opens https://monarch.eldertree.local in browser
+
+# Changes visible in ~30-60 seconds
+```
+
+**Option 3: Port-Forward Live Cluster (Debug Production)**
+```bash
+# Forward remote monarch-dev to localhost
+kubectl port-forward -n canopy-monarch svc/canopy-monarch-frontend 3002:3000
+kubectl port-forward -n canopy-monarch svc/canopy-monarch-api 8002:8000
+
+# Open browser: http://localhost:3002
+# You're now viewing live monarch.eldertree.local but on localhost
+```
+
+**Recommended for Agent Work:**
+- Use **Option 1** (local hot reload) for rapid iteration
+- Agents edit files → Next.js/uvicorn auto-reloads → see changes instantly
+- Deploy to monarch.eldertree.local only for integration testing
+
 ### Deploy to Monarch Dev Environment
 
 ```bash
