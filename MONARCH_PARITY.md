@@ -156,6 +156,83 @@ Features merge back to `main` when:
 4. **Production Ready**: No breaking changes or documented upgrade path
 5. **Documentation Updated**: CHANGELOG.md, API docs, UI docs updated
 
+## Automated Database Migrations
+
+### How It Works
+
+Database migrations now run automatically on pod startup. Both the K8s and Docker Compose environments support this.
+
+#### Kubernetes (Production/Development)
+
+The deployment uses an **init container** that:
+
+1. Waits for PostgreSQL to be ready (via `pg_isready` with 30-second retry)
+2. Runs `alembic upgrade head` to apply all pending migrations
+3. Only then does the main API container start
+
+**Key files:**
+- `backend/scripts/wait-for-db.sh` - PostgreSQL readiness check with retry logic
+- `k8s/monarch-parity/deploy.yaml` - Init container definition
+
+**Behavior:**
+- If migrations fail, the init container exits with error → pod enters `CrashLoopBackOff`
+- This prevents the API from starting with an incompatible schema
+- Fix the migration issue, then manually restart the pod
+
+#### Docker Compose (Local Development)
+
+The API service runs migrations automatically on startup via entrypoint command:
+
+```bash
+# Sequence on docker-compose up:
+# 1. Waits for postgres to be ready
+# 2. Runs alembic upgrade head
+# 3. Starts uvicorn with hot reload
+```
+
+No manual migration steps needed during local development.
+
+### Troubleshooting Migrations
+
+**Check migration status:**
+```bash
+# Local Docker Compose
+docker-compose exec api alembic current
+
+# Kubernetes
+kubectl exec -n canopy-monarch deployment/canopy-monarch-api -- alembic current
+```
+
+**View migration history:**
+```bash
+# Local
+docker-compose exec api alembic history
+
+# Kubernetes
+kubectl exec -n canopy-monarch deployment/canopy-monarch-api -- alembic history
+```
+
+**Manual migration (if needed):**
+```bash
+# Downgrade to a specific revision
+docker-compose exec api alembic downgrade <revision-id>
+
+# Upgrade to specific revision
+docker-compose exec api alembic upgrade <revision-id>@head
+```
+
+**Pod stuck in CrashLoopBackOff?**
+```bash
+# Check init container logs
+kubectl logs -n canopy-monarch deployment/canopy-monarch-api --all-containers=true
+
+# Check alembic errors
+kubectl logs -n canopy-monarch deployment/canopy-monarch-api -c migrate
+
+# Once fixed, trigger rollout
+kubectl rollout restart deployment/canopy-monarch-api -n canopy-monarch
+```
+
 ## Deployment Considerations
 
 ### Resource Footprint

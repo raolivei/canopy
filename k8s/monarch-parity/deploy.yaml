@@ -25,6 +25,36 @@ spec:
         app: canopy-monarch
         component: api
     spec:
+      initContainers:
+        - name: migrate
+          image: ghcr.io/raolivei/canopy-api:monarch-dev
+          command: ["sh", "-c"]
+          args:
+            - |
+              # Wait for PostgreSQL to be ready
+              /app/scripts/wait-for-db.sh \
+                canopy-monarch-postgres \
+                5432 \
+                canopy_monarch \
+                "$POSTGRES_PASSWORD" \
+                canopy_monarch
+
+              # Run alembic migrations from the correct working directory
+              cd /app/backend
+              echo "Running database migrations..."
+              alembic upgrade head
+              echo "Database migrations complete"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: database-url
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: postgres-password
       containers:
         - name: api
           image: ghcr.io/raolivei/canopy-api:monarch-dev

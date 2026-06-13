@@ -6,6 +6,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -16,6 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code (copy backend directory structure)
 COPY . /app/backend/
+
+# Make scripts directory accessible from /app/scripts for both K8s and docker-compose
+RUN mkdir -p /app/scripts && cp /app/backend/scripts/wait-for-db.sh /app/scripts/wait-for-db.sh && chmod +x /app/scripts/wait-for-db.sh
 
 # Set PYTHONPATH to include parent directory so backend imports work
 ENV PYTHONPATH=/app
