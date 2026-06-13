@@ -3,7 +3,7 @@ import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ConfirmModal } from "@/components/ui/Modal";
 import {
   Edit2,
   Trash2,
@@ -55,6 +55,7 @@ const RecurringList: React.FC<RecurringListProps> = ({
   const [selectedPattern, setSelectedPattern] = useState<RecurringPattern | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   const getConfidenceBadgeVariant = (confidence: number) => {
     if (confidence >= 90) return "success";
@@ -202,13 +203,8 @@ const RecurringList: React.FC<RecurringListProps> = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              if (
-                                pattern.id &&
-                                window.confirm(
-                                  "Delete this recurring pattern?"
-                                )
-                              ) {
-                                onDelete?.(pattern.id);
+                              if (pattern.id) {
+                                setDeleteConfirmId(pattern.id);
                               }
                             }}
                             className="text-danger-600 hover:text-danger-700"
@@ -314,6 +310,23 @@ const RecurringList: React.FC<RecurringListProps> = ({
           <RecurringCard pattern={selectedPattern} />
         </Modal>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => {
+          if (deleteConfirmId) {
+            onDelete?.(deleteConfirmId);
+            setDeleteConfirmId(null);
+          }
+        }}
+        title="Delete Recurring Pattern"
+        description="Are you sure you want to delete this recurring pattern? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };
