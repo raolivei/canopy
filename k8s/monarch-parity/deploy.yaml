@@ -1,0 +1,224 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: canopy-monarch
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canopy-monarch-api
+  namespace: canopy-monarch
+  labels:
+    app: canopy-monarch
+    component: api
+spec:
+  replicas: 1  # Single replica for dev
+  selector:
+    matchLabels:
+      app: canopy-monarch
+      component: api
+  template:
+    metadata:
+      labels:
+        app: canopy-monarch
+        component: api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/raolivei/canopy-api:monarch-dev
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: database-url
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: secret-key
+            - name: REDIS_URL
+              value: "redis://canopy-monarch-redis:6379/0"
+            - name: ENVIRONMENT
+              value: "monarch-dev"
+            - name: QUESTRADE_REFRESH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: questrade-refresh-token
+                  optional: true
+            - name: WISE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: wise-api-token
+                  optional: true
+            - name: MONARCH_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: monarch-api-token
+                  optional: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canopy-monarch-frontend
+  namespace: canopy-monarch
+  labels:
+    app: canopy-monarch
+    component: frontend
+spec:
+  replicas: 1  # Single replica for dev
+  selector:
+    matchLabels:
+      app: canopy-monarch
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: canopy-monarch
+        component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/raolivei/canopy-frontend:monarch-dev
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://monarch.eldertree.local/api"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canopy-monarch-redis
+  namespace: canopy-monarch
+  labels:
+    app: canopy-monarch
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canopy-monarch
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: canopy-monarch
+        component: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: canopy-monarch-postgres
+  namespace: canopy-monarch
+  labels:
+    app: canopy-monarch
+    component: postgres
+spec:
+  serviceName: canopy-monarch-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canopy-monarch
+      component: postgres
+  template:
+    metadata:
+      labels:
+        app: canopy-monarch
+        component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: canopy_monarch
+            - name: POSTGRES_USER
+              value: canopy_monarch
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canopy-monarch-secrets
+                  key: postgres-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi

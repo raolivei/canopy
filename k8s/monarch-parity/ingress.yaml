@@ -1,0 +1,36 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canopy-monarch
+  namespace: canopy-monarch
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+  labels:
+    app: canopy-monarch
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - monarch.eldertree.local
+    secretName: canopy-monarch-tls
+  rules:
+  - host: monarch.eldertree.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: canopy-monarch-api
+            port:
+              number: 8000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: canopy-monarch-frontend
+            port:
+              number: 3000
