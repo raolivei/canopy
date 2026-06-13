@@ -3,7 +3,6 @@ import Head from "next/head";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import CommandPalette from "../CommandPalette";
-import { FloatingAssistant } from "../FloatingAssistant";
 import { cn } from "@/utils/cn";
 
 interface PageLayoutProps {
@@ -107,9 +106,6 @@ export default function PageLayout({
           isOpen={isCommandPaletteOpen}
           onClose={() => setIsCommandPaletteOpen(false)}
         />
-
-        {/* Floating AI Assistant */}
-        <FloatingAssistant />
       </div>
     </>
   );
