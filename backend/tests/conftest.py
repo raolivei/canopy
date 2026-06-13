@@ -30,7 +30,7 @@ def _compile_numeric_sqlite(element, _compiler, **_kw):  # pragma: no cover
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from backend.db.models import Base
+from backend.db.base import Base
 
 
 @pytest.fixture(scope="function")

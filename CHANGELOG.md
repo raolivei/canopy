@@ -8,6 +8,37 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [Unreleased]
 
+- **Assistant tools Batch 1 (P2 #75):** Three core financial analysis tools for AI assistant:
+  - `budget_status` - Current vs target budget, month progress %, and overspend alerts by category
+  - `cashflow_summary` - Monthly income, expenses, savings with month-over-month trends
+  - `recurring_analysis` - Detects subscriptions/recurring payments with frequency (daily/weekly/monthly/annual) and next payment dates
+  - All tools return structured JSON with configurable month/analysis window parameters
+  - Unit tests: 9 tests covering budget alerts, cashflow trends, recurring pattern detection, edge cases
+  - Backend implementation: `backend/services/assistant_service.py` (~150 lines per tool)
+  - Pydantic models already defined in `backend/models/assistant.py`
+  - Function definitions already in `AssistantService.FUNCTION_DEFINITIONS`
+  - Test file: `backend/tests/test_assistant_tools_batch1.py` (mock-based, no DB setup needed)
+
+- **Assistant tools Batch 2 (P2 #76):** Three new financial analysis tools for AI assistant:
+  - `spending_patterns` - Analyzes spending trends by category (month-over-month changes, anomaly detection)
+  - `merchant_insights` - Returns top merchants, transaction frequency, spending distribution
+  - `goal_progress` - Calculates net worth targets, savings goals, FIRE timeline with compound growth
+  - All tools return structured JSON with historical analysis (configurable month window)
+  - Unit tests: 14 tests covering nominal, edge cases, empty database scenarios
+  - Backend implementation: `backend/services/assistant_service.py` (~150 lines per tool)
+  - Pydantic models already defined in `backend/models/assistant.py`
+  - Function definitions already in `AssistantService.FUNCTION_DEFINITIONS`
+
+- **[EPIC] Monarch Money Parity Roadmap (issue #47):** Comprehensive 23-issue work plan to achieve feature parity with Monarch Money by 2027, enabling subscription cancellation. Strategic arc spans three phases (Learn/Parallel/Cutover) across P0-P3 priorities:
+  - **P0 (2 issues #48-49):** Stable deployment foundation (database migrations, Vault secrets integration)
+  - **P1 (14 issues #61-74):** Core PFM features (budgets, cashflow, recurring detection, transaction rules, Monarch API sync) and category taxonomy
+  - **P2 (3 issues #75-77):** Assistant expansion (6+ tools, golden questions regression suite, Ollama deployment on Eldertree)
+  - **P3 (3 issues #78-80):** Observability (metrics + Grafana dashboard per workspace standards) and documentation (MCP playbook, cutover runbook)
+  - Six success criteria for subscription cancellation: accounts visibility, imports routine, budgets/cashflow UI usage, assistant parity, history import, runbook completeness
+  - Parallel deployment strategy at `monarch.eldertree.local` prevents production impact during aggressive feature work
+  - Monarch MCP + Claude used as temporary reference oracle (2026) for data model validation, tool inventory, parser benchmarking — not a production dependency
+  - Related: [ollie/memory/project_canopy_monarch_parity.md](https://github.com/raolivei/ollie/blob/main/memory/project_canopy_monarch_parity.md), [ollie/docs/agent-playbooks/monarch-mcp-claude.md](https://github.com/raolivei/ollie/blob/main/docs/agent-playbooks/monarch-mcp-claude.md), [UX Parity EPIC #50](https://github.com/raolivei/canopy/issues/50)
+
 - **Contextual Insights (issue #56):** Budget warnings, month-over-month comparisons, anomaly detection, and recurring predictions. New components & services:
   - `InsightCard` React component (badge-based alerts with warning/success/info/neutral types) in `frontend/components/ui/InsightCard.tsx`
   - `ContextualInsightsService` backend service (Python) calculates: budget overspending, MoM category changes, transaction outliers, recurring patterns
