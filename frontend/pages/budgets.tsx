@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import BudgetForm from "@/components/BudgetForm";
 import BudgetList, { Budget } from "@/components/BudgetList";
+import { BudgetStatsSkeleton } from "@/components/ui/Skeleton";
 import {
   BarChart3,
   Plus,
@@ -163,7 +164,9 @@ export default function BudgetsPage() {
       />
 
       {/* Stats Cards */}
-      {stats && (
+      {!stats ? (
+        <BudgetStatsSkeleton />
+      ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-8">
           <Card>
             <CardContent className="pt-6">

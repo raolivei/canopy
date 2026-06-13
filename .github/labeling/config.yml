@@ -1,7 +1,7 @@
 # Auto-labeling configuration for Canopy
 # Used by raolivei/github-workflows/.github/workflows/auto-label.yml
 
-# Project-specific patterns
+# Project-specific patterns (Canopy-only)
 project_patterns:
   monarch-parity:
     - monarch

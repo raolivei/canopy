@@ -174,3 +174,132 @@ export function SkeletonList({
     </div>
   );
 }
+
+// Page-specific skeleton variants for Monarch Parity UX
+
+export function BudgetStatsSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-4 mb-8", className)}>
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-8 w-32" />
+            </div>
+            <Skeleton variant="circular" width={48} height={48} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function BudgetRowSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex gap-4 pb-3 border-b border-slate-200 dark:border-slate-800">
+        <Skeleton className="h-4 flex-1" />
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-16" />
+      </div>
+      {/* Rows */}
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex gap-4 py-3 px-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function CashflowSummarySkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4", className)}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4"
+        >
+          <Skeleton className="h-4 w-24 mb-3" />
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function CashflowChartGridSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6", className)}>
+      {[1, 2].map((i) => (
+        <div
+          key={i}
+          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-6"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-8 w-24 rounded-md" />
+          </div>
+          <Skeleton variant="rectangular" className="h-64 w-full rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function RecurringStatsSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-4 mb-6", className)}>
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4"
+        >
+          <div className="flex items-start justify-between mb-2">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton variant="circular" width={32} height={32} />
+          </div>
+          <Skeleton className="h-8 w-12" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function RecurringCardSkeleton({ items = 3 }: { items?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: items }).map((_, i) => (
+        <div
+          key={i}
+          className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4"
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              <Skeleton className="h-4 w-32 mb-1" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+            <Skeleton className="h-6 w-16 rounded" />
+          </div>
+          <Skeleton className="h-3 w-40 mb-3" />
+          <div className="flex gap-2">
+            <Skeleton className="h-8 flex-1" />
+            <Skeleton className="h-8 flex-1" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

@@ -356,15 +356,26 @@ class RecurringService:
         Returns:
             Pattern with database ID populated
         """
-        # Note: This requires a database model to be created
-        # For now, this is a placeholder that demonstrates the API
-        # In production, you would:
-        # 1. Create a RecurringPatternModel ORM class
-        # 2. Serialize RecurringPattern to database row
-        # 3. Return pattern with ID populated
-        raise NotImplementedError(
-            "save_recurring_pattern requires RecurringPatternModel database implementation"
+        from backend.db.models.recurring_pattern import RecurringPattern as RecurringPatternModel
+
+        db_pattern = RecurringPatternModel(
+            merchant=pattern.merchant,
+            category=pattern.category,
+            average_amount=pattern.average_amount,
+            amount_variance=pattern.amount_variance,
+            frequency=pattern.frequency.value,
+            next_expected=pattern.next_expected,
+            confidence=pattern.confidence,
+            occurrences=[d.isoformat() for d in pattern.occurrences],
+            should_skip_dates=[d.isoformat() for d in pattern.should_skip_dates],
+            is_active=True,
         )
+        self.db.add(db_pattern)
+        self.db.commit()
+        self.db.refresh(db_pattern)
+
+        pattern.id = db_pattern.id
+        return pattern
 
     def get_recurring_patterns(self) -> list[RecurringPattern]:
         """Get all stored recurring patterns.
@@ -372,10 +383,27 @@ class RecurringService:
         Returns:
             List of user-approved RecurringPattern objects
         """
-        # Note: This requires a database model to be created
-        raise NotImplementedError(
-            "get_recurring_patterns requires RecurringPatternModel database implementation"
-        )
+        from backend.db.models.recurring_pattern import RecurringPattern as RecurringPatternModel
+
+        patterns = self.db.query(RecurringPatternModel).filter(
+            RecurringPatternModel.is_active is True
+        ).all()
+
+        return [
+            RecurringPattern(
+                id=p.id,
+                merchant=p.merchant,
+                category=p.category,
+                average_amount=Decimal(str(p.average_amount)),
+                amount_variance=Decimal(str(p.amount_variance)),
+                frequency=Frequency(p.frequency),
+                next_expected=p.next_expected,
+                confidence=p.confidence,
+                occurrences=[datetime.fromisoformat(d) for d in (p.occurrences or [])],
+                should_skip_dates=[datetime.fromisoformat(d) for d in (p.should_skip_dates or [])],
+            )
+            for p in patterns
+        ]
 
     def delete_recurring_pattern(self, pattern_id: int) -> bool:
         """Delete a stored recurring pattern.
@@ -386,10 +414,18 @@ class RecurringService:
         Returns:
             True if successful
         """
-        # Note: This requires a database model to be created
-        raise NotImplementedError(
-            "delete_recurring_pattern requires RecurringPatternModel database implementation"
-        )
+        from backend.db.models.recurring_pattern import RecurringPattern as RecurringPatternModel
+
+        pattern = self.db.query(RecurringPatternModel).filter(
+            RecurringPatternModel.id == pattern_id
+        ).first()
+
+        if not pattern:
+            return False
+
+        self.db.delete(pattern)
+        self.db.commit()
+        return True
 
     def predict_next_occurrence(self, pattern_id: int) -> Optional[datetime]:
         """Predict next occurrence of a stored pattern.
@@ -400,7 +436,10 @@ class RecurringService:
         Returns:
             Predicted datetime of next occurrence
         """
-        # Note: This requires a database model to be created
-        raise NotImplementedError(
-            "predict_next_occurrence requires RecurringPatternModel database implementation"
-        )
+        from backend.db.models.recurring_pattern import RecurringPattern as RecurringPatternModel
+
+        pattern = self.db.query(RecurringPatternModel).filter(
+            RecurringPatternModel.id == pattern_id
+        ).first()
+
+        return pattern.next_expected if pattern else None

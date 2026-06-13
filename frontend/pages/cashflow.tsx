@@ -7,7 +7,11 @@ import CashflowSummary from "@/components/CashflowSummary";
 import IncomeExpenseTrend from "@/components/IncomeExpenseTrend";
 import SavingsRateTrend from "@/components/SavingsRateTrend";
 import CategoryBreakdown from "@/components/CategoryBreakdown";
-import { SkeletonChart } from "@/components/ui/Skeleton";
+import {
+  SkeletonChart,
+  CashflowSummarySkeleton,
+  CashflowChartGridSkeleton,
+} from "@/components/ui/Skeleton";
 import { Calendar, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { subMonths, endOfToday } from "date-fns";
@@ -117,20 +121,22 @@ export default function CashflowPage() {
         )}
 
         {/* Summary Cards */}
-        {summaryData && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mb-6"
-          >
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-6"
+        >
+          {!summaryData ? (
+            <CashflowSummarySkeleton />
+          ) : (
             <CashflowSummary
               data={summaryData}
-              isLoading={summaryLoading}
+              isLoading={false}
               currency={displayCurrency}
             />
-          </motion.div>
-        )}
+          )}
+        </motion.div>
 
         {/* Period Controls */}
         <motion.div
@@ -158,40 +164,31 @@ export default function CashflowPage() {
         </motion.div>
 
         {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Income vs Expenses */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            {trendLoading ? (
-              <SkeletonChart />
-            ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-6"
+        >
+          {!trendData ? (
+            <CashflowChartGridSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Income vs Expenses */}
               <IncomeExpenseTrend
                 data={monthlyData}
-                isLoading={trendLoading}
+                isLoading={false}
                 currency={displayCurrency}
               />
-            )}
-          </motion.div>
 
-          {/* Savings Rate */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            {trendLoading ? (
-              <SkeletonChart />
-            ) : (
+              {/* Savings Rate */}
               <SavingsRateTrend
                 data={monthlyData}
-                isLoading={trendLoading}
+                isLoading={false}
               />
-            )}
-          </motion.div>
-        </div>
+            </div>
+          )}
+        </motion.div>
 
         {/* Category Breakdown */}
         <motion.div
@@ -199,12 +196,12 @@ export default function CashflowPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          {trendLoading ? (
+          {!trendData ? (
             <SkeletonChart />
           ) : (
             <CategoryBreakdown
               data={latestCategories}
-              isLoading={trendLoading}
+              isLoading={false}
               currency={displayCurrency}
               title="Current Month - Top Expense Categories"
             />

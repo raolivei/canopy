@@ -172,6 +172,14 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         keywords: ["expenses", "income", "payments"],
       },
       {
+        id: "recurring",
+        title: "Go to Recurring Patterns",
+        icon: <TrendingUp className="w-4 h-4" />,
+        category: "Navigation",
+        action: () => router.push("/recurring"),
+        keywords: ["subscriptions", "recurring", "patterns", "expenses"],
+      },
+      {
         id: "import-bank-csv",
         title: "Bank CSV import",
         description: "Legacy bank transaction import",
