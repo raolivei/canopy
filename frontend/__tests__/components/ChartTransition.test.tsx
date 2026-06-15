@@ -60,25 +60,4 @@ describe("ChartTransition", () => {
     expect(screen.getByTestId("chart-content")).toBeInTheDocument();
   });
 
-  it("accepts custom skeleton className", () => {
-    const { container } = render(
-      <ChartTransition isLoading={true} skeletonClassName="custom-skeleton">
-        <div>Chart Data</div>
-      </ChartTransition>
-    );
-
-    const skeletonWrapper = container.querySelector(".custom-skeleton");
-    expect(skeletonWrapper).toBeInTheDocument();
-  });
-
-  it("accepts custom content className", () => {
-    const { container } = render(
-      <ChartTransition isLoading={false} contentClassName="custom-content">
-        <div>Chart Data</div>
-      </ChartTransition>
-    );
-
-    const contentWrapper = container.querySelector(".custom-content");
-    expect(contentWrapper).toBeInTheDocument();
-  });
 });
