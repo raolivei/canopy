@@ -16,6 +16,12 @@ from sqlalchemy.orm import Session
 from backend.db.models.transaction import Transaction as TransactionModel
 from backend.db.models.asset import Asset as AssetModel
 from backend.services.portfolio_calculator import PortfolioCalculator
+from backend.services.query_builder import (
+    TransactionQuery,
+    calculate_trend,
+    sum_amounts,
+    detect_anomaly,
+)
 
 
 class LLMProvider(ABC):
@@ -400,26 +406,23 @@ Available data:
     
     def spending_patterns(self, months: int = 3) -> dict[str, Any]:
         """Analyze spending patterns by category with trends and anomalies."""
-        # Get last N months of transactions
-        today = datetime.now().date()
-        start_date = today - timedelta(days=30 * months)
-
-        query = select(TransactionModel).where(
-            TransactionModel.date >= start_date,
-            TransactionModel.type == "expense"
-        )
-        transactions = self.db.execute(query).scalars().all()
-
         # Group by category and month
+        query = TransactionQuery(self.db).last_months(months).expenses()
+        by_category = query.group_by_category()
+        by_month = TransactionQuery(self.db).last_months(months).expenses().group_by_month()
+
+        # Build monthly category totals
         monthly_category_totals: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-        for tx in transactions:
-            month_key = tx.date.strftime("%Y-%m")
-            category = tx.category or "Uncategorized"
-            monthly_category_totals[month_key][category] += float(abs(tx.amount))
+        for month_key, txns in by_month.items():
+            for tx in txns:
+                category = tx.category or "Uncategorized"
+                monthly_category_totals[month_key][category] += float(abs(tx.amount))
 
         # Calculate trends
         category_trends = {}
-        for category in set().union(*[set(m.keys()) for m in monthly_category_totals.values()]):
+        all_categories = set().union(*[set(m.keys()) for m in monthly_category_totals.values()])
+
+        for category in all_categories:
             months_data = sorted([
                 (month, monthly_category_totals[month].get(category, 0))
                 for month in sorted(monthly_category_totals.keys())
@@ -428,46 +431,25 @@ Available data:
             if len(months_data) >= 2:
                 prev = months_data[-2][1]
                 curr = months_data[-1][1]
-
-                if prev == 0:
-                    percent_change = None
-                    trend = "new" if curr > 0 else "stable"
-                else:
-                    percent_change = ((curr - prev) / prev) * 100
-                    trend = "up" if percent_change > 5 else "down" if percent_change < -5 else "stable"
+                trend_data = calculate_trend(curr, prev)
 
                 category_trends[category] = {
                     "category": category,
                     "current_month": curr,
                     "previous_month": prev,
-                    "trend": trend,
-                    "percent_change": percent_change
+                    **trend_data
                 }
 
         # Detect anomalies
         anomalies = []
         for category, data in category_trends.items():
-            if data["previous_month"] > 0:
-                avg = data["previous_month"]
-                curr = data["current_month"]
-                percent_above = ((curr - avg) / avg) * 100
-
-                if percent_above > 50:
-                    anomalies.append({
-                        "category": category,
-                        "amount": curr,
-                        "vs_average": avg,
-                        "percent_above_average": percent_above,
-                        "flag": "unusual_high"
-                    })
-                elif percent_above < -50:
-                    anomalies.append({
-                        "category": category,
-                        "amount": curr,
-                        "vs_average": avg,
-                        "percent_above_average": abs(percent_above),
-                        "flag": "unusual_low"
-                    })
+            anomaly = detect_anomaly(data["current_month"], data["previous_month"])
+            if anomaly:
+                anomalies.append({
+                    "category": category,
+                    "amount": data["current_month"],
+                    **anomaly
+                })
 
         # Sort and limit results
         sorted_trends = sorted(
@@ -476,7 +458,8 @@ Available data:
             reverse=True
         )[:10]
 
-        total_spending = sum(float(abs(tx.amount)) for tx in transactions)
+        all_txns = query.execute()
+        total_spending = sum_amounts(all_txns)
         avg_monthly = total_spending / max(months, 1)
 
         return {
@@ -489,62 +472,38 @@ Available data:
 
     def merchant_insights(self, months: int = 3, top_n: int = 10) -> dict[str, Any]:
         """Get top merchants, spending frequency, and merchant-level patterns."""
-        # Get last N months of transactions
-        today = datetime.now().date()
-        start_date = today - timedelta(days=30 * months)
+        query = TransactionQuery(self.db).last_months(months).expenses().with_merchant()
+        by_merchant = query.group_by_merchant()
 
-        query = select(TransactionModel).where(
-            TransactionModel.date >= start_date,
-            TransactionModel.type == "expense",
-            TransactionModel.merchant.isnot(None)
-        )
-        transactions = self.db.execute(query).scalars().all()
-
-        # Group by merchant
-        merchant_totals: dict[str, dict[str, Any]] = defaultdict(lambda: {
-            "merchant": None,
-            "category": None,
-            "total_spent": 0,
-            "transaction_count": 0,
-            "amounts": []
-        })
-
-        for tx in transactions:
-            merchant = tx.merchant
-            merchant_totals[merchant]["merchant"] = merchant
-            merchant_totals[merchant]["category"] = tx.category or "Uncategorized"
-            merchant_totals[merchant]["total_spent"] += float(abs(tx.amount))
-            merchant_totals[merchant]["transaction_count"] += 1
-            merchant_totals[merchant]["amounts"].append(float(abs(tx.amount)))
-
-        # Calculate frequency
+        # Calculate frequency and metrics
         merchants_list = []
-        for data in merchant_totals.values():
-            freq_per_month = data["transaction_count"] / max(months, 1)
+        for merchant, txns in by_merchant.items():
+            total_spent = sum_amounts(txns)
+            transaction_count = len(txns)
+            freq_per_month = transaction_count / max(months, 1)
+
             if freq_per_month >= 1:
                 frequency = "daily" if freq_per_month > 30 else "weekly" if freq_per_month > 4 else "monthly"
             else:
                 frequency = "occasional"
 
             merchants_list.append({
-                "merchant": data["merchant"],
-                "category": data["category"],
-                "total_spent": data["total_spent"],
-                "transaction_count": data["transaction_count"],
-                "average_transaction": data["total_spent"] / max(data["transaction_count"], 1),
+                "merchant": merchant,
+                "category": txns[0].category or "Uncategorized",
+                "total_spent": total_spent,
+                "transaction_count": transaction_count,
+                "average_transaction": total_spent / max(transaction_count, 1),
                 "frequency": frequency
             })
 
         # Sort and limit
         sorted_merchants = sorted(merchants_list, key=lambda x: x["total_spent"], reverse=True)[:top_n]
-
         total_spending = sum(m["total_spent"] for m in merchants_list)
-        unique_merchants = len(merchants_list)
 
         return {
             "analysis_months": months,
             "top_merchants": sorted_merchants,
-            "total_unique_merchants": unique_merchants,
+            "total_unique_merchants": len(merchants_list),
             "total_merchant_spending": total_spending
         }
 
