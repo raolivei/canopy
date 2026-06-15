@@ -8,58 +8,17 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ## [Unreleased]
 
-- **Assistant tools Batch 1 (P2 #75):** Three core financial analysis tools for AI assistant:
-  - `budget_status` - Current vs target budget, month progress %, and overspend alerts by category
-  - `cashflow_summary` - Monthly income, expenses, savings with month-over-month trends
-  - `recurring_analysis` - Detects subscriptions/recurring payments with frequency (daily/weekly/monthly/annual) and next payment dates
-  - All tools return structured JSON with configurable month/analysis window parameters
-  - Unit tests: 9 tests covering budget alerts, cashflow trends, recurring pattern detection, edge cases
-  - Backend implementation: `backend/services/assistant_service.py` (~150 lines per tool)
-  - Pydantic models already defined in `backend/models/assistant.py`
-  - Function definitions already in `AssistantService.FUNCTION_DEFINITIONS`
-  - Test file: `backend/tests/test_assistant_tools_batch1.py` (mock-based, no DB setup needed)
+### Added
+- 6 AI assistant tools (budget, cashflow, recurring, patterns, merchant, goals) - #75, #76
+- Golden questions regression suite for Monarch parity testing - #76
+- Contextual insights: budget warnings, MoM comparisons, anomalies, recurring predictions - #56
+- Mobile/A11y: 375px breakpoint, ARIA labels, 18 accessibility tests - #57
+- Chart skeleton→data animations (4 charts) with ChartTransition component
+- Dark mode toggle button (front page header)
+- Monarch Money Parity EPIC roadmap (23 issues, P0-P3) - #47
 
-- **Assistant tools Batch 2 (P2 #76):** Three new financial analysis tools for AI assistant:
-  - `spending_patterns` - Analyzes spending trends by category (month-over-month changes, anomaly detection)
-  - `merchant_insights` - Returns top merchants, transaction frequency, spending distribution
-  - `goal_progress` - Calculates net worth targets, savings goals, FIRE timeline with compound growth
-  - All tools return structured JSON with historical analysis (configurable month window)
-  - Unit tests: 14 tests covering nominal, edge cases, empty database scenarios
-  - Backend implementation: `backend/services/assistant_service.py` (~150 lines per tool)
-  - Pydantic models already defined in `backend/models/assistant.py`
-  - Function definitions already in `AssistantService.FUNCTION_DEFINITIONS`
-
-- **Golden Questions Regression Suite (issue #76):** Parity testing framework comparing Canopy vs Monarch MCP oracle:
-  - Backend endpoint: `POST /v1/assistant/golden-questions/run` - Execute all 10 golden questions, compare results
-  - 10 regression questions: net worth, monthly spending, top categories, budget overages, subscriptions, savings rate, merchants, asset allocation, FIRE goal, anomalies
-  - Service: `GoldenQuestionsService` in `backend/services/golden_questions.py` - Calls both Canopy APIs and mock Monarch MCP functions
-  - Comparison logic: numerical delta (< 1% pass threshold), categorical match (list overlap 80%+), confidence scoring
-  - Response: run ID, pass/fail rates, detailed per-question results with delta, match type, confidence
-  - Pydantic models: `GoldenQuestionsRunRequest`, `GoldenQuestionsRunResponse`, `GoldenQuestionResult` in `backend/models/golden_questions.py`
-  - Unit tests: 19 tests (`backend/tests/test_golden_questions.py`) covering all 10 questions, comparison logic, numeric/categorical matching, batch runs with verbose/stop-on-failure options
-  - API endpoint registered in `backend/api/assistant.py` with error handling
-  - All tests pass (19/19), syntax validated
-
-- **[EPIC] Monarch Money Parity Roadmap (issue #47):** Comprehensive 23-issue work plan to achieve feature parity with Monarch Money by 2027, enabling subscription cancellation. Strategic arc spans three phases (Learn/Parallel/Cutover) across P0-P3 priorities:
-  - **P0 (2 issues #48-49):** Stable deployment foundation (database migrations, Vault secrets integration)
-  - **P1 (14 issues #61-74):** Core PFM features (budgets, cashflow, recurring detection, transaction rules, Monarch API sync) and category taxonomy
-  - **P2 (3 issues #75-77):** Assistant expansion (6+ tools, golden questions regression suite, Ollama deployment on Eldertree)
-  - **P3 (3 issues #78-80):** Observability (metrics + Grafana dashboard per workspace standards) and documentation (MCP playbook, cutover runbook)
-  - Six success criteria for subscription cancellation: accounts visibility, imports routine, budgets/cashflow UI usage, assistant parity, history import, runbook completeness
-  - Parallel deployment strategy at `monarch.eldertree.local` prevents production impact during aggressive feature work
-  - Monarch MCP + Claude used as temporary reference oracle (2026) for data model validation, tool inventory, parser benchmarking — not a production dependency
-  - Related: [ollie/memory/project_canopy_monarch_parity.md](https://github.com/raolivei/ollie/blob/main/memory/project_canopy_monarch_parity.md), [ollie/docs/agent-playbooks/monarch-mcp-claude.md](https://github.com/raolivei/ollie/blob/main/docs/agent-playbooks/monarch-mcp-claude.md), [UX Parity EPIC #50](https://github.com/raolivei/canopy/issues/50)
-
-- **Contextual Insights (issue #56):** Budget warnings, month-over-month comparisons, anomaly detection, and recurring predictions. New components & services:
-  - `InsightCard` React component (badge-based alerts with warning/success/info/neutral types) in `frontend/components/ui/InsightCard.tsx`
-  - `ContextualInsightsService` backend service (Python) calculates: budget overspending, MoM category changes, transaction outliers, recurring patterns
-  - API endpoints: `GET /v1/contextual-insights/{budget-warnings,mom-comparisons,anomalies,recurring-predictions,summary}`
-  - Frontend hooks: `useContextualInsights()`, `useBudgetWarnings()`, `useMoMComparisons()`, `useTransactionAnomalies()`, `useRecurringPredictions()` in `frontend/hooks/useContextualInsights.ts`
-  - `InsightsSection` component aggregates all insights for display on dashboard and reports
-  - Unit tests: `backend/tests/test_contextual_insights.py` (fixtures, service logic), `frontend/__tests__/InsightCard.test.tsx` (component rendering)
-  - No migrations needed (queries only); uses existing transaction/category data
-  - Lint pass: Python syntax OK, no ESLint errors in new TypeScript/JSX
-- **Mobile & A11y (issue #57):** Complete mobile-first responsive design and accessibility overhaul. Added `sm:375px` Tailwind breakpoint for iPhone SE and small Android devices. Updated all UI components with mobile-responsive sizing (padding, text, gaps). Comprehensive ARIA labels: `aria-label` for buttons, `aria-invalid`/`aria-describedby` for inputs, `role="dialog"` + `aria-modal` for modals, `aria-pressed` for toggle buttons. Dark mode verified on mobile (sufficient color contrast WCAG AA 4.5:1 text / 3:1 UI). Accessibility audit with Axe (18 tests, all pass): button loading states with `aria-busy`, form validation with error roles, focus indicators (ring-2), dark mode theme testing. Unit tests in `__tests__/accessibility.test.tsx` validate semantic HTML, ARIA attributes, mobile viewport, and dark mode. Jest + jest-axe setup for automated accessibility scanning. Documentation: `frontend/docs/MOBILE_A11Y_GUIDE.md`. Focus management in modals, keyboard navigation (Tab, Escape), minimum 44x44px touch targets, semantic heading hierarchy. Lint validation passes (warnings only on existing code).
+### Removed
+- Floating AI financial assistant button (bottom-right "More" button)
 
 ## [0.10.4] - 2026-05-26
 
