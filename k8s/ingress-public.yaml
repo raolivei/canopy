@@ -2,23 +2,21 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: canopy
+  name: canopy-public
   namespace: canopy
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
-    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
-    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
-    external-dns.alpha.kubernetes.io/hostname: canopy.eldertree.local
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    external-dns.alpha.kubernetes.io/exclude: "true"
   labels:
     app: canopy
 spec:
   ingressClassName: traefik
   tls:
   - hosts:
-    - canopy.eldertree.local
-    secretName: canopy-tls
+    - canopy.eldertree.xyz
+    secretName: canopy-cloudflare-origin-tls
   rules:
-  - host: canopy.eldertree.local
+  - host: canopy.eldertree.xyz
     http:
       paths:
       - path: /api
