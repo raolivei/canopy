@@ -9,6 +9,8 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 ## [Unreleased]
 
 ### Added
+- Budget service layer (BudgetService) with full CRUD and spending tracking - #62
+- Budget Pydantic response models (BudgetResponse, BudgetStatusResponse, etc.) - #62
 - 6 AI assistant tools (budget, cashflow, recurring, patterns, merchant, goals) - #75, #76
 - Golden questions regression suite for Monarch parity testing - #76
 - Contextual insights: budget warnings, MoM comparisons, anomalies, recurring predictions - #56
