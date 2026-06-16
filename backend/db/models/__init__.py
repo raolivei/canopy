@@ -34,6 +34,7 @@ from backend.db.models.real_estate import (
     RealEstateProperty,
 )
 from backend.db.models.transaction import Transaction, TransactionType
+from backend.db.models.transaction_rule import TransactionRule
 
 __all__ = [
     # Core assets
@@ -61,6 +62,7 @@ __all__ = [
     # Transactions
     "Transaction",
     "TransactionType",
+    "TransactionRule",
     # Budgets
     "Budget",
     "BudgetCategory",
