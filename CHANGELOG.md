@@ -9,6 +9,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 ## [Unreleased]
 
 ### Added
+- Budget API endpoints with full CRUD operations and category tracking - #63
 - 6 AI assistant tools (budget, cashflow, recurring, patterns, merchant, goals) - #75, #76
 - Golden questions regression suite for Monarch parity testing - #76
 - Contextual insights: budget warnings, MoM comparisons, anomalies, recurring predictions - #56
