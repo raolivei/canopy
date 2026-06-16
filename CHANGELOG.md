@@ -18,9 +18,13 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 - Monarch Money Parity EPIC roadmap (23 issues, P0-P3) - #47
 - Performance: Query monitoring, safety limits, composite indexes (10-50x speedup)
 - Migration `20260615_0014`: Transaction table indexes for date/type/category/merchant
+- Auto-label workflow: Labels PRs by title/files + concurrency cancellation
 
 ### Changed
 - CHANGELOG: Simplified to Keep a Changelog standard (74% reduction)
+
+### Fixed
+- Auto-label workflow: Added concurrency group to cancel duplicate runs
 
 ### Removed
 - Floating AI financial assistant button (bottom-right "More" button)
