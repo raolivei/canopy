@@ -5,19 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { SkeletonMetricCard, SkeletonChart } from "@/components/ui/Skeleton";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-} from "recharts";
+import { ChartTransition } from "@/components/ChartTransition";
+import { IncomeExpenseTrend } from "@/components/charts/IncomeExpenseTrend";
+import { CategoryBreakdown } from "@/components/charts/CategoryBreakdown";
 import { formatCurrency, formatCurrencyCompact } from "@/utils/currency";
 import { cn } from "@/utils/cn";
 import { motion } from "framer-motion";
@@ -32,9 +22,6 @@ import {
 } from "lucide-react";
 import {
   CHART_PALETTE,
-  getTooltipStyle,
-  getGridProps,
-  getAxisProps,
   isDarkMode as checkDarkMode,
 } from "@/utils/chartTheme";
 
@@ -89,21 +76,6 @@ function MetricCard({
         {subtitle && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{subtitle}</p>}
       </CardContent>
     </Card>
-  );
-}
-
-const RADIAN = Math.PI / 180;
-function CustomPieLabel({
-  cx, cy, midAngle, innerRadius, outerRadius, pct, category,
-}: any) {
-  if (pct < 4) return null;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-semibold" style={{ fontSize: 11, fontWeight: 600 }}>
-      {`${pct.toFixed(0)}%`}
-    </text>
   );
 }
 
@@ -221,23 +193,9 @@ export default function AnnualReport() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Income vs spending by month</p>
             </CardHeader>
             <CardContent>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={by_month} barGap={2}>
-                    <CartesianGrid {...getGridProps(dark)} />
-                    <XAxis dataKey="month_name" {...getAxisProps(dark)} />
-                    <YAxis {...getAxisProps(dark)} tickFormatter={(v) => formatCurrencyCompact(v, currency)} />
-                    <Tooltip
-                      contentStyle={getTooltipStyle(dark)}
-                      formatter={(v: number, name: string) => [formatCurrency(v, currency), name.charAt(0).toUpperCase() + name.slice(1)]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="income" name="Income" fill={CHART_PALETTE[1]} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="expenses" name="Spending" fill={CHART_PALETTE[4]} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="investments" name="Invested" fill={CHART_PALETTE[2]} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <ChartTransition isLoading={isLoading}>
+                <IncomeExpenseTrend data={by_month} currency={currency} />
+              </ChartTransition>
             </CardContent>
           </Card>
         </motion.div>
@@ -255,46 +213,14 @@ export default function AnnualReport() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Where your money went</p>
             </CardHeader>
             <CardContent>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={by_category}
-                      dataKey="amount"
-                      nameKey="category"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={95}
-                      labelLine={false}
-                      label={CustomPieLabel}
-                    >
-                      {by_category.map((_, i) => (
-                        <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={getTooltipStyle(dark)}
-                      formatter={(v: number) => [formatCurrency(v, currency)]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Legend */}
-              <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
-                {by_category.map((cat, i) => (
-                  <div key={cat.category} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length] }} />
-                      <span className="text-slate-600 dark:text-slate-400 truncate">{cat.category}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="font-medium text-slate-900 dark:text-white">{formatCurrencyCompact(cat.amount, currency)}</span>
-                      <span className="text-slate-400 w-8 text-right">{cat.pct}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ChartTransition isLoading={isLoading}>
+                <CategoryBreakdown
+                  data={by_category}
+                  currency={currency}
+                  showLegend={true}
+                  maxLegendHeight="max-h-40"
+                />
+              </ChartTransition>
             </CardContent>
           </Card>
         </motion.div>
@@ -314,45 +240,13 @@ export default function AnnualReport() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Where your money came from</p>
             </CardHeader>
             <CardContent>
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={income_sources}
-                      dataKey="amount"
-                      nameKey="category"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={90}
-                      labelLine={false}
-                      label={CustomPieLabel}
-                    >
-                      {income_sources.map((_, i) => (
-                        <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={getTooltipStyle(dark)}
-                      formatter={(v: number) => [formatCurrency(v, currency)]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-2 space-y-1.5">
-                {income_sources.map((src, i) => (
-                  <div key={src.category} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length] }} />
-                      <span className="text-slate-600 dark:text-slate-400 truncate">{src.category || "Uncategorized"}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="font-medium text-slate-900 dark:text-white">{formatCurrencyCompact(src.amount, currency)}</span>
-                      <span className="text-slate-400 w-8 text-right">{src.pct}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ChartTransition isLoading={isLoading}>
+                <CategoryBreakdown
+                  data={income_sources}
+                  currency={currency}
+                  showLegend={true}
+                />
+              </ChartTransition>
             </CardContent>
           </Card>
         </motion.div>

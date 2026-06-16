@@ -6,6 +6,13 @@ module.exports = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
+    screens: {
+      'sm': '375px',   // Mobile-first: iPhone SE, small Android devices
+      'md': '768px',   // Tablets
+      'lg': '1024px',  // Desktops
+      'xl': '1280px',  // Wide desktops
+      '2xl': '1536px', // Ultra-wide
+    },
     extend: {
       colors: {
         // Primary: Teal/Emerald (professional, finance-forward)

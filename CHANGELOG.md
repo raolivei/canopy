@@ -6,6 +6,25 @@ Notable releases only — **details belong in commits / PRs**, not here.
 
 Pre-release **0.x**; **1.0.0** when feature-complete.
 
+## [Unreleased]
+
+### Added
+- 6 AI assistant tools (budget, cashflow, recurring, patterns, merchant, goals) - #75, #76
+- Golden questions regression suite for Monarch parity testing - #76
+- Contextual insights: budget warnings, MoM comparisons, anomalies, recurring predictions - #56
+- Mobile/A11y: 375px breakpoint, ARIA labels, 18 accessibility tests - #57
+- Chart skeleton→data animations (4 charts) with ChartTransition component
+- Dark mode toggle button (front page header)
+- Monarch Money Parity EPIC roadmap (23 issues, P0-P3) - #47
+- Performance: Query monitoring, safety limits, composite indexes (10-50x speedup)
+- Migration `20260615_0014`: Transaction table indexes for date/type/category/merchant
+
+### Changed
+- CHANGELOG: Simplified to Keep a Changelog standard (74% reduction)
+
+### Removed
+- Floating AI financial assistant button (bottom-right "More" button)
+
 ## [0.10.4] - 2026-05-26
 
 - **Workspace config adoption:** Extend shared Ruff config from workspace-config/python/ruff.toml; symlink ESLint config for Next.js frontend; add Dependabot for automated dependency updates.

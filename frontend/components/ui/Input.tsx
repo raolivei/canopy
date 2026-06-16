@@ -29,9 +29,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || label?.toLowerCase().replace(/\s/g, "-");
 
     const sizes = {
-      sm: "px-3 py-1.5 text-sm",
-      md: "px-3 py-2 text-sm",
-      lg: "px-4 py-3 text-base",
+      sm: "sm:px-3 sm:py-1.5 px-3 py-1 text-xs sm:text-sm",
+      md: "sm:px-3 sm:py-2 px-3 py-1.5 text-sm sm:text-base",
+      lg: "sm:px-4 sm:py-3 px-4 py-2 text-base sm:text-lg",
     };
 
     const baseInputStyles = cn(
@@ -53,14 +53,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5"
+            className="block sm:text-sm text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 sm:mb-1.5"
           >
             {label}
+            {props.required && <span aria-label="required" className="text-danger-600 ml-1">*</span>}
           </label>
         )}
         <div className="relative">
           {leftIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" aria-hidden="true">
               {leftIcon}
             </div>
           )}
@@ -68,21 +69,23 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={baseInputStyles}
+            aria-invalid={!!error}
+            aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" aria-hidden="true">
               {rightIcon}
             </div>
           )}
         </div>
         {error && (
-          <p className="text-xs text-danger-600 dark:text-danger-400 mt-1">
+          <p id={`${inputId}-error`} className="text-xs text-danger-600 dark:text-danger-400 mt-1" role="alert">
             {error}
           </p>
         )}
         {helperText && !error && (
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p id={`${inputId}-helper`} className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {helperText}
           </p>
         )}
@@ -109,16 +112,17 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5"
+            className="block sm:text-sm text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 sm:mb-1.5"
           >
             {label}
+            {props.required && <span aria-label="required" className="text-danger-600 ml-1">*</span>}
           </label>
         )}
         <textarea
           ref={ref}
           id={inputId}
           className={cn(
-            "w-full px-3 py-2 text-sm",
+            "w-full sm:px-3 sm:py-2 px-3 py-1.5 sm:text-sm text-xs",
             "bg-white dark:bg-slate-900",
             "border border-slate-300 dark:border-slate-700 rounded-md",
             "text-slate-900 dark:text-slate-100",
@@ -128,15 +132,17 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             "disabled:opacity-50 disabled:cursor-not-allowed",
             error && "border-danger-500 focus:ring-danger-500 focus:border-danger-500"
           )}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
           {...props}
         />
         {error && (
-          <p className="text-xs text-danger-600 dark:text-danger-400 mt-1">
+          <p id={`${inputId}-error`} className="text-xs text-danger-600 dark:text-danger-400 mt-1" role="alert">
             {error}
           </p>
         )}
         {helperText && !error && (
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p id={`${inputId}-helper`} className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {helperText}
           </p>
         )}
