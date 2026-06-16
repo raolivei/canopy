@@ -1,0 +1,154 @@
+name: Auto Label PRs
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+    branches: [main]
+
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  auto-label:
+    name: Label PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Label based on title
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const title = context.payload.pull_request.title.toLowerCase();
+            const labels = [];
+
+            // Type labels based on conventional commit prefixes
+            if (title.startsWith('feat:') || title.includes('feature')) {
+              labels.push('enhancement');
+            }
+            if (title.startsWith('fix:')) {
+              labels.push('bug');
+            }
+            if (title.startsWith('docs:')) {
+              labels.push('documentation');
+            }
+            if (title.startsWith('chore:') || title.startsWith('refactor:')) {
+              labels.push('chore');
+            }
+            if (title.includes('assistant') || title.includes('ai')) {
+              labels.push('assistant');
+            }
+            if (title.includes('wip') || title.includes('work in progress')) {
+              labels.push('wip');
+            }
+
+            // Add labels if any found
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: labels
+              });
+              console.log(`Added labels from title: ${labels.join(', ')}`);
+            }
+
+      - name: Label based on files changed
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Get list of changed files
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+
+            const labels = new Set();
+
+            for (const file of files) {
+              const path = file.filename;
+
+              // Backend labels
+              if (path.startsWith('backend/')) {
+                labels.add('backend');
+
+                if (path.includes('/api/')) {
+                  labels.add('api');
+                }
+                if (path.includes('/services/')) {
+                  labels.add('services');
+                }
+                if (path.includes('/ingest/') || path.includes('parser')) {
+                  labels.add('import');
+                }
+                if (path.includes('/models/') || path.includes('alembic')) {
+                  labels.add('database');
+                }
+                if (path.includes('/integrations/')) {
+                  labels.add('integrations');
+                }
+                if (path.includes('test_') || path.includes('tests/')) {
+                  labels.add('testing');
+                }
+              }
+
+              // Frontend labels
+              if (path.startsWith('frontend/')) {
+                labels.add('frontend');
+
+                if (path.includes('/components/ui/')) {
+                  labels.add('ui-components');
+                }
+                if (path.includes('test.') || path.includes('.test.') || path.includes('.spec.')) {
+                  labels.add('testing');
+                }
+              }
+
+              // Infrastructure labels
+              if (path.startsWith('k8s/') || path.startsWith('helm/') ||
+                  path.includes('Dockerfile') || path === 'docker-compose.yml') {
+                labels.add('infrastructure');
+              }
+
+              // CI/CD labels
+              if (path.startsWith('.github/workflows/')) {
+                labels.add('ci-cd');
+              }
+
+              // Documentation labels
+              if (path.endsWith('.md') && !path.includes('CHANGELOG')) {
+                labels.add('documentation');
+              }
+
+              // Dependencies
+              if (path === 'requirements.txt' || path === 'package.json' ||
+                  path === 'package-lock.json' || path === 'poetry.lock') {
+                labels.add('dependencies');
+              }
+            }
+
+            // Add labels if any found
+            const labelArray = Array.from(labels);
+            if (labelArray.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: labelArray
+              });
+              console.log(`Added labels from files: ${labelArray.join(', ')}`);
+            } else {
+              console.log('No file-based labels to add');
+            }
