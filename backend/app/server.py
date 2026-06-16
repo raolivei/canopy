@@ -98,6 +98,14 @@ try:
 except ImportError:
     HAS_CONTEXTUAL_INSIGHTS_ROUTER = False
 
+# Import budgets router
+try:
+    from backend.api import budgets
+
+    HAS_BUDGETS_ROUTER = True
+except ImportError:
+    HAS_BUDGETS_ROUTER = False
+
 
 def _cors_allow_origins() -> list[str]:
     """Origins allowed for browser clients (dev + optional CORS_ALLOW_ORIGINS)."""
@@ -182,6 +190,10 @@ def create_app() -> FastAPI:
     # Include contextual insights router if available
     if HAS_CONTEXTUAL_INSIGHTS_ROUTER:
         app.include_router(contextual_insights.router)
+
+    # Include budgets router if available
+    if HAS_BUDGETS_ROUTER:
+        app.include_router(budgets.router)
 
     return app
 

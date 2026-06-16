@@ -24,7 +24,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 - CHANGELOG: Simplified to Keep a Changelog standard (74% reduction)
 
 ### Fixed
-- Auto-label workflow: Added concurrency group to cancel duplicate runs
+- Auto-label workflow: Added `issues: write` permission to fix labeling failures
 
 ### Removed
 - Floating AI financial assistant button (bottom-right "More" button)
