@@ -89,8 +89,8 @@ class BudgetAnalyzer(InsightStrategy):
 
         # Get transactions for current month by category
         txns = db.query(transaction_model).filter(
-            transaction_model.transaction_date >= month_start,
-            transaction_model.transaction_date <= today,
+            transaction_model.date >= month_start,
+            transaction_model.date <= today,
         ).all()
 
         category_totals: dict[str, Decimal] = {}
@@ -132,14 +132,14 @@ class MoMAnalyzer(InsightStrategy):
 
         # Current month by category
         current_txns = db.query(transaction_model).filter(
-            transaction_model.transaction_date >= current_month_start,
-            transaction_model.transaction_date <= today,
+            transaction_model.date >= current_month_start,
+            transaction_model.date <= today,
         ).all()
 
         # Previous month by category
         previous_txns = db.query(transaction_model).filter(
-            transaction_model.transaction_date >= previous_month_start,
-            transaction_model.transaction_date <= previous_month_end,
+            transaction_model.date >= previous_month_start,
+            transaction_model.date <= previous_month_end,
         ).all()
 
         current_totals: dict[str, Decimal] = {}
@@ -194,8 +194,8 @@ class AnomalyDetector(InsightStrategy):
         month_start = date(today.year, today.month, 1)
 
         txns = db.query(transaction_model).filter(
-            transaction_model.transaction_date >= month_start,
-            transaction_model.transaction_date <= today,
+            transaction_model.date >= month_start,
+            transaction_model.date <= today,
         ).all()
 
         if len(txns) < 3:
@@ -245,8 +245,8 @@ class RecurringPredictor(InsightStrategy):
         three_months_ago = today - timedelta(days=90)
 
         txns = db.query(transaction_model).filter(
-            transaction_model.transaction_date >= three_months_ago,
-            transaction_model.transaction_date <= today,
+            transaction_model.date >= three_months_ago,
+            transaction_model.date <= today,
         ).all()
 
         # Group by merchant to find patterns
@@ -255,7 +255,7 @@ class RecurringPredictor(InsightStrategy):
             merchant = txn.merchant or "Unknown"
             if merchant not in merchant_txns:
                 merchant_txns[merchant] = []
-            merchant_txns[merchant].append((txn.transaction_date, txn.amount))
+            merchant_txns[merchant].append((txn.date, txn.amount))
 
         # Detect patterns (similar amounts, ~30 day intervals)
         for merchant, transactions in merchant_txns.items():
@@ -351,8 +351,8 @@ class ContextualInsightsService:
 
         # Get transactions for current month by category
         txns = self.db.query(self.transaction_model).filter(
-            self.transaction_model.transaction_date >= month_start,
-            self.transaction_model.transaction_date <= today,
+            self.transaction_model.date >= month_start,
+            self.transaction_model.date <= today,
         ).all()
 
         category_totals: dict[str, Decimal] = {}
@@ -389,14 +389,14 @@ class ContextualInsightsService:
 
         # Current month by category
         current_txns = self.db.query(self.transaction_model).filter(
-            self.transaction_model.transaction_date >= current_month_start,
-            self.transaction_model.transaction_date <= today,
+            self.transaction_model.date >= current_month_start,
+            self.transaction_model.date <= today,
         ).all()
 
         # Previous month by category
         previous_txns = self.db.query(self.transaction_model).filter(
-            self.transaction_model.transaction_date >= previous_month_start,
-            self.transaction_model.transaction_date <= previous_month_end,
+            self.transaction_model.date >= previous_month_start,
+            self.transaction_model.date <= previous_month_end,
         ).all()
 
         current_totals: dict[str, Decimal] = {}
@@ -446,8 +446,8 @@ class ContextualInsightsService:
         month_start = date(today.year, today.month, 1)
 
         txns = self.db.query(self.transaction_model).filter(
-            self.transaction_model.transaction_date >= month_start,
-            self.transaction_model.transaction_date <= today,
+            self.transaction_model.date >= month_start,
+            self.transaction_model.date <= today,
         ).all()
 
         if len(txns) < 3:
@@ -492,8 +492,8 @@ class ContextualInsightsService:
         three_months_ago = today - timedelta(days=90)
 
         txns = self.db.query(self.transaction_model).filter(
-            self.transaction_model.transaction_date >= three_months_ago,
-            self.transaction_model.transaction_date <= today,
+            self.transaction_model.date >= three_months_ago,
+            self.transaction_model.date <= today,
         ).all()
 
         # Group by merchant to find patterns
@@ -502,7 +502,7 @@ class ContextualInsightsService:
             merchant = txn.merchant or "Unknown"
             if merchant not in merchant_txns:
                 merchant_txns[merchant] = []
-            merchant_txns[merchant].append((txn.transaction_date, txn.amount))
+            merchant_txns[merchant].append((txn.date, txn.amount))
 
         # Detect patterns (similar amounts, ~30 day intervals)
         for merchant, transactions in merchant_txns.items():
