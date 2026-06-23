@@ -5,7 +5,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Copy package files (lock file enables reproducible, cache-friendly installs)
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 
 # Install dependencies — npm ci is faster than install; cache mount + retries
 # handle transient registry DNS failures (EAI_AGAIN) on CI runners.
