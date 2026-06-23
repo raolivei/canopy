@@ -25,7 +25,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ### Fixed
 - Auto-label workflow: Added concurrency group to cancel duplicate runs
-- Frontend Docker build: use `npm ci` with lockfile and registry retries (fixes transient `EAI_AGAIN` on self-hosted runners)
+- Frontend Docker build: use `npm ci` with lockfile, install verification, and registry retries; build on `ubuntu-latest` (fixes transient `EAI_AGAIN` on self-hosted runners)
 
 ### Removed
 - Floating AI financial assistant button (bottom-right "More" button)

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:18-alpine AS builder
 
 # Set working directory
@@ -6,15 +7,23 @@ WORKDIR /app
 # Copy package files (lock file enables reproducible, cache-friendly installs)
 COPY package.json package-lock.json ./
 
-# Install dependencies — npm ci is faster than install; retries handle transient
-# registry DNS failures (EAI_AGAIN) seen on self-hosted ARM64 runners.
+# Install dependencies — npm ci is faster than install; cache mount + retries
+# handle transient registry DNS failures (EAI_AGAIN) on CI runners.
 RUN npm config set fetch-retries 5 \
     && npm config set fetch-retry-mintimeout 20000 \
     && npm config set fetch-retry-maxtimeout 120000 \
-    && for attempt in 1 2 3; do \
-         npm ci --legacy-peer-deps && break; \
-         if [ "$attempt" -eq 3 ]; then exit 1; fi; \
-         echo "npm ci failed (attempt $attempt/3), retrying in 30s..."; \
+    && set -e; \
+       for attempt in 1 2 3; do \
+         if npm ci --legacy-peer-deps \
+            && test -x node_modules/.bin/next; then \
+           break; \
+         fi; \
+         if [ "$attempt" -eq 3 ]; then \
+           echo "npm ci failed after 3 attempts"; \
+           exit 1; \
+         fi; \
+         echo "npm ci incomplete (attempt $attempt/3), retrying in 30s..."; \
+         rm -rf node_modules; \
          sleep 30; \
        done
 
@@ -56,4 +65,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
 
 # Run application
 CMD ["npm", "start"]
-

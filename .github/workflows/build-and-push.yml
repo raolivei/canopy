@@ -46,6 +46,9 @@ jobs:
     with:
       image-name: canopy-frontend
       context: ./frontend
+      # GitHub-hosted runners have more reliable npm registry access than
+      # self-hosted Pi runners (EAI_AGAIN / file-descriptor exhaustion).
+      runs-on: ubuntu-latest
       create-git-tag: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     secrets:
       REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
