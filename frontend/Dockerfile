@@ -3,11 +3,20 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+# Copy package files (lock file enables reproducible, cache-friendly installs)
+COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies — npm ci is faster than install; retries handle transient
+# registry DNS failures (EAI_AGAIN) seen on self-hosted ARM64 runners.
+RUN npm config set fetch-retries 5 \
+    && npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retry-maxtimeout 120000 \
+    && for attempt in 1 2 3; do \
+         npm ci --legacy-peer-deps && break; \
+         if [ "$attempt" -eq 3 ]; then exit 1; fi; \
+         echo "npm ci failed (attempt $attempt/3), retrying in 30s..."; \
+         sleep 30; \
+       done
 
 # Copy source code
 COPY . .
