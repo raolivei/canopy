@@ -1,7 +1,7 @@
 """Add transaction_rules table for automatic categorization
 
 Revision ID: 20260616_0016
-Revises: 20260616_0015
+Revises: 20260616_0015a
 Create Date: 2026-06-16
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '20260616_0016'
-down_revision = '20260616_0015'
+down_revision = '20260616_0015a'
 branch_labels = None
 depends_on = None
 
