@@ -116,16 +116,18 @@ export default function Transactions() {
     fetchTransactions();
   }, [fetchTransactions]);
 
+  const { action: queryAction, category: queryCategory } = router.query;
+  const { replace } = router;
   useEffect(() => {
-    if (router.query.action === "add") {
+    if (queryAction === "add") {
       setIsAddModalOpen(true);
-      router.replace("/transactions", undefined, { shallow: true });
+      replace("/transactions", undefined, { shallow: true });
     }
-    if (router.query.category && typeof router.query.category === "string") {
-      setCategoryFilter([router.query.category]);
+    if (queryCategory && typeof queryCategory === "string") {
+      setCategoryFilter([queryCategory]);
       setShowAdvanced(true);
     }
-  }, [router.query]);
+  }, [queryAction, queryCategory, replace]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

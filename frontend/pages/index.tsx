@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import PageLayout from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -528,9 +529,11 @@ export default function Dashboard() {
         >
           <Card className="overflow-hidden">
             <div className="p-10 lg:p-14 text-center bg-gradient-to-br from-primary-50/60 via-white to-emerald-50/40 dark:from-primary-950/30 dark:via-slate-900 dark:to-emerald-950/20">
-              <img
+              <Image
                 src="/brand/canopy-icon.svg"
                 alt="Canopy"
+                width={96}
+                height={96}
                 className="w-24 h-24 mx-auto mb-6 rounded-2xl shadow-lg ring-1 ring-slate-200/50 dark:ring-slate-800/50"
               />
               <h2 className="text-2xl lg:text-3xl font-semibold text-slate-900 dark:text-white mb-2">
@@ -700,9 +703,11 @@ function BrandHeader({ actions }: { actions?: React.ReactNode } = {}) {
     <div className="mb-6 lg:mb-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <img
+          <Image
             src="/brand/canopy-icon.svg"
             alt="Canopy"
+            width={56}
+            height={56}
             className="w-14 h-14 rounded-xl shadow-md ring-1 ring-slate-200/60 dark:ring-slate-700/60"
           />
           <div>
