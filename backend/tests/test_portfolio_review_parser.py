@@ -80,14 +80,14 @@ def test_legacy_multiregion_csv_only_keeps_canada() -> None:
         "🇧🇷 Brazil Portfolio\n"
         "15 Apr 2026\n"
         "Investment,Platform,Currency,Value (BRL),USD,% Brazil,% Global,Return,Div/Yr,Yield,FX,Target %,Delta,Conviction,Action\n"
-        "CPTS11,FII XP,BRL,\"10,000\",\"2,000\",1.5%,0.5%,—,—,—,BRL,—,—,4,Hold\n"
+        'CPTS11,FII XP,BRL,"10,000","2,000",1.5%,0.5%,—,—,—,BRL,—,—,4,Hold\n'
         "🇨🇦 Canada Portfolio\n"
         "Investment,Platform,Value (CAD),% Global,Return,Div/Yr,Yield,Target %,Delta,Conviction,Action\n"
-        "VCN,Vanguard,\"5,000\",5,—,—,—,—,—,3,Hold\n"
-        "VFV,Vanguard,\"3,500\",3,—,—,—,—,—,4,Hold\n"
+        'VCN,Vanguard,"5,000",5,—,—,—,—,—,3,Hold\n'
+        'VFV,Vanguard,"3,500",3,—,—,—,—,—,4,Hold\n'
         "₿ CRYPTO Portfolio\n"
         "Investment,Platform,Currency,Value (CAD),USD,% Crypto,% Global,Return,Div/Yr,Yield,FX,Target %,Delta,Conviction,Action\n"
-        "BTC,NDAX,CAD,\"8,000\",\"6,000\",2%,1%,—,—,—,USD,—,—,5,Hold\n"
+        'BTC,NDAX,CAD,"8,000","6,000",2%,1%,—,—,—,USD,—,—,5,Hold\n'
     )
     parsed = parse_portfolio_review_text(text)
     investments = [ln.investment for ln in parsed.lines]

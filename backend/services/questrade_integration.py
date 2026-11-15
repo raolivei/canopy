@@ -13,7 +13,6 @@ https://www.questrade.com/api/documentation/getting-started
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
 
 import httpx
 
@@ -41,11 +40,11 @@ class QuestradePosition:
     symbol_id: int
     symbol: str
     open_quantity: Decimal
-    current_market_value: Optional[Decimal]
-    current_price: Optional[Decimal]
-    average_entry_price: Optional[Decimal]
-    open_pnl: Optional[Decimal]
-    closed_pnl: Optional[Decimal]
+    current_market_value: Decimal | None
+    current_price: Decimal | None
+    average_entry_price: Decimal | None
+    open_pnl: Decimal | None
+    closed_pnl: Decimal | None
 
 
 @dataclass
@@ -56,8 +55,8 @@ class QuestradeBalance:
     cash: Decimal
     market_value: Decimal
     total_equity: Decimal
-    buying_power: Optional[Decimal]
-    maintenance_excess: Optional[Decimal]
+    buying_power: Decimal | None
+    maintenance_excess: Decimal | None
 
 
 class QuestradeIntegrationService:
@@ -71,10 +70,10 @@ class QuestradeIntegrationService:
 
     def __init__(self, refresh_token: str):
         self.refresh_token = refresh_token.strip()
-        self._access_token: Optional[str] = None
-        self._api_server: Optional[str] = None
-        self._expires_at: Optional[float] = None
-        self._client: Optional[httpx.Client] = None
+        self._access_token: str | None = None
+        self._api_server: str | None = None
+        self._expires_at: float | None = None
+        self._client: httpx.Client | None = None
 
     def _ensure_token(self) -> None:
         """Refresh access token if expired or missing."""
@@ -116,7 +115,7 @@ class QuestradeIntegrationService:
             timeout=30.0,
         )
 
-    def _get(self, path: str, params: Optional[dict] = None) -> dict:
+    def _get(self, path: str, params: dict | None = None) -> dict:
         """GET from Questrade API (path like 'accounts' or 'accounts/123/positions')."""
         self._ensure_token()
         path = path.strip("/")

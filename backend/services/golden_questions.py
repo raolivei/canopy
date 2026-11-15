@@ -1,17 +1,14 @@
 """Golden Questions regression suite service for Canopy ↔ Monarch parity testing."""
 
-import json
 import time
 import uuid
-from datetime import datetime, date
-from decimal import Decimal
-from typing import Any, Optional, Callable
-
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from collections.abc import Callable
+from datetime import date, datetime
+from typing import Any
 
 from backend.db.models.transaction import Transaction
-from backend.db.models.asset import Asset
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 
 class MonarchReferenceUnavailable(RuntimeError):
@@ -21,7 +18,7 @@ class MonarchReferenceUnavailable(RuntimeError):
 class GoldenQuestionsService:
     """Service for executing golden questions and comparing Canopy vs Monarch MCP."""
 
-    def __init__(self, db: Session, monarch_client: Optional[Callable] = None):
+    def __init__(self, db: Session, monarch_client: Callable | None = None):
         """Initialize service with database session and optional Monarch MCP client.
 
         Args:
@@ -126,9 +123,7 @@ class GoldenQuestionsService:
                 monarch_result = q["monarch_fn"]()
                 canopy_result = q["canopy_fn"]()
 
-                comparison = q["compare_fn"](
-                    canopy_result, monarch_result, q["question"]
-                )
+                comparison = q["compare_fn"](canopy_result, monarch_result, q["question"])
 
                 result = {
                     "question_number": q["number"],
@@ -197,9 +192,7 @@ class GoldenQuestionsService:
     def _net_worth_canopy(self) -> float:
         """Get total net worth from Canopy."""
         # Simplified: use transaction balances
-        query = select(func.sum(Transaction.amount)).where(
-            Transaction.type == "income"
-        )
+        query = select(func.sum(Transaction.amount)).where(Transaction.type == "income")
         result = self.db.execute(query).scalar()
         return float(result or 0)
 
@@ -237,13 +230,13 @@ class GoldenQuestionsService:
         """Get budget overages from Canopy."""
         return ["No overages detected"]
 
-    def _next_subscription_canopy(self) -> Optional[str]:
+    def _next_subscription_canopy(self) -> str | None:
         """Get next subscription payment from Canopy."""
         return "No upcoming subscriptions"
 
     def _savings_rate_canopy(self) -> float:
         """Get savings rate from Canopy."""
-        from datetime import date, timedelta
+        from datetime import date
 
         today = date.today()
         month_start = date(today.year, today.month, 1)
@@ -281,9 +274,11 @@ class GoldenQuestionsService:
 
     def _asset_allocation_canopy(self) -> dict[str, float]:
         """Get asset allocation from Canopy."""
-        query = select(Transaction.category, func.count()).where(
-            Transaction.type == "expense"
-        ).group_by(Transaction.category)
+        query = (
+            select(Transaction.category, func.count())
+            .where(Transaction.type == "expense")
+            .group_by(Transaction.category)
+        )
         results = self.db.execute(query).all()
         total = sum(r[1] for r in results)
         return {r[0]: (r[1] / total * 100) if total > 0 else 0 for r in results}
@@ -310,9 +305,12 @@ class GoldenQuestionsService:
         anomalies = []
         for merchant, avg_amount, count in results:
             if count >= 2:
-                latest_query = select(Transaction.amount).where(
-                    Transaction.merchant == merchant
-                ).order_by(Transaction.date.desc()).limit(1)
+                latest_query = (
+                    select(Transaction.amount)
+                    .where(Transaction.merchant == merchant)
+                    .order_by(Transaction.date.desc())
+                    .limit(1)
+                )
                 latest = self.db.execute(latest_query).scalar()
                 if latest and abs(latest - avg_amount) > avg_amount * 0.5:
                     anomalies.append({"merchant": merchant, "deviation": "high"})
@@ -342,17 +340,11 @@ class GoldenQuestionsService:
             # Map question type to MCP tool calls
             if question_type == "net_worth":
                 accounts = self.monarch_client("get_accounts", {})
-                total = sum(
-                    float(acc.get("current_balance", 0))
-                    for acc in accounts.get("accounts", [])
-                )
+                total = sum(float(acc.get("current_balance", 0)) for acc in accounts.get("accounts", []))
                 return total
 
             elif question_type == "spending":
-                cashflow = self.monarch_client(
-                    "get_cashflow_summary",
-                    {"start_date": start_date, "end_date": end_date}
-                )
+                cashflow = self.monarch_client("get_cashflow_summary", {"start_date": start_date, "end_date": end_date})
                 summary = cashflow.get("summary", [{}])[0] if cashflow.get("summary") else {}
                 return abs(float(summary.get("expenses", 0)))
 
@@ -363,27 +355,20 @@ class GoldenQuestionsService:
                         "start_date": start_date,
                         "end_date": end_date,
                         "limit": 1000,
-                    }
+                    },
                 )
                 # Aggregate by category
                 category_totals = {}
                 for txn in txns.get("transactions", []):
                     if float(txn.get("amount", 0)) < 0:  # Expenses only
                         cat = txn.get("category", {}).get("name", "Uncategorized")
-                        category_totals[cat] = category_totals.get(cat, 0) + abs(
-                            float(txn.get("amount", 0))
-                        )
+                        category_totals[cat] = category_totals.get(cat, 0) + abs(float(txn.get("amount", 0)))
                 # Return top 3
-                sorted_cats = sorted(
-                    category_totals.items(), key=lambda x: x[1], reverse=True
-                )
+                sorted_cats = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
                 return [cat[0] for cat in sorted_cats[:3]]
 
             elif question_type == "budget":
-                budgets = self.monarch_client(
-                    "get_budgets",
-                    {"start_date": start_date, "end_date": end_date}
-                )
+                budgets = self.monarch_client("get_budgets", {"start_date": start_date, "end_date": end_date})
                 overages = []
                 for budget in budgets.get("budgets", []):
                     spent = float(budget.get("actual", 0))
@@ -394,8 +379,7 @@ class GoldenQuestionsService:
 
             elif question_type == "subscriptions":
                 recurring = self.monarch_client(
-                    "get_recurring_transactions",
-                    {"start_date": start_date, "end_date": end_date}
+                    "get_recurring_transactions", {"start_date": start_date, "end_date": end_date}
                 )
                 if recurring.get("recurring_transactions"):
                     next_sub = recurring["recurring_transactions"][0]
@@ -403,10 +387,7 @@ class GoldenQuestionsService:
                 return "No upcoming subscriptions"
 
             elif question_type == "savings_rate":
-                cashflow = self.monarch_client(
-                    "get_cashflow_summary",
-                    {"start_date": start_date, "end_date": end_date}
-                )
+                cashflow = self.monarch_client("get_cashflow_summary", {"start_date": start_date, "end_date": end_date})
                 summary = cashflow.get("summary", [{}])[0] if cashflow.get("summary") else {}
                 return float(summary.get("savings_rate", 0))
 
@@ -417,20 +398,16 @@ class GoldenQuestionsService:
                         "start_date": start_date,
                         "end_date": end_date,
                         "limit": 1000,
-                    }
+                    },
                 )
                 # Aggregate by merchant
                 merchant_totals = {}
                 for txn in txns.get("transactions", []):
                     if float(txn.get("amount", 0)) < 0:  # Expenses only
                         merchant = txn.get("merchant_name", "Unknown")
-                        merchant_totals[merchant] = merchant_totals.get(merchant, 0) + abs(
-                            float(txn.get("amount", 0))
-                        )
+                        merchant_totals[merchant] = merchant_totals.get(merchant, 0) + abs(float(txn.get("amount", 0)))
                 # Return top 5
-                sorted_merchants = sorted(
-                    merchant_totals.items(), key=lambda x: x[1], reverse=True
-                )
+                sorted_merchants = sorted(merchant_totals.items(), key=lambda x: x[1], reverse=True)
                 return [m[0] for m in sorted_merchants[:5]]
 
             elif question_type == "allocation":
@@ -443,17 +420,11 @@ class GoldenQuestionsService:
                     type_totals[acc_type] = type_totals.get(acc_type, 0) + balance
                     total += balance
                 # Return percentages
-                return {
-                    acc_type: (amt / total * 100) if total > 0 else 0
-                    for acc_type, amt in type_totals.items()
-                }
+                return {acc_type: (amt / total * 100) if total > 0 else 0 for acc_type, amt in type_totals.items()}
 
             elif question_type == "fire_goal":
                 accounts = self.monarch_client("get_accounts", {})
-                total = sum(
-                    float(acc.get("current_balance", 0))
-                    for acc in accounts.get("accounts", [])
-                )
+                total = sum(float(acc.get("current_balance", 0)) for acc in accounts.get("accounts", []))
                 return f"Current net worth: ${total:,.2f}"
 
             elif question_type == "anomalies":
@@ -463,7 +434,7 @@ class GoldenQuestionsService:
                         "start_date": start_date,
                         "end_date": end_date,
                         "limit": 1000,
-                    }
+                    },
                 )
                 # Simple anomaly detection: look for unusually large transactions
                 amounts = [abs(float(txn.get("amount", 0))) for txn in txns.get("transactions", [])]
@@ -476,10 +447,7 @@ class GoldenQuestionsService:
                 anomalies = []
                 for txn in txns.get("transactions", []):
                     if abs(float(txn.get("amount", 0))) > threshold:
-                        anomalies.append({
-                            "merchant": txn.get("merchant_name", "Unknown"),
-                            "deviation": "high"
-                        })
+                        anomalies.append({"merchant": txn.get("merchant_name", "Unknown"), "deviation": "high"})
                 return anomalies
 
             else:
@@ -504,7 +472,7 @@ class GoldenQuestionsService:
         """Get budget overages from Monarch MCP."""
         return self._monarch_answer("budget")
 
-    def _next_subscription_monarch(self) -> Optional[str]:
+    def _next_subscription_monarch(self) -> str | None:
         """Get next subscription from Monarch MCP."""
         return self._monarch_answer("subscriptions")
 
@@ -530,9 +498,7 @@ class GoldenQuestionsService:
 
     # ==================== Comparison Functions ====================
 
-    def _compare_numeric(
-        self, canopy: float, monarch: float, question: str
-    ) -> dict[str, Any]:
+    def _compare_numeric(self, canopy: float, monarch: float, question: str) -> dict[str, Any]:
         """Compare numeric results."""
         delta = abs(canopy - monarch)
         delta_pct = (delta / max(abs(monarch), 1)) * 100 if monarch != 0 else (0 if canopy == 0 else 100)
@@ -558,16 +524,13 @@ class GoldenQuestionsService:
             "delta_percent": delta_pct,
         }
 
-    def _compare_categorical(
-        self, canopy: Any, monarch: Any, question: str
-    ) -> dict[str, Any]:
+    def _compare_categorical(self, canopy: Any, monarch: Any, question: str) -> dict[str, Any]:
         """Compare categorical results."""
         match = str(canopy).lower() == str(monarch).lower()
 
         if isinstance(canopy, (list, dict)) and isinstance(monarch, (list, dict)):
             if isinstance(canopy, list) and isinstance(monarch, list):
-                overlap = len(set(str(c).lower() for c in canopy) &
-                             set(str(m).lower() for m in monarch))
+                overlap = len(set(str(c).lower() for c in canopy) & set(str(m).lower() for m in monarch))
                 total = max(len(canopy), len(monarch), 1)
                 confidence = overlap / total
                 match = confidence >= 0.8

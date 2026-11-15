@@ -5,10 +5,7 @@ Canopy - Personal Finance Platform
 
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, Optional
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from typing import Any
 
 from backend.db.models.budget import Budget, BudgetCategory, BudgetPeriodType
 from backend.db.models.transaction import Transaction as TransactionModel
@@ -19,6 +16,8 @@ from backend.models.budget_responses import (
     CategoryStatusResponse,
     UpdateBudgetRequest,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
 
 
 class BudgetService:
@@ -37,7 +36,7 @@ class BudgetService:
         name: str,
         amount: Decimal,
         period: str,
-        categories: Optional[list[dict[str, Any]]] = None,
+        categories: list[dict[str, Any]] | None = None,
     ) -> BudgetResponse:
         """Create a new budget with optional categories.
 
@@ -56,10 +55,8 @@ class BudgetService:
         # Validate period
         try:
             period_type = BudgetPeriodType(period)
-        except ValueError:
-            raise ValueError(
-                f"Invalid period: {period}. Must be 'monthly' or 'yearly'"
-            )
+        except ValueError as exc:
+            raise ValueError(f"Invalid period: {period}. Must be 'monthly' or 'yearly'") from exc
 
         # Create budget
         budget = Budget(
@@ -77,9 +74,7 @@ class BudgetService:
         if categories:
             for cat_data in categories:
                 if "category_name" not in cat_data or "amount_limit" not in cat_data:
-                    raise ValueError(
-                        "Each category must have 'category_name' and 'amount_limit'"
-                    )
+                    raise ValueError("Each category must have 'category_name' and 'amount_limit'")
 
                 category = BudgetCategory(
                     budget_id=budget.id,
@@ -109,7 +104,7 @@ class BudgetService:
             categories=category_responses,
         )
 
-    def get_budget(self, budget_id: int) -> Optional[BudgetResponse]:
+    def get_budget(self, budget_id: int) -> BudgetResponse | None:
         """Fetch budget with categories by ID.
 
         Args:
@@ -118,11 +113,7 @@ class BudgetService:
         Returns:
             BudgetResponse if found, None otherwise
         """
-        query = (
-            select(Budget)
-            .where(Budget.id == budget_id)
-            .options(joinedload(Budget.categories))
-        )
+        query = select(Budget).where(Budget.id == budget_id).options(joinedload(Budget.categories))
 
         result = self.db.execute(query).scalars().first()
 
@@ -147,9 +138,7 @@ class BudgetService:
             categories=category_responses,
         )
 
-    def update_budget(
-        self, budget_id: int, data: UpdateBudgetRequest
-    ) -> Optional[BudgetResponse]:
+    def update_budget(self, budget_id: int, data: UpdateBudgetRequest) -> BudgetResponse | None:
         """Update budget details.
 
         Args:
@@ -233,9 +222,7 @@ class BudgetService:
             for budget in budgets
         ]
 
-    def add_category(
-        self, budget_id: int, category_name: str, amount_limit: Decimal
-    ) -> Optional[BudgetCategoryResponse]:
+    def add_category(self, budget_id: int, category_name: str, amount_limit: Decimal) -> BudgetCategoryResponse | None:
         """Add a category to an existing budget.
 
         Args:
@@ -264,9 +251,7 @@ class BudgetService:
         existing = self.db.execute(existing_query).scalars().first()
 
         if existing:
-            raise ValueError(
-                f"Category '{category_name}' already exists for budget {budget_id}"
-            )
+            raise ValueError(f"Category '{category_name}' already exists for budget {budget_id}")
 
         # Create category
         category = BudgetCategory(
@@ -285,9 +270,7 @@ class BudgetService:
             amount_limit=category.amount_limit,
         )
 
-    def track_spending(
-        self, budget_id: int, period_start: date, period_end: date
-    ) -> dict[str, Decimal]:
+    def track_spending(self, budget_id: int, period_start: date, period_end: date) -> dict[str, Decimal]:
         """Calculate actual spending vs budget for a period.
 
         Args:
@@ -302,11 +285,7 @@ class BudgetService:
             ValueError: If budget not found
         """
         # Verify budget exists
-        query = (
-            select(Budget)
-            .options(joinedload(Budget.categories))
-            .where(Budget.id == budget_id)
-        )
+        query = select(Budget).options(joinedload(Budget.categories)).where(Budget.id == budget_id)
         budget = self.db.execute(query).scalars().first()
 
         if not budget:
@@ -329,9 +308,7 @@ class BudgetService:
             category = tx.category or "Uncategorized"
             amount = abs(tx.amount)
 
-            category_spending[category] = (
-                category_spending.get(category, Decimal("0.00")) + amount
-            )
+            category_spending[category] = category_spending.get(category, Decimal("0.00")) + amount
             total_spent += amount
 
         # Add total
@@ -340,9 +317,7 @@ class BudgetService:
 
         return result
 
-    def get_budget_status(
-        self, budget_id: int, month: Optional[str] = None
-    ) -> Optional[BudgetStatusResponse]:
+    def get_budget_status(self, budget_id: int, month: str | None = None) -> BudgetStatusResponse | None:
         """Get current period status with warnings.
 
         Args:
@@ -364,17 +339,11 @@ class BudgetService:
 
         try:
             year, month_num = map(int, month_str.split("-"))
-        except ValueError:
-            raise ValueError(
-                f"Invalid month format: {month_str}. Expected YYYY-MM"
-            )
+        except ValueError as exc:
+            raise ValueError(f"Invalid month format: {month_str}. Expected YYYY-MM") from exc
 
         # Fetch budget
-        query = (
-            select(Budget)
-            .options(joinedload(Budget.categories))
-            .where(Budget.id == budget_id)
-        )
+        query = select(Budget).options(joinedload(Budget.categories)).where(Budget.id == budget_id)
         budget = self.db.execute(query).scalars().first()
 
         if not budget:
@@ -395,9 +364,7 @@ class BudgetService:
         spending = self.track_spending(budget_id, period_start, period_end)
         total_spent = spending.pop("total")
         remaining = budget.amount - total_spent
-        percentage_used = (
-            float(total_spent / budget.amount * 100) if budget.amount > 0 else 0
-        )
+        percentage_used = float(total_spent / budget.amount * 100) if budget.amount > 0 else 0
 
         # Determine overall status
         if percentage_used >= 100:
@@ -412,11 +379,7 @@ class BudgetService:
         for cat in budget.categories:
             cat_spent = spending.get(cat.category_name, Decimal("0.00"))
             cat_remaining = cat.amount_limit - cat_spent
-            cat_percentage = (
-                float(cat_spent / cat.amount_limit * 100)
-                if cat.amount_limit > 0
-                else 0
-            )
+            cat_percentage = float(cat_spent / cat.amount_limit * 100) if cat.amount_limit > 0 else 0
 
             if cat_percentage >= 100:
                 cat_status = "over"

@@ -3,8 +3,6 @@
 Canopy - Personal Finance Platform
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -58,17 +56,13 @@ class CategoryBreakdownItem(BaseModel):
 
     category: str = Field(..., description="Expense category name")
     amount: float = Field(..., description="Total amount spent in category")
-    percentage: float = Field(
-        ..., description="Percentage of total expenses", ge=0, le=100
-    )
+    percentage: float = Field(..., description="Percentage of total expenses", ge=0, le=100)
 
 
 class CategoryBreakdownRequest(BaseModel):
     """Request for category breakdown."""
 
-    month: Optional[str] = Field(
-        None, description="Month in YYYY-MM format (defaults to current month)"
-    )
+    month: str | None = Field(None, description="Month in YYYY-MM format (defaults to current month)")
 
 
 class CategoryBreakdownResponse(BaseModel):
@@ -99,12 +93,8 @@ class BurnRateResponse(BaseModel):
     months_analyzed: int = Field(..., description="Actual number of months with data")
     average_monthly_burn: float = Field(..., description="Average monthly spending")
     monthly_breakdown: list[MonthlyBurn]
-    min_month: Optional[dict[str, float | str]] = Field(
-        None, description="Month with minimum spending"
-    )
-    max_month: Optional[dict[str, float | str]] = Field(
-        None, description="Month with maximum spending"
-    )
+    min_month: dict[str, float | str] | None = Field(None, description="Month with minimum spending")
+    max_month: dict[str, float | str] | None = Field(None, description="Month with maximum spending")
     volatility: str = Field(
         ...,
         description="Spending volatility: 'low', 'moderate', 'high', or 'no_data'",

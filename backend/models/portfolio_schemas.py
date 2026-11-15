@@ -2,7 +2,6 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -30,8 +29,8 @@ class AssetResponse(BaseModel):
     asset_type: AssetType
     currency: str
     created_at: datetime
-    current_price: Optional[Decimal] = None
-    price_updated_at: Optional[datetime] = None
+    current_price: Decimal | None = None
+    price_updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -40,11 +39,11 @@ class AssetWithHoldings(AssetResponse):
     """Asset with calculated holdings data."""
 
     total_shares: Decimal = Field(default=Decimal("0"))
-    average_cost: Optional[Decimal] = None
+    average_cost: Decimal | None = None
     total_cost_basis: Decimal = Field(default=Decimal("0"))
-    market_value: Optional[Decimal] = None
-    unrealized_gain_loss: Optional[Decimal] = None
-    return_pct: Optional[Decimal] = None
+    market_value: Decimal | None = None
+    unrealized_gain_loss: Decimal | None = None
+    return_pct: Decimal | None = None
 
 
 # ============== Lot Schemas ==============
@@ -58,8 +57,8 @@ class LotCreate(BaseModel):
     price_per_unit: Decimal = Field(..., gt=0, description="Price per share/unit")
     fees: Decimal = Field(default=Decimal("0"), ge=0, description="Transaction fees")
     purchase_date: date = Field(..., description="Date of purchase")
-    account: Optional[str] = Field(None, max_length=100, description="Brokerage account")
-    notes: Optional[str] = Field(None, description="Optional notes")
+    account: str | None = Field(None, max_length=100, description="Brokerage account")
+    notes: str | None = Field(None, description="Optional notes")
 
 
 class LotSell(BaseModel):
@@ -79,17 +78,17 @@ class LotResponse(BaseModel):
     price_per_unit: Decimal
     fees: Decimal
     purchase_date: date
-    account: Optional[str] = None
-    notes: Optional[str] = None
+    account: str | None = None
+    notes: str | None = None
     is_sold: bool
-    sold_date: Optional[date] = None
-    sold_price_per_unit: Optional[Decimal] = None
-    sold_fees: Optional[Decimal] = None
+    sold_date: date | None = None
+    sold_price_per_unit: Decimal | None = None
+    sold_fees: Decimal | None = None
     created_at: datetime
 
     # Calculated fields
     cost_basis: Decimal
-    realized_gain_loss: Optional[Decimal] = None
+    realized_gain_loss: Decimal | None = None
 
     model_config = {"from_attributes": True}
 
@@ -104,8 +103,8 @@ class DividendCreate(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Dividend amount")
     payment_date: date = Field(..., description="Date dividend was paid")
     dividend_type: DividendType = Field(default=DividendType.CASH)
-    shares_received: Optional[Decimal] = Field(None, ge=0, description="For stock/reinvested dividends")
-    notes: Optional[str] = None
+    shares_received: Decimal | None = Field(None, ge=0, description="For stock/reinvested dividends")
+    notes: str | None = None
 
 
 class DividendResponse(BaseModel):
@@ -116,12 +115,12 @@ class DividendResponse(BaseModel):
     amount: Decimal
     payment_date: date
     dividend_type: DividendType
-    shares_received: Optional[Decimal] = None
-    notes: Optional[str] = None
+    shares_received: Decimal | None = None
+    notes: str | None = None
     created_at: datetime
 
     # Include asset info
-    asset_symbol: Optional[str] = None
+    asset_symbol: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -139,21 +138,21 @@ class HoldingSummary(BaseModel):
     currency: str = "CAD"
     total_shares: Decimal
     average_cost: Decimal
-    current_price: Optional[Decimal] = None
+    current_price: Decimal | None = None
     cost_basis: Decimal
-    market_value: Optional[Decimal] = None
-    unrealized_gain_loss: Optional[Decimal] = None
-    return_pct: Optional[Decimal] = None
-    allocation_pct: Optional[Decimal] = None
+    market_value: Decimal | None = None
+    unrealized_gain_loss: Decimal | None = None
+    return_pct: Decimal | None = None
+    allocation_pct: Decimal | None = None
 
 
 class PortfolioSummary(BaseModel):
     """Complete portfolio summary with metrics."""
 
-    total_value: Optional[Decimal] = None
+    total_value: Decimal | None = None
     total_cost_basis: Decimal
-    total_gain_loss: Optional[Decimal] = None
-    total_return_pct: Optional[Decimal] = None
+    total_gain_loss: Decimal | None = None
+    total_return_pct: Decimal | None = None
     total_dividends: Decimal
     holdings_count: int
     holdings: list[HoldingSummary]
@@ -185,7 +184,7 @@ class PerformancePoint(BaseModel):
     total_value: Decimal
     total_cost_basis: Decimal
     gain_loss: Decimal
-    return_pct: Optional[Decimal] = None
+    return_pct: Decimal | None = None
 
 
 class PortfolioPerformance(BaseModel):
@@ -193,7 +192,7 @@ class PortfolioPerformance(BaseModel):
 
     period: str  # 7d, 30d, 90d, 1y, all
     data_points: list[PerformancePoint]
-    start_value: Optional[Decimal] = None
-    end_value: Optional[Decimal] = None
-    period_return: Optional[Decimal] = None
-    period_return_pct: Optional[Decimal] = None
+    start_value: Decimal | None = None
+    end_value: Decimal | None = None
+    period_return: Decimal | None = None
+    period_return_pct: Decimal | None = None

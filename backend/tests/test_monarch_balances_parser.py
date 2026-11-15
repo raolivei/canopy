@@ -21,9 +21,7 @@ def _body(*rows: str) -> str:
 def test_header_detection_matches_only_balances_shape() -> None:
     assert looks_like_balances_header("Date,Balance,Account")
     assert looks_like_balances_header("Date,Balance,Account,extra")  # tolerant
-    assert not looks_like_balances_header(
-        "Date,Merchant,Category,Account,Original Statement,Notes,Amount,Tags"
-    )
+    assert not looks_like_balances_header("Date,Merchant,Category,Account,Original Statement,Notes,Amount,Tags")
     assert not looks_like_balances_header("")
 
 

@@ -21,7 +21,6 @@ import re
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Optional
 
 _TICKER = r"[A-Z][A-Z0-9\.\-]*"
 _NUM = r"[-+]?\d+(?:\.\d+)?"
@@ -52,7 +51,7 @@ class BuyInfo:
     shares: Decimal
     price: Decimal
     executed_at: date
-    fx_rate: Optional[Decimal]
+    fx_rate: Decimal | None
 
 
 @dataclass(frozen=True)
@@ -62,7 +61,7 @@ class SellInfo:
     shares: Decimal
     price: Decimal
     executed_at: date
-    fx_rate: Optional[Decimal]
+    fx_rate: Decimal | None
 
 
 @dataclass(frozen=True)
@@ -71,7 +70,7 @@ class DivInfo:
     name: str
     pay_date: date
     record_date: date
-    fx_rate: Optional[Decimal]
+    fx_rate: Decimal | None
 
 
 @dataclass(frozen=True)
@@ -86,21 +85,21 @@ class DirectDepositInfo:
     employer: str
 
 
-def _dec(s: str) -> Optional[Decimal]:
+def _dec(s: str) -> Decimal | None:
     try:
         return Decimal(s)
     except (InvalidOperation, ValueError):
         return None
 
 
-def _date(s: str) -> Optional[date]:
+def _date(s: str) -> date | None:
     try:
         return date.fromisoformat(s)
     except ValueError:
         return None
 
 
-def parse_buy(desc: str) -> Optional[BuyInfo]:
+def parse_buy(desc: str) -> BuyInfo | None:
     m = _BUY_RE.match(desc)
     if not m:
         return None
@@ -120,7 +119,7 @@ def parse_buy(desc: str) -> Optional[BuyInfo]:
     )
 
 
-def parse_sell(desc: str) -> Optional[SellInfo]:
+def parse_sell(desc: str) -> SellInfo | None:
     m = _SELL_RE.match(desc)
     if not m:
         return None
@@ -140,7 +139,7 @@ def parse_sell(desc: str) -> Optional[SellInfo]:
     )
 
 
-def parse_div(desc: str) -> Optional[DivInfo]:
+def parse_div(desc: str) -> DivInfo | None:
     m = _DIV_RE.match(desc)
     if not m:
         return None
@@ -158,7 +157,7 @@ def parse_div(desc: str) -> Optional[DivInfo]:
     )
 
 
-def parse_share_transfer(desc: str) -> Optional[ShareTransferInfo]:
+def parse_share_transfer(desc: str) -> ShareTransferInfo | None:
     m = _SHARE_TRANSFER_RE.match(desc)
     if not m:
         return None
@@ -172,7 +171,7 @@ def parse_share_transfer(desc: str) -> Optional[ShareTransferInfo]:
     )
 
 
-def parse_direct_deposit(desc: str) -> Optional[DirectDepositInfo]:
+def parse_direct_deposit(desc: str) -> DirectDepositInfo | None:
     m = _DIRECT_DEPOSIT_RE.match(desc)
     if not m:
         return None

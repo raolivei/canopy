@@ -10,7 +10,6 @@ flag so the UI can display a banner if we're unable to refresh.
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -25,9 +24,9 @@ class UsdCadRateResponse(BaseModel):
     """Current USD/CAD closing rate plus metadata for the UI banner."""
 
     pair: str = "USDCAD"
-    rate: Optional[float]
-    as_of_date: Optional[date]
-    source: Optional[str]
+    rate: float | None
+    as_of_date: date | None
+    source: str | None
     is_stale: bool
 
 
@@ -81,6 +80,4 @@ def backfill_usd_cad(payload: BackfillRequest, db: DbSession) -> BackfillRespons
     start = end - timedelta(days=max(1, payload.days))
     written = fx_service.backfill_rates(db, start_date=start, end_date=end)
     db.commit()
-    return BackfillResponse(
-        observations_written=written, start_date=start, end_date=end
-    )
+    return BackfillResponse(observations_written=written, start_date=start, end_date=end)

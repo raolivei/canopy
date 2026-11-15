@@ -1,7 +1,5 @@
 """Pydantic models for Golden Questions regression suite."""
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -10,18 +8,21 @@ class GoldenQuestionResult(BaseModel):
 
     question_number: int = Field(..., description="Question 1-10 identifier")
     question: str = Field(..., description="The golden question text")
-    category: str = Field(..., description="Category: net_worth, spending, budget, subscriptions, savings, merchants, portfolio, goals, anomalies")
+    category: str = Field(
+        ...,
+        description="Category: net_worth, spending, budget, subscriptions, savings, merchants, portfolio, goals, anomalies",
+    )
     canopy_answer: str = Field(..., description="Canopy API response")
     monarch_reference: str = Field(..., description="Monarch MCP reference oracle response")
     match_type: str = Field(
         ...,
         description="Match result: exact, numerical_delta, categorical_match, partial, mismatch, unavailable, error",
     )
-    numerical_delta: Optional[float] = Field(None, description="Absolute difference for numerical comparisons")
-    delta_percent: Optional[float] = Field(None, description="Percentage difference for numerical comparisons")
+    numerical_delta: float | None = Field(None, description="Absolute difference for numerical comparisons")
+    delta_percent: float | None = Field(None, description="Percentage difference for numerical comparisons")
     confidence: float = Field(..., ge=0, le=1, description="Confidence score 0.0-1.0")
     passed: bool = Field(..., description="True if comparison passes threshold")
-    notes: Optional[str] = Field(None, description="Additional details about comparison")
+    notes: str | None = Field(None, description="Additional details about comparison")
 
 
 class GoldenQuestionsRunRequest(BaseModel):

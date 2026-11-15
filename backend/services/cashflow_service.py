@@ -3,14 +3,12 @@
 Canopy - Personal Finance Platform
 """
 
-from datetime import date, datetime, timedelta
-from decimal import Decimal
-from typing import Any, Optional
-
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from datetime import date, timedelta
+from typing import Any
 
 from backend.db.models.transaction import Transaction as TransactionModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 class CashflowService:
@@ -24,9 +22,7 @@ class CashflowService:
         """
         self.db = db
 
-    def get_monthly_summary(
-        self, start_date: date, end_date: date
-    ) -> list[dict[str, Any]]:
+    def get_monthly_summary(self, start_date: date, end_date: date) -> list[dict[str, Any]]:
         """Calculate income, expenses, and net for each month in date range.
 
         Args:
@@ -68,13 +64,15 @@ class CashflowService:
             expenses = data["expenses"]
             net = income - expenses
 
-            result.append({
-                "month": month_key,
-                "income": income,
-                "expenses": expenses,
-                "net": net,
-                "currency": "CAD",
-            })
+            result.append(
+                {
+                    "month": month_key,
+                    "income": income,
+                    "expenses": expenses,
+                    "net": net,
+                    "currency": "CAD",
+                }
+            )
 
         return result
 
@@ -133,7 +131,7 @@ class CashflowService:
             "currency": "CAD",
         }
 
-    def get_category_breakdown(self, month: Optional[str] = None) -> dict[str, Any]:
+    def get_category_breakdown(self, month: str | None = None) -> dict[str, Any]:
         """Get expense breakdown by category for a specific month.
 
         Args:
@@ -169,9 +167,7 @@ class CashflowService:
         category_totals: dict[str, float] = {}
         for tx in transactions:
             category = tx.category or "Uncategorized"
-            category_totals[category] = category_totals.get(category, 0) + float(
-                abs(tx.amount)
-            )
+            category_totals[category] = category_totals.get(category, 0) + float(abs(tx.amount))
 
         total_expenses = sum(category_totals.values())
 
@@ -219,9 +215,7 @@ class CashflowService:
 
         for tx in transactions:
             month_key = tx.date.strftime("%Y-%m")
-            monthly_expenses[month_key] = monthly_expenses.get(month_key, 0) + float(
-                abs(tx.amount)
-            )
+            monthly_expenses[month_key] = monthly_expenses.get(month_key, 0) + float(abs(tx.amount))
 
         if not monthly_expenses:
             return {
@@ -241,18 +235,12 @@ class CashflowService:
         max_burn = max(monthly_values)
 
         # Find months with min/max
-        min_month = next(
-            month for month, val in monthly_expenses.items() if val == min_burn
-        )
-        max_month = next(
-            month for month, val in monthly_expenses.items() if val == max_burn
-        )
+        min_month = next(month for month, val in monthly_expenses.items() if val == min_burn)
+        max_month = next(month for month, val in monthly_expenses.items() if val == max_burn)
 
         # Calculate volatility
         if avg_burn > 0:
-            variance = sum((val - avg_burn) ** 2 for val in monthly_values) / len(
-                monthly_values
-            )
+            variance = sum((val - avg_burn) ** 2 for val in monthly_values) / len(monthly_values)
             std_dev = variance**0.5
             coefficient_of_variation = (std_dev / avg_burn) * 100
 
@@ -266,10 +254,7 @@ class CashflowService:
             volatility = "no_data"
 
         # Build monthly breakdown
-        monthly_breakdown = [
-            {"month": month, "amount": amount}
-            for month, amount in sorted(monthly_expenses.items())
-        ]
+        monthly_breakdown = [{"month": month, "amount": amount} for month, amount in sorted(monthly_expenses.items())]
 
         return {
             "months_analyzed": len(monthly_expenses),

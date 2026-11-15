@@ -4,7 +4,6 @@ import time
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
@@ -58,7 +57,7 @@ async def preview_csv_import(
     file: UploadFile = File(...),
     bank_format: str = Form(BankFormat.GENERIC.value),
     default_currency: str = Form("CAD"),
-    default_account: Optional[str] = Form(None),
+    default_account: str | None = Form(None),
     skip_rows: int = Form(0),
     skip_duplicates: bool = Form(True),
 ):
@@ -76,7 +75,7 @@ async def preview_csv_import(
         content = await file.read()
         file_content = content.decode("utf-8")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}") from e
 
     # Try to detect headers and format
     lines = file_content.strip().split("\n")
@@ -94,8 +93,7 @@ async def preview_csv_import(
 
     # Prefer Amex presets when headers match (Import UI may default to Monarch).
     if (
-        detected_format
-        in (BankFormat.AMEX_YEAR_END_SUMMARY, BankFormat.AMEX_MONTHLY_STATEMENT_CA)
+        detected_format in (BankFormat.AMEX_YEAR_END_SUMMARY, BankFormat.AMEX_MONTHLY_STATEMENT_CA)
         and detected_format in csv_service.BANK_FORMATS
         and bank_format_enum == BankFormat.MONARCH
     ):
@@ -124,7 +122,7 @@ async def preview_csv_import(
     try:
         preview = csv_service.parse_csv_file(file_content=file_content, config=config, existing_transactions=[])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}") from e
 
     # Generate unique import ID
     import_id = str(uuid.uuid4())

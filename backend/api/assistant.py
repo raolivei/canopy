@@ -1,7 +1,5 @@
 """AI Assistant API endpoints."""
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import desc, select
 
@@ -19,7 +17,7 @@ router = APIRouter(prefix="/v1/assistant", tags=["assistant"])
 def _get_assistant_service(db: DbSession) -> AssistantService:
     """Create assistant service with config from settings."""
     settings = get_settings()
-    
+
     return AssistantService(
         db=db,
         provider_type=settings.assistant_provider,
@@ -44,66 +42,57 @@ async def chat(request: ChatRequest, db: DbSession):
             db.add(conversation)
             db.commit()
             db.refresh(conversation)
-        
+
         # Get conversation history
-        history_query = select(AssistantMessage).where(
-            AssistantMessage.conversation_id == conversation.id
-        ).order_by(AssistantMessage.created_at)
-        
+        history_query = (
+            select(AssistantMessage)
+            .where(AssistantMessage.conversation_id == conversation.id)
+            .order_by(AssistantMessage.created_at)
+        )
+
         messages = db.execute(history_query).scalars().all()
-        history = [
-            {"role": msg.role, "content": msg.content}
-            for msg in messages
-        ]
-        
+        history = [{"role": msg.role, "content": msg.content} for msg in messages]
+
         # Get assistant service and process query
         assistant = _get_assistant_service(db)
         result = assistant.chat(request.query, history)
-        
+
         # Save user message
-        user_msg = AssistantMessage(
-            conversation_id=conversation.id,
-            role="user",
-            content=request.query
-        )
+        user_msg = AssistantMessage(conversation_id=conversation.id, role="user", content=request.query)
         db.add(user_msg)
-        
+
         # Save assistant response
         assistant_msg = AssistantMessage(
             conversation_id=conversation.id,
             role="assistant",
             content=result["response"],
             functions_called=result.get("functions_called"),
-            execution_time_ms=result.get("execution_time_ms")
+            execution_time_ms=result.get("execution_time_ms"),
         )
         db.add(assistant_msg)
         db.commit()
         db.refresh(assistant_msg)
-        
+
         # Build response
         return ChatResponse(
             response=result["response"],
             conversation_id=conversation.id,
             message_id=assistant_msg.id,
-            functions_called=[
-                FunctionCall(**fc) for fc in result.get("functions_called", [])
-            ],
-            execution_time_ms=result.get("execution_time_ms", 0)
+            functions_called=[FunctionCall(**fc) for fc in result.get("functions_called", [])],
+            execution_time_ms=result.get("execution_time_ms", 0),
         )
-    
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Assistant error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Assistant error: {str(e)}") from e
 
 
 @router.get("/conversations", response_model=list[Conversation])
 async def get_conversations(db: DbSession, limit: int = 10):
     """Get recent conversations."""
-    query = select(AssistantConversation).order_by(
-        desc(AssistantConversation.updated_at)
-    ).limit(limit)
-    
+    query = select(AssistantConversation).order_by(desc(AssistantConversation.updated_at)).limit(limit)
+
     conversations = db.execute(query).scalars().all()
-    
+
     return [
         Conversation(
             id=conv.id,
@@ -114,13 +103,13 @@ async def get_conversations(db: DbSession, limit: int = 10):
                     id=msg.id,
                     role=msg.role,
                     content=msg.content,
-                    functions_called=[
-                        FunctionCall(**fc) for fc in (msg.functions_called or [])
-                    ] if msg.functions_called else None,
-                    created_at=msg.created_at
+                    functions_called=[FunctionCall(**fc) for fc in (msg.functions_called or [])]
+                    if msg.functions_called
+                    else None,
+                    created_at=msg.created_at,
                 )
                 for msg in conv.messages
-            ]
+            ],
         )
         for conv in conversations
     ]
@@ -142,28 +131,22 @@ async def get_conversation(conversation_id: int, db: DbSession):
                 id=msg.id,
                 role=msg.role,
                 content=msg.content,
-                functions_called=[
-                    FunctionCall(**fc) for fc in (msg.functions_called or [])
-                ] if msg.functions_called else None,
-                created_at=msg.created_at
+                functions_called=[FunctionCall(**fc) for fc in (msg.functions_called or [])]
+                if msg.functions_called
+                else None,
+                created_at=msg.created_at,
             )
             for msg in conversation.messages
-        ]
+        ],
     )
 
 
 @router.post("/golden-questions/run", response_model=GoldenQuestionsRunResponse)
-async def run_golden_questions(
-    request: GoldenQuestionsRunRequest,
-    db: DbSession
-):
+async def run_golden_questions(request: GoldenQuestionsRunRequest, db: DbSession):
     """Execute golden questions regression suite comparing Canopy vs Monarch MCP."""
     try:
         service = GoldenQuestionsService(db)
-        result = service.run_golden_questions(
-            verbose=request.verbose,
-            stop_on_failure=request.stop_on_failure
-        )
+        result = service.run_golden_questions(verbose=request.verbose, stop_on_failure=request.stop_on_failure)
         return GoldenQuestionsRunResponse(**result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Golden questions error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Golden questions error: {str(e)}") from e

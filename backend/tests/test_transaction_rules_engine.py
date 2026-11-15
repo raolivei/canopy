@@ -93,9 +93,37 @@ def test_apply_rules_priority_order(db: Session, sample_transaction: Transaction
     engine = RulesEngine(db)
     actions = engine.apply_rules(sample_transaction)
 
-    # High priority rule applies first
+    # Both rules match and are applied highest priority first; without
+    # stop_on_match the later (lower-priority) rule overrides the field.
+    assert len(actions) == 2
+    assert [a["rule_name"] for a in actions] == ["High priority", "Low priority"]
+    assert sample_transaction.category == "Low"
+
+
+def test_apply_rules_stop_on_match_prevents_override(db: Session, sample_transaction: Transaction) -> None:
+    """A high-priority rule with stop_on_match keeps lower-priority rules from running."""
+    rule_low = TransactionRule(
+        name="Low priority",
+        priority=5,
+        active=True,
+        conditions={"conditions": [{"field": "merchant", "operator": "contains", "value": "Starbucks"}]},
+        actions={"actions": [{"type": "set_category", "value": "Low"}]},
+    )
+    rule_high = TransactionRule(
+        name="High priority",
+        priority=20,
+        active=True,
+        stop_on_match=True,
+        conditions={"conditions": [{"field": "merchant", "operator": "contains", "value": "Starbucks"}]},
+        actions={"actions": [{"type": "set_category", "value": "High"}]},
+    )
+    db.add_all([rule_low, rule_high])
+    db.flush()
+
+    actions = RulesEngine(db).apply_rules(sample_transaction)
+
+    assert [a["rule_name"] for a in actions] == ["High priority"]
     assert sample_transaction.category == "High"
-    assert len(actions) == 2  # Both rules match
 
 
 def test_apply_rules_stop_on_match(db: Session, sample_transaction: Transaction) -> None:

@@ -7,7 +7,7 @@ parser, and only the Canada section contributes rows.
 
 from collections import defaultdict
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from sqlalchemy import select
@@ -51,9 +51,7 @@ def _line_to_response(ln: PortfolioReviewLine) -> PortfolioReviewLineResponse:
     return PortfolioReviewLineResponse.model_validate(ln)
 
 
-def _parsed_line_to_db(
-    pl: ParsedLine, review_id: int, sort_order: int
-) -> PortfolioReviewLine:
+def _parsed_line_to_db(pl: ParsedLine, review_id: int, sort_order: int) -> PortfolioReviewLine:
     raw = pl.raw if isinstance(pl.raw, dict) else {}
     return PortfolioReviewLine(
         review_id=review_id,
@@ -78,27 +76,13 @@ async def list_reviews(
     db: DbSession,
     limit: int = Query(50, ge=1, le=200),
 ):
-    rows = (
-        db.execute(
-            select(PortfolioReview)
-            .order_by(PortfolioReview.as_of_date.desc())
-            .limit(limit)
-        )
-        .scalars()
-        .all()
-    )
+    rows = db.execute(select(PortfolioReview).order_by(PortfolioReview.as_of_date.desc()).limit(limit)).scalars().all()
     return [_review_to_summary(r) for r in rows]
 
 
 @router.get("/timeline", response_model=list[TimelinePoint])
 async def timeline(db: DbSession):
-    rows = (
-        db.execute(
-            select(PortfolioReview).order_by(PortfolioReview.as_of_date.asc())
-        )
-        .scalars()
-        .all()
-    )
+    rows = db.execute(select(PortfolioReview).order_by(PortfolioReview.as_of_date.asc())).scalars().all()
     return [
         TimelinePoint(
             id=r.id,
@@ -115,19 +99,15 @@ async def compare_reviews(
     from_id: int = Query(..., description="Earlier review id"),
     to_id: int = Query(..., description="Later review id"),
 ):
-    a = db.execute(
-        select(PortfolioReview).where(PortfolioReview.id == from_id)
-    ).scalar_one_or_none()
-    b = db.execute(
-        select(PortfolioReview).where(PortfolioReview.id == to_id)
-    ).scalar_one_or_none()
+    a = db.execute(select(PortfolioReview).where(PortfolioReview.id == from_id)).scalar_one_or_none()
+    b = db.execute(select(PortfolioReview).where(PortfolioReview.id == to_id)).scalar_one_or_none()
     if not a or not b:
         raise HTTPException(status_code=404, detail="Review not found")
 
     ta = a.total_value_cad
     tb = b.total_value_cad
-    delta: Optional[Decimal] = None
-    pct: Optional[float] = None
+    delta: Decimal | None = None
+    pct: float | None = None
     if ta is not None and tb is not None:
         delta = tb - ta
         if ta != 0:
@@ -144,9 +124,7 @@ async def compare_reviews(
 @router.get("/{review_id}", response_model=PortfolioReviewDetail)
 async def get_review(review_id: int, db: DbSession):
     r = db.execute(
-        select(PortfolioReview)
-        .options(selectinload(PortfolioReview.lines))
-        .where(PortfolioReview.id == review_id)
+        select(PortfolioReview).options(selectinload(PortfolioReview.lines)).where(PortfolioReview.id == review_id)
     ).scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="Review not found")
@@ -159,9 +137,7 @@ async def get_review(review_id: int, db: DbSession):
 
 @router.delete("/{review_id}")
 async def delete_review(review_id: int, db: DbSession):
-    r = db.execute(
-        select(PortfolioReview).where(PortfolioReview.id == review_id)
-    ).scalar_one_or_none()
+    r = db.execute(select(PortfolioReview).where(PortfolioReview.id == review_id)).scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="Review not found")
     db.delete(r)
@@ -175,21 +151,11 @@ async def get_allocation(
     db: DbSession,
     group_by: GroupBy = Query("platform"),
 ):
-    r = db.execute(
-        select(PortfolioReview).where(PortfolioReview.id == review_id)
-    ).scalar_one_or_none()
+    r = db.execute(select(PortfolioReview).where(PortfolioReview.id == review_id)).scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    lines = (
-        db.execute(
-            select(PortfolioReviewLine).where(
-                PortfolioReviewLine.review_id == review_id
-            )
-        )
-        .scalars()
-        .all()
-    )
+    lines = db.execute(select(PortfolioReviewLine).where(PortfolioReviewLine.review_id == review_id)).scalars().all()
 
     buckets: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     for ln in lines:
@@ -252,8 +218,8 @@ def _import_one(
     db,
     raw_bytes: bytes,
     *,
-    filename: Optional[str],
-    label: Optional[str],
+    filename: str | None,
+    label: str | None,
     replace: bool,
 ) -> PortfolioReview:
     """Persist a single portfolio-review CSV. Raises HTTPException on any error."""
@@ -278,8 +244,7 @@ def _import_one(
         raise HTTPException(
             status_code=400,
             detail=(
-                "No Canadian rows found. Ensure the CSV has a 'Canada Portfolio' "
-                "section with a 'Value (CAD)' column."
+                "No Canadian rows found. Ensure the CSV has a 'Canada Portfolio' section with a 'Value (CAD)' column."
             ),
         )
 
@@ -292,10 +257,7 @@ def _import_one(
     if existing and not replace:
         raise HTTPException(
             status_code=409,
-            detail=(
-                f"A review already exists for {parsed.as_of_date}. "
-                "Pass replace=true to overwrite."
-            ),
+            detail=(f"A review already exists for {parsed.as_of_date}. Pass replace=true to overwrite."),
         )
 
     if existing and replace:
@@ -324,7 +286,7 @@ def _import_one(
 async def import_review(
     db: DbSession,
     file: UploadFile = File(...),
-    label: Optional[str] = Query(None, max_length=64),
+    label: str | None = Query(None, max_length=64),
     replace: bool = Query(
         False,
         description="If true, replace existing review with the same as_of_date",
@@ -334,9 +296,7 @@ async def import_review(
     pr = _import_one(db, raw, filename=file.filename, label=label, replace=replace)
 
     r = db.execute(
-        select(PortfolioReview)
-        .options(selectinload(PortfolioReview.lines))
-        .where(PortfolioReview.id == pr.id)
+        select(PortfolioReview).options(selectinload(PortfolioReview.lines)).where(PortfolioReview.id == pr.id)
     ).scalar_one()
     lines = sorted(r.lines, key=lambda x: x.sort_order)
     return PortfolioReviewDetail(
@@ -349,13 +309,10 @@ async def import_review(
 async def import_reviews_batch(
     db: DbSession,
     files: list[UploadFile] = File(...),
-    label: Optional[str] = Query(None, max_length=64),
+    label: str | None = Query(None, max_length=64),
     replace: bool = Query(
         False,
-        description=(
-            "If true, replace existing reviews that share an as_of_date with any "
-            "incoming file."
-        ),
+        description=("If true, replace existing reviews that share an as_of_date with any incoming file."),
     ),
 ):
     """Import multiple portfolio-review CSVs in one request.
@@ -371,9 +328,7 @@ async def import_reviews_batch(
         filename = f.filename or "upload.csv"
         try:
             raw = await f.read()
-            pr = _import_one(
-                db, raw, filename=filename, label=label, replace=replace
-            )
+            pr = _import_one(db, raw, filename=filename, label=label, replace=replace)
             results.append(
                 BatchImportFileResult(
                     filename=filename,

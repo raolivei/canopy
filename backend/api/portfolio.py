@@ -1,7 +1,6 @@
 """Portfolio API endpoints for asset, lot, and dividend management."""
 
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
@@ -57,7 +56,7 @@ async def create_asset(asset_data: AssetCreate, db: DbSession):
 @router.get("/assets", response_model=list[AssetWithHoldings])
 async def list_assets(
     db: DbSession,
-    asset_type: Optional[AssetType] = Query(None, description="Filter by asset type"),
+    asset_type: AssetType | None = Query(None, description="Filter by asset type"),
 ):
     """List all tracked assets with holdings data."""
     query = select(Asset)
@@ -66,11 +65,7 @@ async def list_assets(
 
     assets = db.execute(query.order_by(Asset.symbol)).scalars().all()
     calculator = PortfolioCalculator(db)
-    balance_ids = [
-        a.id
-        for a in assets
-        if not a.is_liability and a.asset_type in BALANCE_BASED_ASSET_TYPES
-    ]
+    balance_ids = [a.id for a in assets if not a.is_liability and a.asset_type in BALANCE_BASED_ASSET_TYPES]
     balance_map = calculator.native_balances_from_history(balance_ids)
 
     result = []
@@ -108,9 +103,7 @@ async def get_asset(asset_id: int, db: DbSession):
 
     calculator = PortfolioCalculator(db)
     balance_map = (
-        calculator.native_balances_from_history([asset.id])
-        if asset.asset_type in BALANCE_BASED_ASSET_TYPES
-        else {}
+        calculator.native_balances_from_history([asset.id]) if asset.asset_type in BALANCE_BASED_ASSET_TYPES else {}
     )
     summary = calculator.get_holding_summary(asset, balance_map=balance_map)
 
@@ -192,7 +185,7 @@ async def create_lot(lot_data: LotCreate, db: DbSession):
 @router.get("/lots", response_model=list[LotResponse])
 async def list_lots(
     db: DbSession,
-    asset_id: Optional[int] = Query(None, description="Filter by asset ID"),
+    asset_id: int | None = Query(None, description="Filter by asset ID"),
     include_sold: bool = Query(False, description="Include sold lots"),
 ):
     """List all purchase lots."""
@@ -317,9 +310,9 @@ async def create_dividend(dividend_data: DividendCreate, db: DbSession):
 @router.get("/dividends", response_model=list[DividendResponse])
 async def list_dividends(
     db: DbSession,
-    asset_id: Optional[int] = Query(None, description="Filter by asset ID"),
-    start_date: Optional[date] = Query(None, description="Start date filter"),
-    end_date: Optional[date] = Query(None, description="End date filter"),
+    asset_id: int | None = Query(None, description="Filter by asset ID"),
+    start_date: date | None = Query(None, description="Start date filter"),
+    end_date: date | None = Query(None, description="End date filter"),
 ):
     """List dividend payments."""
     query = select(Dividend, Asset.symbol).join(Asset)

@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,14 +32,14 @@ class Lot(Base):
     purchase_date: Mapped[date] = mapped_column(Date)
 
     # Optional metadata
-    account: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    account: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Sale tracking
     is_sold: Mapped[bool] = mapped_column(Boolean, default=False)
-    sold_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    sold_price_per_unit: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
-    sold_fees: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=4), nullable=True)
+    sold_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    sold_price_per_unit: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
+    sold_fees: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=4), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -56,7 +56,7 @@ class Lot(Base):
         return (self.quantity * self.price_per_unit) + self.fees
 
     @property
-    def realized_gain_loss(self) -> Optional[Decimal]:
+    def realized_gain_loss(self) -> Decimal | None:
         """Realized gain/loss if lot is sold."""
         if not self.is_sold or self.sold_price_per_unit is None:
             return None

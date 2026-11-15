@@ -3,7 +3,7 @@
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -39,10 +39,10 @@ class Dividend(Base):
     )
 
     # For stock dividends or reinvested dividends
-    shares_received: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
+    shares_received: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
 
     # Optional metadata
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

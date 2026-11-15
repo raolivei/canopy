@@ -16,10 +16,10 @@ from __future__ import annotations
 import csv
 import enum
 import io
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Iterable, Iterator, Optional
 
 
 class ShapeKind(str, enum.Enum):
@@ -70,8 +70,8 @@ class ParsedRow:
     currency: str
     description: str
     raw_code: str  # WS transaction code (shape A) or type (shape B)
-    balance: Optional[Decimal] = None
-    post_date: Optional[date] = None
+    balance: Decimal | None = None
+    post_date: date | None = None
 
 
 # Shape-A code -> RowKind
@@ -96,7 +96,7 @@ _SHAPE_A_MAP: dict[str, RowKind] = {
 }
 
 
-def _dec(s: Optional[str]) -> Optional[Decimal]:
+def _dec(s: str | None) -> Decimal | None:
     if s is None:
         return None
     t = s.strip()
@@ -108,7 +108,7 @@ def _dec(s: Optional[str]) -> Optional[Decimal]:
         return None
 
 
-def _date(s: Optional[str]) -> Optional[date]:
+def _date(s: str | None) -> date | None:
     if not s:
         return None
     try:
@@ -135,7 +135,7 @@ def iter_rows(content: str) -> Iterator[tuple[ShapeKind, list[str], dict[str, st
     a *new* shape with the fresh header row context.
     """
     reader = csv.reader(io.StringIO(content))
-    header: Optional[list[str]] = None
+    header: list[str] | None = None
     shape = ShapeKind.UNKNOWN
     for raw in reader:
         if not any((cell or "").strip() for cell in raw):
@@ -158,7 +158,7 @@ def iter_rows(content: str) -> Iterator[tuple[ShapeKind, list[str], dict[str, st
         yield shape, header, row_dict
 
 
-def parse_shape_a(row: dict[str, str]) -> Optional[ParsedRow]:
+def parse_shape_a(row: dict[str, str]) -> ParsedRow | None:
     code = (row.get("transaction") or "").strip().upper()
     occurred = _date(row.get("date"))
     amount = _dec(row.get("amount"))
@@ -178,7 +178,7 @@ def parse_shape_a(row: dict[str, str]) -> Optional[ParsedRow]:
     )
 
 
-def parse_shape_b(row: dict[str, str]) -> Optional[ParsedRow]:
+def parse_shape_b(row: dict[str, str]) -> ParsedRow | None:
     """Normalize a credit-card row.
 
     Sign convention out of Wealthsimple: **purchases are positive, refunds

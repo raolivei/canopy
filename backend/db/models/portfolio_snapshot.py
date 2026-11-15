@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, ForeignKey, Index, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -39,7 +39,7 @@ class PortfolioSnapshot(Base):
         return self.total_value - self.total_cost_basis
 
     @property
-    def total_return_pct(self) -> Optional[Decimal]:
+    def total_return_pct(self) -> Decimal | None:
         """Total return percentage."""
         if self.total_cost_basis == 0:
             return None
@@ -77,7 +77,7 @@ class SnapshotHolding(Base):
         return self.market_value - self.cost_basis
 
     @property
-    def return_pct(self) -> Optional[Decimal]:
+    def return_pct(self) -> Decimal | None:
         """Return percentage for this holding."""
         if self.cost_basis == 0:
             return None

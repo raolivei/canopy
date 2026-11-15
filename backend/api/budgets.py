@@ -1,7 +1,6 @@
 """Budget API endpoints for creating and tracking spending budgets."""
 
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
@@ -82,7 +81,7 @@ async def create_budget(budget_data: BudgetCreate, db: DbSession):
 async def list_budgets(
     db: DbSession,
     active_only: bool = Query(True, description="Filter by active budgets only"),
-    user_id: Optional[int] = Query(None, description="Filter by user ID"),
+    user_id: int | None = Query(None, description="Filter by user ID"),
 ):
     """List all budgets with optional filters."""
     query = select(BudgetModel)
@@ -198,7 +197,7 @@ async def get_budget_status(budget_id: int, db: DbSession):
         status = service.get_budget_status(budget_id)
         return status
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.get("/{budget_id}/tracking", response_model=BudgetTracking)
@@ -210,4 +209,4 @@ async def get_budget_tracking(budget_id: int, db: DbSession):
         tracking = service.get_budget_tracking(budget_id)
         return tracking
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e

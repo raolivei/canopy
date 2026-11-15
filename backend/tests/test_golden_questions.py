@@ -2,23 +2,17 @@
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from backend.services.golden_questions import GoldenQuestionsService
 
 
-def create_mock_transaction(
-    date_val, merchant, description, amount, category, type_val
-):
+def create_mock_transaction(date_val, merchant, description, amount, category, type_val):
     """Create a mock transaction object."""
     tx = MagicMock()
-    tx.date = (
-        date_val
-        if isinstance(date_val, datetime)
-        else datetime.combine(date_val, datetime.min.time())
-    )
+    tx.date = date_val if isinstance(date_val, datetime) else datetime.combine(date_val, datetime.min.time())
     tx.merchant = merchant
     tx.description = description
     tx.amount = Decimal(str(amount))
@@ -45,9 +39,7 @@ def mock_db_with_data():
     # Transactions
     txns = [
         # Income
-        create_mock_transaction(
-            month_start, "Employer", "Salary", "5000.00", "Income", "income"
-        ),
+        create_mock_transaction(month_start, "Employer", "Salary", "5000.00", "Income", "income"),
         # Expenses
         create_mock_transaction(
             month_start + timedelta(days=1),
@@ -98,8 +90,11 @@ def mock_db_with_data():
         create_mock_asset("Chequing", 5000.00),
     ]
 
-    # Mock database
+    # Mock database. The seeded rows above document the scenario the
+    # hard-coded query answers below are derived from.
     mock_db = MagicMock()
+    mock_db.seeded_transactions = txns
+    mock_db.seeded_assets = assets
 
     def mock_execute(query):
         result = MagicMock()
@@ -117,29 +112,41 @@ def mock_db_with_data():
             elif "group_by" in str(query).lower():
                 # Group by queries return scalars().all()
                 if "category" in str(query).lower():
-                    result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(
-                        return_value=[
-                            ("Groceries", -330.00),
-                            ("Transportation", -60.00),
-                            ("Entertainment", -16.99),
-                        ]
-                    )))
+                    result.scalars = MagicMock(
+                        return_value=MagicMock(
+                            all=MagicMock(
+                                return_value=[
+                                    ("Groceries", -330.00),
+                                    ("Transportation", -60.00),
+                                    ("Entertainment", -16.99),
+                                ]
+                            )
+                        )
+                    )
                 elif "merchant" in str(query).lower():
-                    result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(
-                        return_value=[
-                            ("Supermarket", -330.00),
-                            ("Shell Gas", -60.00),
-                            ("Netflix", -16.99),
-                        ]
-                    )))
+                    result.scalars = MagicMock(
+                        return_value=MagicMock(
+                            all=MagicMock(
+                                return_value=[
+                                    ("Supermarket", -330.00),
+                                    ("Shell Gas", -60.00),
+                                    ("Netflix", -16.99),
+                                ]
+                            )
+                        )
+                    )
                 elif "type" in str(query).lower() and "asset" in str(query).lower():
-                    result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(
-                        return_value=[
-                            ("RRSP", 50000.00),
-                            ("TFSA", 30000.00),
-                            ("Chequing", 5000.00),
-                        ]
-                    )))
+                    result.scalars = MagicMock(
+                        return_value=MagicMock(
+                            all=MagicMock(
+                                return_value=[
+                                    ("RRSP", 50000.00),
+                                    ("TFSA", 30000.00),
+                                    ("Chequing", 5000.00),
+                                ]
+                            )
+                        )
+                    )
 
         result.all = MagicMock(return_value=[])
         return result

@@ -3,7 +3,6 @@
 import logging
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from celery import Celery
 from celery.schedules import crontab
@@ -53,13 +52,14 @@ def import_csv(file_path: str) -> str:
 
 
 @celery_app.task(name="ingest.sync_questrade")
-def sync_questrade(refresh_token: Optional[str] = None) -> dict:
+def sync_questrade(refresh_token: str | None = None) -> dict:
     """Sync Questrade accounts and positions into Canopy. Uses refresh_token or settings."""
     token = refresh_token or get_settings().questrade_refresh_token
     if not token:
         logger.warning("Questrade sync skipped: no refresh token")
         return {"status": "skipped", "reason": "no_refresh_token"}
     from backend.services.questrade_integration import QuestradeIntegrationService
+
     db = SessionLocal()
     try:
         with QuestradeIntegrationService(token) as qt:
@@ -97,19 +97,29 @@ def sync_questrade(refresh_token: Optional[str] = None) -> dict:
                         lot.price_per_unit = price
                         updated_lots += 1
                     else:
-                        db.add(Lot(
-                            asset_id=asset.id,
-                            quantity=pos.open_quantity,
-                            price_per_unit=price,
-                            fees=Decimal("0"),
-                            purchase_date=date.today(),
-                            account=account_label,
-                            notes=f"Synced from Questrade {acc.type}",
-                        ))
+                        db.add(
+                            Lot(
+                                asset_id=asset.id,
+                                quantity=pos.open_quantity,
+                                price_per_unit=price,
+                                fees=Decimal("0"),
+                                purchase_date=date.today(),
+                                account=account_label,
+                                notes=f"Synced from Questrade {acc.type}",
+                            )
+                        )
                         created_lots += 1
             db.commit()
-            logger.info(f"Questrade sync: {len(accounts)} accounts, +{created_assets} assets, +{created_lots} lots, ~{updated_lots} updated")
-            return {"status": "synced", "accounts": len(accounts), "created_assets": created_assets, "created_lots": created_lots, "updated_lots": updated_lots}
+            logger.info(
+                f"Questrade sync: {len(accounts)} accounts, +{created_assets} assets, +{created_lots} lots, ~{updated_lots} updated"
+            )
+            return {
+                "status": "synced",
+                "accounts": len(accounts),
+                "created_assets": created_assets,
+                "created_lots": created_lots,
+                "updated_lots": updated_lots,
+            }
     except Exception as e:
         logger.exception("Questrade sync failed")
         return {"status": "error", "detail": str(e)}
@@ -186,13 +196,7 @@ def create_daily_snapshot() -> dict:
 
         for asset in assets:
             # Calculate totals from unsold lots
-            lots = (
-                db.execute(
-                    select(Lot).where(Lot.asset_id == asset.id).where(Lot.is_sold.is_(False))
-                )
-                .scalars()
-                .all()
-            )
+            lots = db.execute(select(Lot).where(Lot.asset_id == asset.id).where(Lot.is_sold.is_(False))).scalars().all()
 
             if not lots:
                 continue

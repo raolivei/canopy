@@ -7,6 +7,7 @@ TestClient. The route just composes these helpers + a DB round trip.
 
 from __future__ import annotations
 
+from datetime import UTC
 from decimal import Decimal
 
 from backend.api.accounts import (
@@ -114,7 +115,7 @@ def test_wise_balance_uses_current_price_not_csv_snapshot_history() -> None:
     """Wise sync only sets ``current_price``. Monarch/CSV can still attach
     ``AccountBalanceHistory`` rows to the same asset — those must not show as $0.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from backend.api.accounts import _asset_to_account
     from backend.db.models.asset import Asset, AssetType
@@ -127,12 +128,12 @@ def test_wise_balance_uses_current_price_not_csv_snapshot_history() -> None:
         currency="CAD",
         sync_source="WISE",
         current_price=Decimal("999.00"),
-        price_updated_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
+        price_updated_at=datetime(2026, 4, 1, tzinfo=UTC),
     )
     r = _asset_to_account(
         a,
         latest_balance=Decimal("0"),
-        latest_balance_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+        latest_balance_date=datetime(2026, 4, 19, tzinfo=UTC),
     )
     assert r.balance == 999.0
     assert r.updated_at == a.price_updated_at
@@ -176,38 +177,40 @@ def test_latest_balances_pulls_from_account_balance_history() -> None:
         db.add_all([chq, tfsa])
         db.flush()
 
-        db.add_all([
-            AccountBalanceHistory(
-                asset_id=chq.id,
-                as_of_date=date(2026, 1, 31),
-                balance=Decimal("100.00"),
-                currency="CAD",
-                source="wealthsimple_csv",
-            ),
-            AccountBalanceHistory(
-                asset_id=chq.id,
-                as_of_date=date(2026, 3, 31),
-                balance=Decimal("1.61"),
-                currency="CAD",
-                source="wealthsimple_csv",
-            ),
-            # A USD sub-balance on a CAD-denominated TFSA should be
-            # ignored for the Accounts-page "native" view.
-            AccountBalanceHistory(
-                asset_id=tfsa.id,
-                as_of_date=date(2026, 3, 31),
-                balance=Decimal("42.00"),
-                currency="USD",
-                source="wealthsimple_csv",
-            ),
-            AccountBalanceHistory(
-                asset_id=tfsa.id,
-                as_of_date=date(2026, 3, 31),
-                balance=Decimal("500.00"),
-                currency="CAD",
-                source="wealthsimple_csv",
-            ),
-        ])
+        db.add_all(
+            [
+                AccountBalanceHistory(
+                    asset_id=chq.id,
+                    as_of_date=date(2026, 1, 31),
+                    balance=Decimal("100.00"),
+                    currency="CAD",
+                    source="wealthsimple_csv",
+                ),
+                AccountBalanceHistory(
+                    asset_id=chq.id,
+                    as_of_date=date(2026, 3, 31),
+                    balance=Decimal("1.61"),
+                    currency="CAD",
+                    source="wealthsimple_csv",
+                ),
+                # A USD sub-balance on a CAD-denominated TFSA should be
+                # ignored for the Accounts-page "native" view.
+                AccountBalanceHistory(
+                    asset_id=tfsa.id,
+                    as_of_date=date(2026, 3, 31),
+                    balance=Decimal("42.00"),
+                    currency="USD",
+                    source="wealthsimple_csv",
+                ),
+                AccountBalanceHistory(
+                    asset_id=tfsa.id,
+                    as_of_date=date(2026, 3, 31),
+                    balance=Decimal("500.00"),
+                    currency="CAD",
+                    source="wealthsimple_csv",
+                ),
+            ]
+        )
         db.flush()
 
         latest = _latest_balances_by_asset(db, [chq.id, tfsa.id])

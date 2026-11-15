@@ -4,7 +4,6 @@ Canopy - Personal Finance Platform
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -48,7 +47,7 @@ class TransactionRule(Base):
 
     # Rule identification
     name: Mapped[str] = mapped_column(String(200))
-    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Execution priority (higher = evaluated first)
     priority: Mapped[int] = mapped_column(Integer, default=0)
@@ -63,7 +62,7 @@ class TransactionRule(Base):
 
     # Usage statistics
     match_count: Mapped[int] = mapped_column(Integer, default=0)
-    last_matched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_matched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

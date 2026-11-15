@@ -99,14 +99,14 @@ class Category(Base):
     # Category details
     name: Mapped[str] = mapped_column(String(100), unique=True)
     display_name: Mapped[str] = mapped_column(String(100))
-    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Visual representation
-    icon: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    color: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # Hex color or Tailwind class
+    icon: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)  # Hex color or Tailwind class
 
     # Hierarchical structure (2-level: parent → child)
-    parent_id: Mapped[Optional[UUID]] = mapped_column(
+    parent_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("categories.id", ondelete="CASCADE"),
         nullable=True,

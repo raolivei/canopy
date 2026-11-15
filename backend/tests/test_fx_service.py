@@ -95,12 +95,8 @@ def test_get_latest_rate_returns_newest_row(db: Session) -> None:
 
 def test_is_stale_thresholds() -> None:
     today = date(2026, 4, 18)
-    fresh = FxRate(
-        pair="USDCAD", as_of_date=date(2026, 4, 17), rate=Decimal("1"), source="x"
-    )
-    stale = FxRate(
-        pair="USDCAD", as_of_date=date(2026, 4, 10), rate=Decimal("1"), source="x"
-    )
+    fresh = FxRate(pair="USDCAD", as_of_date=date(2026, 4, 17), rate=Decimal("1"), source="x")
+    stale = FxRate(pair="USDCAD", as_of_date=date(2026, 4, 10), rate=Decimal("1"), source="x")
 
     assert fx_service.is_stale(None, today=today) is True
     assert fx_service.is_stale(fresh, today=today) is False
@@ -162,11 +158,7 @@ def test_convert_rejects_unsupported_currencies() -> None:
 
 def _fake_boc_payload(observations: list[tuple[str, str]]) -> dict:
     """Return a BoC Valet-shaped JSON payload for ``observations``."""
-    return {
-        "observations": [
-            {"d": d_str, "FXUSDCAD": {"v": v_str}} for d_str, v_str in observations
-        ]
-    }
+    return {"observations": [{"d": d_str, "FXUSDCAD": {"v": v_str}} for d_str, v_str in observations]}
 
 
 def test_ensure_latest_rate_cached_hits_boc_when_empty(db: Session) -> None:

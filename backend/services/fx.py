@@ -41,14 +41,13 @@ import json
 import logging
 import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from collections.abc import Iterable
+from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Iterable, Optional
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from backend.db.models.fx_rate import FxRate
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -75,23 +74,16 @@ DISPLAY_FALLBACK_USDCAD = Decimal("1.35")
 # ---------------------------------------------------------------------------
 
 
-def get_latest_rate(db: Session, pair: str = DEFAULT_PAIR) -> Optional[FxRate]:
+def get_latest_rate(db: Session, pair: str = DEFAULT_PAIR) -> FxRate | None:
     """Return the most-recently observed row for ``pair``, or ``None``."""
     return (
-        db.execute(
-            select(FxRate)
-            .where(FxRate.pair == pair)
-            .order_by(FxRate.as_of_date.desc())
-            .limit(1)
-        )
+        db.execute(select(FxRate).where(FxRate.pair == pair).order_by(FxRate.as_of_date.desc()).limit(1))
         .scalars()
         .first()
     )
 
 
-def get_rate_on(
-    db: Session, on_date: date, pair: str = DEFAULT_PAIR
-) -> Optional[Decimal]:
+def get_rate_on(db: Session, on_date: date, pair: str = DEFAULT_PAIR) -> Decimal | None:
     """Return the rate for ``pair`` on ``on_date``.
 
     If there is no exact match (weekends / holidays / gaps), return the
@@ -111,7 +103,7 @@ def get_rate_on(
     return row.rate if row is not None else None
 
 
-def is_stale(rate_row: Optional[FxRate], today: Optional[date] = None) -> bool:
+def is_stale(rate_row: FxRate | None, today: date | None = None) -> bool:
     """Return True if ``rate_row`` is older than :data:`STALE_AFTER_DAYS`.
 
     A missing row is considered stale. ``today`` is injectable for
@@ -148,9 +140,7 @@ def convert(
     from_ccy = (from_ccy or "").upper()
     to_ccy = (to_ccy or "").upper()
     if from_ccy not in {"CAD", "USD"} or to_ccy not in {"CAD", "USD"}:
-        raise ValueError(
-            f"convert() only supports CAD + USD; got from={from_ccy} to={to_ccy}"
-        )
+        raise ValueError(f"convert() only supports CAD + USD; got from={from_ccy} to={to_ccy}")
     if from_ccy == to_ccy:
         return amount
     if usd_cad_rate is None or usd_cad_rate == 0:
@@ -171,7 +161,7 @@ def ensure_latest_rate_cached(
     *,
     http_get=None,
     pair: str = DEFAULT_PAIR,
-) -> Optional[FxRate]:
+) -> FxRate | None:
     """Return the latest cached rate, fetching from BoC if it's stale.
 
     ``http_get`` is injected for tests; it takes a URL and returns the
@@ -194,7 +184,7 @@ def backfill_rates(
     db: Session,
     *,
     start_date: date,
-    end_date: Optional[date] = None,
+    end_date: date | None = None,
     http_get=None,
     pair: str = DEFAULT_PAIR,
 ) -> int:
@@ -203,9 +193,7 @@ def backfill_rates(
     Returns the number of observations written (new + updated).
     """
     end_date = end_date or date.today()
-    fetched = _fetch_boc_observations(
-        start_date=start_date, end_date=end_date, http_get=http_get
-    )
+    fetched = _fetch_boc_observations(start_date=start_date, end_date=end_date, http_get=http_get)
     if not fetched:
         return 0
     _upsert_rates(db, fetched, pair=pair)
@@ -220,9 +208,9 @@ def backfill_rates(
 
 def _fetch_boc_observations(
     *,
-    n_recent: Optional[int] = None,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    n_recent: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     http_get=None,
 ) -> list[tuple[date, Decimal]]:
     """Return a list of ``(date, rate)`` tuples fetched from BoC.
@@ -330,7 +318,7 @@ def _upsert_rates(
 # ---------------------------------------------------------------------------
 
 
-def usd_amount_to_cad(amount: Decimal, usd_cad_rate: Optional[Decimal]) -> Decimal:
+def usd_amount_to_cad(amount: Decimal, usd_cad_rate: Decimal | None) -> Decimal:
     """Convert USD -> CAD with a guarded fallback.
 
     When ``usd_cad_rate`` is ``None`` (no FX known at all), returns
@@ -342,7 +330,7 @@ def usd_amount_to_cad(amount: Decimal, usd_cad_rate: Optional[Decimal]) -> Decim
     return amount * usd_cad_rate
 
 
-def cad_amount_to_usd(amount: Decimal, usd_cad_rate: Optional[Decimal]) -> Decimal:
+def cad_amount_to_usd(amount: Decimal, usd_cad_rate: Decimal | None) -> Decimal:
     """Convert CAD -> USD with a guarded fallback (see :func:`usd_amount_to_cad`)."""
     if usd_cad_rate is None or usd_cad_rate == 0:
         return Decimal("0")

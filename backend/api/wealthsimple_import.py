@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import select
@@ -175,11 +174,7 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
     """
     summaries: list[WsAccountSummary] = []
 
-    assets = (
-        db.execute(select(Asset).where(Asset.sync_source == "wealthsimple"))
-        .scalars()
-        .all()
-    )
+    assets = db.execute(select(Asset).where(Asset.sync_source == "wealthsimple")).scalars().all()
     for asset in assets:
         # One row per currency: the latest observation for each.
         per_ccy_rows = db.execute(
@@ -202,9 +197,7 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
             if key in seen:
                 continue
             seen.add(key)
-            balances.append(
-                WsSubBalance(currency=key, balance=balance, as_of_date=as_of)
-            )
+            balances.append(WsSubBalance(currency=key, balance=balance, as_of_date=as_of))
 
         # Legacy field: pick the CAD entry if present, else the first
         # balance we have.
@@ -216,31 +209,19 @@ def list_accounts(db: DbSession) -> list[WsAccountSummary]:
                 kind="asset",
                 symbol_or_name=asset.symbol,
                 display_name=asset.name,
-                account_type=(
-                    asset.asset_type.value
-                    if hasattr(asset.asset_type, "value")
-                    else str(asset.asset_type)
-                ),
+                account_type=(asset.asset_type.value if hasattr(asset.asset_type, "value") else str(asset.asset_type)),
                 institution=asset.institution or "Wealthsimple",
                 currency=asset.currency,
                 current_balance=legacy_balance.balance if legacy_balance else None,
-                balance_updated_at=(
-                    legacy_balance.as_of_date if legacy_balance else None
-                ),
+                balance_updated_at=(legacy_balance.as_of_date if legacy_balance else None),
                 balances_by_currency=balances,
             )
         )
 
-    liabilities = (
-        db.execute(select(Liability).where(Liability.institution == "Wealthsimple"))
-        .scalars()
-        .all()
-    )
+    liabilities = db.execute(select(Liability).where(Liability.institution == "Wealthsimple")).scalars().all()
     for liab in liabilities:
         liab_balance = liab.current_balance or Decimal("0")
-        liab_as_of = (
-            liab.balance_updated_at.date() if liab.balance_updated_at is not None else None
-        )
+        liab_as_of = liab.balance_updated_at.date() if liab.balance_updated_at is not None else None
         summaries.append(
             WsAccountSummary(
                 kind="liability",
@@ -356,18 +337,13 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
 
     # Pre-load FX rates for the whole window so per-point conversion is
     # O(log n) rather than n DB queries.
-    fx_rows = (
-        db.execute(
-            select(FxRate.as_of_date, FxRate.rate)
-            .where(FxRate.pair == "USDCAD")
-            .order_by(FxRate.as_of_date)
-        )
-        .all()
-    )
+    fx_rows = db.execute(
+        select(FxRate.as_of_date, FxRate.rate).where(FxRate.pair == "USDCAD").order_by(FxRate.as_of_date)
+    ).all()
     fx_dates = [row[0] for row in fx_rows]
     fx_values = [row[1] for row in fx_rows]
 
-    def _rate_on(d: date) -> Optional[Decimal]:
+    def _rate_on(d: date) -> Decimal | None:
         if not fx_dates:
             return None
         idx = bisect_right(fx_dates, d)
@@ -382,9 +358,7 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
     # Normalise the lot list so the inner loop only touches Python
     # primitives (avoids hitting SQLAlchemy attribute loading ~N times
     # per date for long timelines).
-    lots_by_currency: dict[str, list[tuple[date, date | None, Decimal]]] = (
-        defaultdict(list)
-    )
+    lots_by_currency: dict[str, list[tuple[date, date | None, Decimal]]] = defaultdict(list)
     for qty, ppu, purchase_date, is_sold, sold_date, ccy in lot_rows:
         if qty is None or ppu is None or purchase_date is None:
             continue
@@ -427,9 +401,7 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
         running_debt.update(events[d]["debt"])
 
         def _sum_ccy(bag: dict[tuple[str, int], Decimal], ccy: str) -> Decimal:
-            return sum(
-                (v for (c, _aid), v in bag.items() if c == ccy), start=Decimal("0")
-            )
+            return sum((v for (c, _aid), v in bag.items() if c == ccy), start=Decimal("0"))
 
         cad_inv = _sum_ccy(running_inv, "CAD")
         cad_cash = _sum_ccy(running_cash, "CAD")
@@ -447,18 +419,14 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
 
         rate = _rate_on(d)
 
-        def _combine_cad(
-            cad_amt: Decimal, usd_amt: Decimal, r: Optional[Decimal]
-        ) -> Decimal:
+        def _combine_cad(cad_amt: Decimal, usd_amt: Decimal, r: Decimal | None) -> Decimal:
             if r is None or r == 0:
                 # Without FX we can't mix; fall back to the CAD slice
                 # alone rather than pretending USD is zero'd at 1.0.
                 return cad_amt
             return cad_amt + (usd_amt * r)
 
-        def _combine_usd(
-            cad_amt: Decimal, usd_amt: Decimal, r: Optional[Decimal]
-        ) -> Decimal:
+        def _combine_usd(cad_amt: Decimal, usd_amt: Decimal, r: Decimal | None) -> Decimal:
             if r is None or r == 0:
                 return usd_amt
             return usd_amt + (cad_amt / r)
@@ -528,8 +496,6 @@ def networth_timeline(db: DbSession) -> NetWorthTimelineResponse:
         latest_combined_cad=last.combined_cad,
         latest_combined_usd=last.combined_usd,
         fx_rate=latest_rate_row.rate if latest_rate_row is not None else None,
-        fx_as_of_date=(
-            latest_rate_row.as_of_date if latest_rate_row is not None else None
-        ),
+        fx_as_of_date=(latest_rate_row.as_of_date if latest_rate_row is not None else None),
         fx_is_stale=fx_service.is_stale(latest_rate_row),
     )
