@@ -13,7 +13,10 @@ class GoldenQuestionResult(BaseModel):
     category: str = Field(..., description="Category: net_worth, spending, budget, subscriptions, savings, merchants, portfolio, goals, anomalies")
     canopy_answer: str = Field(..., description="Canopy API response")
     monarch_reference: str = Field(..., description="Monarch MCP reference oracle response")
-    match_type: str = Field(..., description="Match result: exact, numerical_delta, categorical_match, partial, mismatch")
+    match_type: str = Field(
+        ...,
+        description="Match result: exact, numerical_delta, categorical_match, partial, mismatch, unavailable, error",
+    )
     numerical_delta: Optional[float] = Field(None, description="Absolute difference for numerical comparisons")
     delta_percent: Optional[float] = Field(None, description="Percentage difference for numerical comparisons")
     confidence: float = Field(..., ge=0, le=1, description="Confidence score 0.0-1.0")

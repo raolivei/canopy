@@ -9,6 +9,8 @@
 
 **Canadian net worth and investments — self-hosted.**
 
+Product roadmap: [Canopy Wallet + Tax](docs/WALLET_TAX_PLAN.md) — Monarch workflow assessment, existing issue reconciliation, tax document ledger, dependencies and acceptance checks.
+
 Canopy is a personal finance app for **CAD + USD**: Wealthsimple and Monarch CSV imports, optional **Wise** (CAD/USD balances) and **Questrade** integrations, portfolio holdings, cash/credit accounts, insights, and a **FIRE calculator**. Data stays on your infrastructure (e.g. k3s at home, Tailscale access).
 
 ## What it does

@@ -14,6 +14,10 @@ from backend.db.models.transaction import Transaction
 from backend.db.models.asset import Asset
 
 
+class MonarchReferenceUnavailable(RuntimeError):
+    """An independent Monarch reference could not be obtained."""
+
+
 class GoldenQuestionsService:
     """Service for executing golden questions and comparing Canopy vs Monarch MCP."""
 
@@ -119,8 +123,8 @@ class GoldenQuestionsService:
 
         for q in questions:
             try:
-                canopy_result = q["canopy_fn"]()
                 monarch_result = q["monarch_fn"]()
+                canopy_result = q["canopy_fn"]()
 
                 comparison = q["compare_fn"](
                     canopy_result, monarch_result, q["question"]
@@ -146,10 +150,31 @@ class GoldenQuestionsService:
                     break
 
             except Exception as e:
-                error_msg = f"Q{q['number']}: {str(e)}"
+                # Never count missing references or execution errors as a match,
+                # and never expose provider exception bodies (which may contain data).
+                unavailable = isinstance(e, MonarchReferenceUnavailable)
+                note = "Monarch reference unavailable" if unavailable else "Comparison could not be completed"
+                error_msg = f"Q{q['number']}: {note}"
                 errors.append(error_msg)
+                results.append(
+                    {
+                        "question_number": q["number"],
+                        "question": q["question"],
+                        "category": q["category"],
+                        "canopy_answer": "",
+                        "monarch_reference": "",
+                        "match_type": "unavailable" if unavailable else "error",
+                        "numerical_delta": None,
+                        "delta_percent": None,
+                        "confidence": 0.0,
+                        "passed": False,
+                        "notes": note,
+                    }
+                )
                 if verbose:
                     print(f"Error processing {error_msg}")
+                if stop_on_failure:
+                    break
 
         elapsed_ms = int((time.time() - start_time) * 1000)
         passed = sum(1 for r in results if r["passed"])
@@ -297,17 +322,16 @@ class GoldenQuestionsService:
     # ==================== Monarch Reference Functions ====================
 
     def _monarch_answer(self, question_type: str) -> Any:
-        """Get answer from Monarch MCP or fallback to synthetic data.
+        """Get an independent reference; missing access must never imply parity.
 
         Args:
             question_type: Type of question (net_worth, spending, categories, etc.)
 
         Returns:
-            Answer from Monarch MCP or synthetic fallback data
+            Answer from the configured Monarch reference client
         """
         if not self.monarch_client:
-            # Fallback to synthetic data if MCP unavailable
-            return self._get_synthetic_monarch_data(question_type)
+            raise MonarchReferenceUnavailable("No Monarch reference client configured")
 
         try:
             today = date.today()
@@ -459,37 +483,10 @@ class GoldenQuestionsService:
                 return anomalies
 
             else:
-                return self._get_synthetic_monarch_data(question_type)
+                raise MonarchReferenceUnavailable("Unsupported reference question")
 
         except Exception as e:
-            # Log error and fallback to synthetic data
-            print(f"Monarch MCP error for {question_type}: {str(e)}")
-            return self._get_synthetic_monarch_data(question_type)
-
-    def _get_synthetic_monarch_data(self, question_type: str) -> Any:
-        """Generate synthetic Monarch data for testing when MCP unavailable."""
-        if question_type == "net_worth":
-            return self._net_worth_canopy()
-        elif question_type == "spending":
-            return self._spending_this_month_canopy()
-        elif question_type == "categories":
-            return self._top_categories_canopy()
-        elif question_type == "budget":
-            return self._budget_overages_canopy()
-        elif question_type == "subscriptions":
-            return self._next_subscription_canopy()
-        elif question_type == "savings_rate":
-            return self._savings_rate_canopy()
-        elif question_type == "merchants":
-            return self._top_merchants_canopy()
-        elif question_type == "allocation":
-            return self._asset_allocation_canopy()
-        elif question_type == "fire_goal":
-            return self._fire_goal_canopy()
-        elif question_type == "anomalies":
-            return self._anomalies_canopy()
-        else:
-            return None
+            raise MonarchReferenceUnavailable("Monarch reference request failed") from e
 
     def _net_worth_monarch(self) -> float:
         """Get net worth from Monarch MCP."""
