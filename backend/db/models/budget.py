@@ -6,7 +6,7 @@ Canopy - Personal Finance Platform
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -51,7 +51,7 @@ class Budget(Base):
     )
 
     # Optional user_id for future multi-user support (nullable for single-user)
-    user_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    user_id: Mapped[int | None] = mapped_column(nullable=True)
 
     # Active status for soft deletion
     active: Mapped[bool] = mapped_column(Boolean, default=True)

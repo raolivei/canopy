@@ -14,7 +14,6 @@ Both are nullable to allow lazy backfill for pre-existing rows.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -29,11 +28,11 @@ class ImportedEvent(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    canonical_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    canonical_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     source: Mapped[str] = mapped_column(String(50))
     target_table: Mapped[str] = mapped_column(String(50))
-    target_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    target_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:

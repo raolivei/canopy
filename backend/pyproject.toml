@@ -29,10 +29,21 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 
 [tool.ruff]
-extend = "../../workspace-config/python/ruff.toml"
-line-length = 120  # Override shared default (100)
+# Standalone config (the shared workspace-config ruff.toml is not checked out
+# alongside this repo). Mirrors the raolivei Python baseline.
+line-length = 120
+target-version = "py311"
+extend-exclude = ["alembic/versions", "venv", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# E501: long literals handled per-file; B008: FastAPI Depends/Query defaults;
+# B007/E722: legacy patterns to tighten separately; UP042: str-Enum mixins are
+# intentional for Pydantic/SQLAlchemy compatibility.
+ignore = ["E501", "B008", "B007", "E722", "UP042"]
 
 [tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
 # Long regex strings and literal CSV rows must stay on one line.
 "services/wealthsimple/description_parser.py" = ["E501"]
 "tests/test_wealthsimple_importer.py" = ["E501"]

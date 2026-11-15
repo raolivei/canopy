@@ -30,9 +30,9 @@ Idempotency:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, time, timezone
-from typing import Iterable, Optional
+from datetime import UTC, datetime, time
 
 from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.liability import Liability, LiabilityBalanceHistory
@@ -121,7 +121,7 @@ class MonarchBalancesImporter:
 
     def __init__(self, db: Session) -> None:
         self.db = db
-        self._account_cache: dict[str, Optional[ResolvedAccount]] = {}
+        self._account_cache: dict[str, ResolvedAccount | None] = {}
 
     # ------------------------------------------------------------------
     # Entry point
@@ -148,12 +148,7 @@ class MonarchBalancesImporter:
         report.skipped_pseudo = parsed.skipped_pseudo
         report.skipped_foreign = parsed.skipped_foreign
         report.skipped_unknown_account = parsed.skipped_unknown
-        report.rows_seen = (
-            parsed.kept
-            + parsed.skipped_pseudo
-            + parsed.skipped_foreign
-            + parsed.skipped_unknown
-        )
+        report.rows_seen = parsed.kept + parsed.skipped_pseudo + parsed.skipped_foreign + parsed.skipped_unknown
 
         if not parsed.header_ok:
             return report
@@ -234,7 +229,7 @@ class MonarchBalancesImporter:
         # downstream "amount owed" math stays consistent with the WS
         # importer.
         owed = abs(row.balance)
-        recorded_at = datetime.combine(row.as_of, time.min, tzinfo=timezone.utc)
+        recorded_at = datetime.combine(row.as_of, time.min, tzinfo=UTC)
 
         # LiabilityBalanceHistory has no unique constraint, so scan for
         # an existing row on the same calendar day. This is O(n) per
@@ -287,13 +282,13 @@ class MonarchBalancesImporter:
             liab = self.db.get(Liability, liability_id)
             if liab is not None:
                 liab.current_balance = owed
-                liab.balance_updated_at = datetime.now(timezone.utc)
+                liab.balance_updated_at = datetime.now(UTC)
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _resolve_cached(self, row: BalanceRow) -> Optional[ResolvedAccount]:
+    def _resolve_cached(self, row: BalanceRow) -> ResolvedAccount | None:
         key = row.account_label
         if key in self._account_cache:
             return self._account_cache[key]
@@ -313,9 +308,7 @@ class MonarchBalancesImporter:
 # ---------------------------------------------------------------------------
 
 
-def ingest_balances(
-    db: Session, files: Iterable[tuple[str, str]]
-) -> BalancesImportSummary:
+def ingest_balances(db: Session, files: Iterable[tuple[str, str]]) -> BalancesImportSummary:
     """Single-call helper used by the API layer."""
     return MonarchBalancesImporter(db).ingest(files)
 

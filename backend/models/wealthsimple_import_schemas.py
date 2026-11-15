@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,11 +13,11 @@ class WsFileClassification(BaseModel):
     account_label: str
     account_kind: str
     account_class: str
-    account_number: Optional[str] = None
-    statement_period_start: Optional[date] = None
+    account_number: str | None = None
+    statement_period_start: date | None = None
     shape: str
     skipped: bool
-    skip_reason: Optional[str] = None
+    skip_reason: str | None = None
     rows_seen: int = 0
     rows_imported: int = 0
     rows_duplicate: int = 0
@@ -57,7 +56,7 @@ class WsSubBalance(BaseModel):
 
     currency: str
     balance: Decimal
-    as_of_date: Optional[date] = None
+    as_of_date: date | None = None
 
 
 class WsAccountSummary(BaseModel):
@@ -69,8 +68,8 @@ class WsAccountSummary(BaseModel):
     currency: str
     # Legacy CAD-native balance, kept for back-compat with older
     # frontends. Mirrors ``balances_by_currency["CAD"]`` when present.
-    current_balance: Optional[Decimal] = None
-    balance_updated_at: Optional[date] = None
+    current_balance: Decimal | None = None
+    balance_updated_at: date | None = None
     balances_by_currency: list[WsSubBalance] = []
 
 
@@ -109,7 +108,7 @@ class NetWorthPoint(BaseModel):
     usd: NetWorthSlice
     combined_cad: NetWorthSlice
     combined_usd: NetWorthSlice
-    fx_rate: Optional[Decimal] = None
+    fx_rate: Decimal | None = None
 
 
 class NetWorthTimelineResponse(BaseModel):
@@ -118,10 +117,10 @@ class NetWorthTimelineResponse(BaseModel):
     latest_cash: Decimal = Decimal("0")
     latest_debt: Decimal = Decimal("0")
     latest_net_worth: Decimal = Decimal("0")
-    latest_cad: Optional[NetWorthSlice] = None
-    latest_usd: Optional[NetWorthSlice] = None
-    latest_combined_cad: Optional[NetWorthSlice] = None
-    latest_combined_usd: Optional[NetWorthSlice] = None
-    fx_rate: Optional[Decimal] = None
-    fx_as_of_date: Optional[date] = None
+    latest_cad: NetWorthSlice | None = None
+    latest_usd: NetWorthSlice | None = None
+    latest_combined_cad: NetWorthSlice | None = None
+    latest_combined_usd: NetWorthSlice | None = None
+    fx_rate: Decimal | None = None
+    fx_as_of_date: date | None = None
     fx_is_stale: bool = True

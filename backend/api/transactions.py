@@ -2,7 +2,6 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import desc, func, or_, select
@@ -36,15 +35,15 @@ def _db_to_response(tx: TransactionModel) -> Transaction:
 @router.get("/", response_model=list[Transaction])
 async def get_transactions(
     db: DbSession,
-    search: Optional[str] = Query(None, description="Search description, merchant, notes"),
-    category: Optional[str] = Query(None, description="Filter by category"),
-    account: Optional[str] = Query(None, description="Filter by account"),
-    type: Optional[str] = Query(None, description="Filter by type (income, expense, transfer)"),
-    start_date: Optional[datetime] = Query(None, description="Filter by start date"),
-    end_date: Optional[datetime] = Query(None, description="Filter by end date"),
-    min_amount: Optional[float] = Query(None, description="Minimum amount (absolute)"),
-    max_amount: Optional[float] = Query(None, description="Maximum amount (absolute)"),
-    import_source: Optional[str] = Query(None, description="Filter by import source"),
+    search: str | None = Query(None, description="Search description, merchant, notes"),
+    category: str | None = Query(None, description="Filter by category"),
+    account: str | None = Query(None, description="Filter by account"),
+    type: str | None = Query(None, description="Filter by type (income, expense, transfer)"),
+    start_date: datetime | None = Query(None, description="Filter by start date"),
+    end_date: datetime | None = Query(None, description="Filter by end date"),
+    min_amount: float | None = Query(None, description="Minimum amount (absolute)"),
+    max_amount: float | None = Query(None, description="Maximum amount (absolute)"),
+    import_source: str | None = Query(None, description="Filter by import source"),
     limit: int = Query(500, ge=1, le=5000, description="Maximum number of transactions"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
@@ -89,8 +88,8 @@ async def get_transactions(
 @router.get("/summary")
 async def get_transactions_summary(
     db: DbSession,
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
 ):
     """Get summary statistics for transactions."""
     base_query = select(TransactionModel)
@@ -153,7 +152,7 @@ INVESTMENT_CATS = {"Buy", "Investments", "Sell"}
 @router.get("/annual-report")
 async def get_annual_report(
     db: DbSession,
-    year: Optional[int] = Query(
+    year: int | None = Query(
         None,
         ge=2000,
         le=2100,

@@ -23,6 +23,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ### Changed
 - CHANGELOG: Simplified to Keep a Changelog standard (74% reduction)
+- Ruff config inlined in backend/pyproject.toml (shared extend path did not exist); mechanical lint and format fixes across the backend - #108
 
 ### Fixed
 - Auto-label workflow: Added concurrency group to cancel duplicate runs

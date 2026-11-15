@@ -37,10 +37,7 @@ def main() -> int:
 
     if confirm is None:
         try:
-            confirm = input(
-                "This will DELETE every row from every data table. Type "
-                "'RESET ALL DATA' to proceed: "
-            )
+            confirm = input("This will DELETE every row from every data table. Type 'RESET ALL DATA' to proceed: ")
         except EOFError:
             confirm = ""
 

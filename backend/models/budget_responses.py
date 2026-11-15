@@ -5,7 +5,6 @@ Canopy - Personal Finance Platform
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,9 +25,7 @@ class BudgetResponse(BaseModel):
     amount: Decimal = Field(..., description="Total budget amount")
     period: str = Field(..., description="Budget period: 'monthly' or 'yearly'")
     active: bool = Field(..., description="Whether budget is active")
-    categories: list[BudgetCategoryResponse] = Field(
-        default_factory=list, description="Category breakdowns"
-    )
+    categories: list[BudgetCategoryResponse] = Field(default_factory=list, description="Category breakdowns")
 
 
 class CategoryStatusResponse(BaseModel):
@@ -60,9 +57,7 @@ class BudgetStatusResponse(BaseModel):
         ...,
         description="Overall status: 'under', 'warning', or 'over'",
     )
-    categories: list[CategoryStatusResponse] = Field(
-        default_factory=list, description="Category-level status"
-    )
+    categories: list[CategoryStatusResponse] = Field(default_factory=list, description="Category-level status")
     currency: str = Field(default="CAD", description="Currency code")
 
 
@@ -81,19 +76,15 @@ class CreateBudgetRequest(BaseModel):
 class UpdateBudgetRequest(BaseModel):
     """Request to update an existing budget."""
 
-    name: Optional[str] = Field(
-        None, description="Budget name", min_length=1, max_length=200
-    )
-    amount: Optional[Decimal] = Field(None, description="Total budget amount", gt=0)
-    active: Optional[bool] = Field(None, description="Whether budget is active")
+    name: str | None = Field(None, description="Budget name", min_length=1, max_length=200)
+    amount: Decimal | None = Field(None, description="Total budget amount", gt=0)
+    active: bool | None = Field(None, description="Whether budget is active")
 
 
 class AddCategoryRequest(BaseModel):
     """Request to add a category to a budget."""
 
-    category_name: str = Field(
-        ..., description="Category name", min_length=1, max_length=100
-    )
+    category_name: str = Field(..., description="Category name", min_length=1, max_length=100)
     amount_limit: Decimal = Field(..., description="Category spending limit", gt=0)
 
 
@@ -109,6 +100,4 @@ class BudgetStatusRequest(BaseModel):
     """Request to get budget status for a specific month."""
 
     budget_id: int = Field(..., description="Budget ID")
-    month: Optional[str] = Field(
-        None, description="Month in YYYY-MM format (defaults to current month)"
-    )
+    month: str | None = Field(None, description="Month in YYYY-MM format (defaults to current month)")

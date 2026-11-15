@@ -1,6 +1,5 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,25 +13,25 @@ class TransactionType(str, Enum):
 
 
 class Transaction(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     description: str
     amount: float
     currency: str = "USD"
     type: TransactionType
-    category: Optional[str] = None
+    category: str | None = None
     date: datetime
-    account: Optional[str] = None
+    account: str | None = None
 
     # Enhanced Monarch-like fields
-    merchant: Optional[str] = None  # Clean merchant name
-    original_statement: Optional[str] = None  # Raw bank statement text
-    notes: Optional[str] = None  # User notes
-    tags: List[str] = Field(default_factory=list)  # Transaction tags
+    merchant: str | None = None  # Clean merchant name
+    original_statement: str | None = None  # Raw bank statement text
+    notes: str | None = None  # User notes
+    tags: list[str] = Field(default_factory=list)  # Transaction tags
 
     # Investment-specific fields
-    ticker: Optional[str] = None  # Stock/ETF ticker symbol
-    shares: Optional[float] = None  # Number of shares
-    price_per_share: Optional[float] = None  # Price per share
+    ticker: str | None = None  # Stock/ETF ticker symbol
+    shares: float | None = None  # Number of shares
+    price_per_share: float | None = None  # Price per share
 
 
 class TransactionCreate(BaseModel):
@@ -40,17 +39,17 @@ class TransactionCreate(BaseModel):
     amount: float
     currency: str = "USD"
     type: TransactionType
-    category: Optional[str] = None
-    date: Optional[datetime] = None
-    account: Optional[str] = None
+    category: str | None = None
+    date: datetime | None = None
+    account: str | None = None
 
     # Enhanced Monarch-like fields
-    merchant: Optional[str] = None
-    original_statement: Optional[str] = None
-    notes: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
+    merchant: str | None = None
+    original_statement: str | None = None
+    notes: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
     # Investment-specific fields
-    ticker: Optional[str] = None
-    shares: Optional[float] = None
-    price_per_share: Optional[float] = None
+    ticker: str | None = None
+    shares: float | None = None
+    price_per_share: float | None = None

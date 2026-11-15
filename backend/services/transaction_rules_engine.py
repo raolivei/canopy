@@ -6,13 +6,12 @@ Canopy - Personal Finance Platform
 import re
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from typing import Any
 
 from backend.db.models.transaction import Transaction
 from backend.db.models.transaction_rule import TransactionRule
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 class RulesEngine:
@@ -44,7 +43,9 @@ class RulesEngine:
             List of applied actions with rule info
         """
         # Get all active rules ordered by priority (highest first)
-        query = select(TransactionRule).where(TransactionRule.active == True).order_by(TransactionRule.priority.desc())
+        query = (
+            select(TransactionRule).where(TransactionRule.active.is_(True)).order_by(TransactionRule.priority.desc())
+        )
 
         rules = self.db.execute(query).scalars().all()
 

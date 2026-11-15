@@ -4,8 +4,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, Column, Integer, String, Date, DECIMAL, Boolean, Text
-from sqlalchemy.orm import sessionmaker, Session, declarative_base
+from sqlalchemy import DECIMAL, Column, Date, Integer, String, create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
 from backend.services.contextual_insights import ContextualInsightsService
 
 # Create a minimal Transaction model for testing

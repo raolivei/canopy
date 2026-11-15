@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -30,14 +30,22 @@ def mock_db_for_budget():
 
     txns = [
         create_mock_transaction(month_start, "Supermarket", "Groceries", "-150.00", "Groceries", "expense"),
-        create_mock_transaction(month_start + timedelta(days=5), "Gas Station", "Fuel", "-60.00", "Transportation", "expense"),
-        create_mock_transaction(month_start + timedelta(days=10), "Supermarket", "Groceries", "-180.00", "Groceries", "expense"),
-        create_mock_transaction(month_start + timedelta(days=15), "Restaurant", "Dinner", "-95.00", "Dining Out", "expense"),
+        create_mock_transaction(
+            month_start + timedelta(days=5), "Gas Station", "Fuel", "-60.00", "Transportation", "expense"
+        ),
+        create_mock_transaction(
+            month_start + timedelta(days=10), "Supermarket", "Groceries", "-180.00", "Groceries", "expense"
+        ),
+        create_mock_transaction(
+            month_start + timedelta(days=15), "Restaurant", "Dinner", "-95.00", "Dining Out", "expense"
+        ),
         create_mock_transaction(month_start + timedelta(days=20), "Employer", "Salary", "5000.00", "Income", "income"),
     ]
 
     mock_db = MagicMock()
-    mock_db.execute = MagicMock(return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=txns)))))
+    mock_db.execute = MagicMock(
+        return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=txns))))
+    )
     return mock_db, txns
 
 
@@ -49,20 +57,48 @@ def mock_db_for_recurring():
 
     txns = [
         # Monthly subscription (Netflix-like)
-        create_mock_transaction(three_months_ago, "Netflix", "Monthly subscription", "-16.99", "Entertainment", "expense"),
-        create_mock_transaction(three_months_ago + timedelta(days=30), "Netflix", "Monthly subscription", "-16.99", "Entertainment", "expense"),
-        create_mock_transaction(three_months_ago + timedelta(days=60), "Netflix", "Monthly subscription", "-16.99", "Entertainment", "expense"),
+        create_mock_transaction(
+            three_months_ago, "Netflix", "Monthly subscription", "-16.99", "Entertainment", "expense"
+        ),
+        create_mock_transaction(
+            three_months_ago + timedelta(days=30),
+            "Netflix",
+            "Monthly subscription",
+            "-16.99",
+            "Entertainment",
+            "expense",
+        ),
+        create_mock_transaction(
+            three_months_ago + timedelta(days=60),
+            "Netflix",
+            "Monthly subscription",
+            "-16.99",
+            "Entertainment",
+            "expense",
+        ),
         # Weekly coffee
-        create_mock_transaction(three_months_ago + timedelta(days=7), "Coffee Shop", "Coffee", "-5.50", "Dining Out", "expense"),
-        create_mock_transaction(three_months_ago + timedelta(days=14), "Coffee Shop", "Coffee", "-5.75", "Dining Out", "expense"),
-        create_mock_transaction(three_months_ago + timedelta(days=21), "Coffee Shop", "Coffee", "-5.50", "Dining Out", "expense"),
-        create_mock_transaction(three_months_ago + timedelta(days=28), "Coffee Shop", "Coffee", "-6.00", "Dining Out", "expense"),
+        create_mock_transaction(
+            three_months_ago + timedelta(days=7), "Coffee Shop", "Coffee", "-5.50", "Dining Out", "expense"
+        ),
+        create_mock_transaction(
+            three_months_ago + timedelta(days=14), "Coffee Shop", "Coffee", "-5.75", "Dining Out", "expense"
+        ),
+        create_mock_transaction(
+            three_months_ago + timedelta(days=21), "Coffee Shop", "Coffee", "-5.50", "Dining Out", "expense"
+        ),
+        create_mock_transaction(
+            three_months_ago + timedelta(days=28), "Coffee Shop", "Coffee", "-6.00", "Dining Out", "expense"
+        ),
         # One-off transaction
-        create_mock_transaction(three_months_ago + timedelta(days=10), "Random Store", "One-time purchase", "-50.00", "Shopping", "expense"),
+        create_mock_transaction(
+            three_months_ago + timedelta(days=10), "Random Store", "One-time purchase", "-50.00", "Shopping", "expense"
+        ),
     ]
 
     mock_db = MagicMock()
-    mock_db.execute = MagicMock(return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=txns)))))
+    mock_db.execute = MagicMock(
+        return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=txns))))
+    )
     return mock_db, txns
 
 

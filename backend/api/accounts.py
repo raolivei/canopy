@@ -27,7 +27,7 @@ clients and mirrors the CAD-native section.
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -86,11 +86,11 @@ class AccountResponse(BaseModel):
     kind: AccountKind
     balance: float  # Positive for assets, positive for liabilities (amount owed)
     currency: str
-    institution: Optional[str] = None
-    external_account_id: Optional[str] = None
-    last4: Optional[str] = None
-    source: Optional[str] = None  # e.g. "wealthsimple"
-    updated_at: Optional[datetime] = None
+    institution: str | None = None
+    external_account_id: str | None = None
+    last4: str | None = None
+    source: str | None = None  # e.g. "wealthsimple"
+    updated_at: datetime | None = None
 
 
 class CurrencyTotals(BaseModel):
@@ -113,9 +113,9 @@ class CombinedTotals(BaseModel):
 class FxInfo(BaseModel):
     """USD/CAD rate metadata used for combined conversion."""
 
-    usd_cad_rate: Optional[float]
-    as_of_date: Optional[str]  # ISO date string
-    source: Optional[str]
+    usd_cad_rate: float | None
+    as_of_date: str | None  # ISO date string
+    source: str | None
     is_stale: bool
 
 
@@ -138,8 +138,8 @@ class AccountsResponse(BaseModel):
 
 def _asset_to_account(
     asset: Asset,
-    latest_balance: Optional[Decimal] = None,
-    latest_balance_date: Optional[datetime] = None,
+    latest_balance: Decimal | None = None,
+    latest_balance_date: datetime | None = None,
 ) -> AccountResponse:
     # Prefer ``AccountBalanceHistory`` (that's where the Wealthsimple
     # importer writes cash sub-balances). Fall back to
@@ -247,7 +247,7 @@ def _roll_up_by_currency(accounts: list[AccountResponse]) -> dict[str, CurrencyT
 
 def _combine_totals(
     per_ccy: dict[str, CurrencyTotals],
-    usd_cad_rate: Optional[Decimal],
+    usd_cad_rate: Decimal | None,
 ) -> dict[str, CombinedTotals]:
     """Convert per-currency buckets into Combined CAD and Combined USD.
 

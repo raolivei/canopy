@@ -102,10 +102,7 @@ def reset_data(
     if x_confirm_reset != CONFIRM_PHRASE:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"Missing or incorrect confirmation. "
-                f"Send header X-Confirm-Reset: {CONFIRM_PHRASE!r}."
-            ),
+            detail=(f"Missing or incorrect confirmation. Send header X-Confirm-Reset: {CONFIRM_PHRASE!r}."),
         )
 
     report = reset_all_data(db)

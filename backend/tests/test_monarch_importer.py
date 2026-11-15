@@ -16,7 +16,7 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -136,7 +136,7 @@ def test_layer1_cutover_drops_monarch_rows_in_ws_window(db: Session) -> None:
         amount=Decimal("50.00"),
         currency="CAD",
         type="buy",
-        date=datetime(2024, 6, 1, tzinfo=timezone.utc),
+        date=datetime(2024, 6, 1, tzinfo=UTC),
         account="MANAGED_TFSA (...DqRQ)",
         import_source="wealthsimple_csv",
     )
@@ -183,7 +183,7 @@ def test_layer2_canonical_hash_blocks_cross_source_duplicate(db: Session) -> Non
     db.add(asset)
     db.flush()
 
-    when = datetime(2024, 4, 10, tzinfo=timezone.utc).date()
+    when = datetime(2024, 4, 10, tzinfo=UTC).date()
     amount = Decimal("42.00")
 
     # Seed ONLY an ImportedEvent - no matching Transaction - so the

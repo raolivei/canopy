@@ -6,7 +6,6 @@ Canopy - Personal Finance Platform
 import enum
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import DateTime, Index, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -40,26 +39,26 @@ class Transaction(Base):
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     # Categorization
-    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    account: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    account: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Merchant info (from Monarch/bank data)
-    merchant: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    original_statement: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    merchant: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    original_statement: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Additional metadata
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    tags: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
 
     # Investment transaction fields
-    ticker: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    shares: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
-    price_per_share: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
-    fees: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
+    ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    shares: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
+    price_per_share: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
+    fees: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
 
     # Import tracking
-    import_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    import_source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # e.g., "monarch", "rbc"
+    import_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    import_source: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g., "monarch", "rbc"
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,7 +1,6 @@
 import csv
 import io
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 from backend.models.csv_import import (
     BankFormat,
@@ -155,9 +154,9 @@ class CSVParserService:
     }
 
     def __init__(self):
-        self.import_cache: Dict[str, CSVImportPreview] = {}
+        self.import_cache: dict[str, CSVImportPreview] = {}
 
-    def detect_bank_format(self, headers: List[str]) -> Optional[BankFormat]:
+    def detect_bank_format(self, headers: list[str]) -> BankFormat | None:
         """Attempt to detect bank format from CSV headers"""
         headers_lower = [h.lower().strip() for h in headers]
 
@@ -233,7 +232,7 @@ class CSVParserService:
         self,
         file_content: str,
         config: CSVImportConfig,
-        existing_transactions: List[Transaction] = None,
+        existing_transactions: list[Transaction] = None,
     ) -> CSVImportPreview:
         """Parse CSV file and return preview of transactions"""
 
@@ -248,7 +247,7 @@ class CSVParserService:
         if config.skip_rows > 0:
             rows = rows[config.skip_rows :]
 
-        transactions: List[TransactionPreview] = []
+        transactions: list[TransactionPreview] = []
         duplicate_count = 0
         error_count = 0
 
@@ -302,10 +301,10 @@ class CSVParserService:
 
     def _parse_row(
         self,
-        row: Dict[str, str],
+        row: dict[str, str],
         row_number: int,
         config: CSVImportConfig,
-        existing_transactions: List[Transaction],
+        existing_transactions: list[Transaction],
     ) -> TransactionPreview:
         """Parse a single CSV row into a transaction preview"""
 
@@ -537,8 +536,8 @@ class CSVParserService:
         description: str,
         amount: float,
         date: datetime,
-        existing_transactions: List[Transaction],
-    ) -> Tuple[bool, Optional[str]]:
+        existing_transactions: list[Transaction],
+    ) -> tuple[bool, str | None]:
         """Check if transaction is a duplicate"""
 
         for tx in existing_transactions:
@@ -556,8 +555,8 @@ class CSVParserService:
         preview: CSVImportPreview,
         skip_duplicates: bool = True,
         skip_errors: bool = True,
-        selected_rows: Optional[List[int]] = None,
-    ) -> List[TransactionCreate]:
+        selected_rows: list[int] | None = None,
+    ) -> list[TransactionCreate]:
         """Convert preview transactions to TransactionCreate objects"""
 
         transactions = []

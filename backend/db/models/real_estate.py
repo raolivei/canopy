@@ -12,7 +12,6 @@ Supports:
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -56,9 +55,9 @@ class RealEstateProperty(Base):
 
     # Property identification
     name: Mapped[str] = mapped_column(String(255))  # e.g., "Toronto condo"
-    address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    state: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(50), nullable=True)
     country: Mapped[str] = mapped_column(String(2), default="CA")  # ISO 3166-1 alpha-2
 
     # Financial details (CAD + USD only; see AccountBalanceHistory for multi-currency balances).
@@ -73,26 +72,24 @@ class RealEstateProperty(Base):
     )  # 0.5 = 50% ownership
 
     # Partners (for shared ownership)
-    partner_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    partner_ownership_percentage: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=5, scale=4), nullable=True
-    )
+    partner_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    partner_ownership_percentage: Mapped[Decimal | None] = mapped_column(Numeric(precision=5, scale=4), nullable=True)
 
     # Value estimation
-    estimated_market_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
-    value_estimated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    estimated_market_value: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
+    value_estimated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Purchase details
-    purchase_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    expected_delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    purchase_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expected_delivery_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Status
     is_delivered: Mapped[bool] = mapped_column(Boolean, default=False)
     is_rented: Mapped[bool] = mapped_column(Boolean, default=False)
-    monthly_rent: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
+    monthly_rent: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
 
     # Notes
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -132,7 +129,7 @@ class RealEstateProperty(Base):
         return (self.total_paid / (self.total_contract_value * self.ownership_percentage)) * 100
 
     @property
-    def user_market_value(self) -> Optional[Decimal]:
+    def user_market_value(self) -> Decimal | None:
         """Get the user's share of the estimated market value."""
         if self.estimated_market_value is None:
             return None
@@ -152,7 +149,7 @@ class RealEstatePaymentSeries(Base):
 
     # Series identification
     name: Mapped[str] = mapped_column(String(100))  # e.g., "MENSAIS 2025"
-    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Payment details
     frequency: Mapped[str] = mapped_column(String(50), default="monthly")
@@ -161,7 +158,7 @@ class RealEstatePaymentSeries(Base):
 
     # Schedule
     start_date: Mapped[date] = mapped_column(Date)
-    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Status
     status: Mapped[str] = mapped_column(String(50), default="not_started")
@@ -183,7 +180,7 @@ class RealEstatePayment(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     property_id: Mapped[int] = mapped_column(ForeignKey("real_estate_properties.id", ondelete="CASCADE"))
-    series_id: Mapped[Optional[int]] = mapped_column(
+    series_id: Mapped[int | None] = mapped_column(
         ForeignKey("real_estate_payment_series.id", ondelete="SET NULL"), nullable=True
     )
 
@@ -195,15 +192,15 @@ class RealEstatePayment(Base):
     nominal_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=18, scale=2)
     )  # Original amount without corrections
-    amount_with_correction: Mapped[Optional[Decimal]] = mapped_column(
+    amount_with_correction: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=18, scale=2), nullable=True
     )  # Amount with inflation/interest corrections
-    amount_paid: Mapped[Optional[Decimal]] = mapped_column(
+    amount_paid: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=18, scale=2), nullable=True
     )  # Actual amount paid
 
     # Payment info
-    payment_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    payment_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="not_started")
 
     # Split tracking (for 50/50 ownership)
@@ -211,7 +208,7 @@ class RealEstatePayment(Base):
     paid_by_user: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Notes
-    notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

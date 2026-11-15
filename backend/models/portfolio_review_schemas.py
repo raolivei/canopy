@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -12,16 +12,16 @@ class PortfolioReviewLineResponse(BaseModel):
     sort_order: int
     investment: str
     platform: str
-    value_cad: Optional[Decimal] = None
-    pct_global: Optional[Decimal] = None
-    return_pct: Optional[Decimal] = None
-    div_per_year: Optional[Decimal] = None
-    yield_pct: Optional[Decimal] = None
-    target_pct: Optional[str] = None
-    delta: Optional[str] = None
-    conviction: Optional[int] = None
-    action: Optional[str] = None
-    raw_row: Optional[dict[str, Any]] = None
+    value_cad: Decimal | None = None
+    pct_global: Decimal | None = None
+    return_pct: Decimal | None = None
+    div_per_year: Decimal | None = None
+    yield_pct: Decimal | None = None
+    target_pct: str | None = None
+    delta: str | None = None
+    conviction: int | None = None
+    action: str | None = None
+    raw_row: dict[str, Any] | None = None
 
     model_config = {"from_attributes": True}
 
@@ -29,9 +29,9 @@ class PortfolioReviewLineResponse(BaseModel):
 class PortfolioReviewSummary(BaseModel):
     id: int
     as_of_date: date
-    label: Optional[str] = None
+    label: str | None = None
     source: str
-    total_value_cad: Optional[Decimal] = None
+    total_value_cad: Decimal | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -57,19 +57,19 @@ class AllocationResponse(BaseModel):
 class TimelinePoint(BaseModel):
     id: int
     as_of_date: date
-    total_value_cad: Optional[Decimal] = None
+    total_value_cad: Decimal | None = None
 
 
 class CompareResponse(BaseModel):
     from_review: PortfolioReviewSummary
     to_review: PortfolioReviewSummary
-    total_cad_delta: Optional[Decimal] = None
-    pct_change: Optional[float] = None
+    total_cad_delta: Decimal | None = None
+    pct_change: float | None = None
 
 
 class ImportPreviewResponse(BaseModel):
     as_of_date: date
-    label: Optional[str] = None
+    label: str | None = None
     line_count: int
     total_value_cad: Decimal
     sample_lines: list[dict[str, Any]] = Field(
@@ -83,11 +83,11 @@ class BatchImportFileResult(BaseModel):
 
     filename: str
     success: bool
-    review_id: Optional[int] = None
-    as_of_date: Optional[date] = None
-    line_count: Optional[int] = None
-    total_value_cad: Optional[Decimal] = None
-    error: Optional[str] = None
+    review_id: int | None = None
+    as_of_date: date | None = None
+    line_count: int | None = None
+    total_value_cad: Decimal | None = None
+    error: str | None = None
 
 
 class BatchImportResponse(BaseModel):

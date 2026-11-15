@@ -11,7 +11,6 @@ API Documentation: https://docs.wise.com/api-docs/api-reference
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
 
 import httpx
 from pydantic import BaseModel
@@ -38,11 +37,11 @@ class WiseTransaction(BaseModel):
     description: str
     amount: Decimal
     currency: str
-    running_balance: Optional[Decimal] = None
+    running_balance: Decimal | None = None
     transaction_type: str  # CREDIT, DEBIT, etc.
-    reference: Optional[str] = None
-    merchant: Optional[str] = None
-    category: Optional[str] = None
+    reference: str | None = None
+    merchant: str | None = None
+    category: str | None = None
 
 
 class WiseProfile(BaseModel):
@@ -50,8 +49,8 @@ class WiseProfile(BaseModel):
 
     id: int
     type: str  # personal or business
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class WiseIntegrationService:
@@ -77,7 +76,7 @@ class WiseIntegrationService:
         """
         self.api_token = api_token
         self.base_url = self.SANDBOX_URL if sandbox else self.BASE_URL
-        self._profile_id: Optional[int] = None
+        self._profile_id: int | None = None
         self._client = httpx.Client(
             headers={
                 "Authorization": f"Bearer {api_token}",
@@ -116,7 +115,7 @@ class WiseIntegrationService:
             self._profile_id = personal.id
         return self._profile_id
 
-    def get_balances(self, profile_id: Optional[int] = None) -> list[WiseBalance]:
+    def get_balances(self, profile_id: int | None = None) -> list[WiseBalance]:
         """Get all currency balances for the profile."""
         profile_id = profile_id or self.get_personal_profile_id()
         data = self._get(f"/v4/profiles/{profile_id}/balances?types=STANDARD")
@@ -135,9 +134,9 @@ class WiseIntegrationService:
     def get_transactions(
         self,
         currency: str,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        profile_id: Optional[int] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        profile_id: int | None = None,
         limit: int = 100,
     ) -> list[WiseTransaction]:
         """Get transactions for a specific currency.
@@ -223,10 +222,10 @@ class WiseIntegrationService:
 
     def get_all_transactions(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        profile_id: Optional[int] = None,
-        currencies: Optional[set[str]] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        profile_id: int | None = None,
+        currencies: set[str] | None = None,
     ) -> list[WiseTransaction]:
         """Get transactions across currencies.
 
@@ -274,7 +273,7 @@ class WiseIntegrationService:
 # Convenience function for one-off use
 def fetch_wise_transactions(
     api_token: str,
-    currency: Optional[str] = None,
+    currency: str | None = None,
     days: int = 90,
     sandbox: bool = False,
 ) -> list[WiseTransaction]:

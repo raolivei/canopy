@@ -34,7 +34,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Optional
 
 REQUIRED_COLUMNS = [
     "Date",
@@ -76,7 +75,7 @@ class MonarchRow:
     tags: tuple[str, ...]
     account_class: AccountClass
     currency: str
-    account_last4: Optional[str]
+    account_last4: str | None
 
 
 @dataclass
@@ -196,7 +195,7 @@ def _normalise_row(
     *,
     line_no: int,
     out: ParseResult,
-) -> Optional[MonarchRow]:
+) -> MonarchRow | None:
     date_str = (raw.get("Date") or "").strip()
     m = _DATE_RE.match(date_str)
     if not m:
@@ -346,7 +345,7 @@ def _infer_currency(label: str) -> str:
     return "CAD"
 
 
-def _extract_last4(label: str) -> Optional[str]:
+def _extract_last4(label: str) -> str | None:
     m = _LAST4_RE.search(label)
     if not m:
         return None

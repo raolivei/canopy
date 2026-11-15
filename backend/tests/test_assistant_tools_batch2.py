@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import create_engine
@@ -12,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import Base
 from backend.db.models.transaction import Transaction as TransactionModel
-from backend.db.models.asset import Asset, AssetType
 from backend.services.assistant_service import AssistantService
 
 
@@ -29,10 +27,7 @@ def db() -> Session:
 def assistant_service(db: Session) -> AssistantService:
     """Create AssistantService with mocked provider."""
     service = AssistantService(
-        db=db,
-        provider_type="ollama",
-        ollama_host="http://localhost:11434",
-        ollama_model="llama3.1:8b"
+        db=db, provider_type="ollama", ollama_host="http://localhost:11434", ollama_model="llama3.1:8b"
     )
     return service
 
@@ -50,7 +45,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Grocery shopping",
             amount=Decimal("-150.00"),
             currency="CAD",
-            date=today - timedelta(days=5)
+            date=today - timedelta(days=5),
         ),
         TransactionModel(
             type="expense",
@@ -59,7 +54,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Weekly shopping",
             amount=Decimal("-200.00"),
             currency="CAD",
-            date=today - timedelta(days=12)
+            date=today - timedelta(days=12),
         ),
         # Previous month groceries
         TransactionModel(
@@ -69,7 +64,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Grocery shopping",
             amount=Decimal("-120.00"),
             currency="CAD",
-            date=today - timedelta(days=35)
+            date=today - timedelta(days=35),
         ),
         # Gas transactions
         TransactionModel(
@@ -79,7 +74,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Gas fill-up",
             amount=Decimal("-60.00"),
             currency="CAD",
-            date=today - timedelta(days=8)
+            date=today - timedelta(days=8),
         ),
         TransactionModel(
             type="expense",
@@ -88,7 +83,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Gas fill-up",
             amount=Decimal("-55.00"),
             currency="CAD",
-            date=today - timedelta(days=25)
+            date=today - timedelta(days=25),
         ),
         # Dining (anomaly - unusually high)
         TransactionModel(
@@ -98,7 +93,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Dinner",
             amount=Decimal("-150.00"),
             currency="CAD",
-            date=today - timedelta(days=3)
+            date=today - timedelta(days=3),
         ),
         TransactionModel(
             type="expense",
@@ -107,7 +102,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Coffee",
             amount=Decimal("-15.00"),
             currency="CAD",
-            date=today - timedelta(days=32)
+            date=today - timedelta(days=32),
         ),
         # Income
         TransactionModel(
@@ -117,7 +112,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Monthly salary",
             amount=Decimal("5000.00"),
             currency="CAD",
-            date=today - timedelta(days=2)
+            date=today - timedelta(days=2),
         ),
         # Merchant repeat transactions
         TransactionModel(
@@ -127,7 +122,7 @@ def sample_transactions(db: Session) -> list[TransactionModel]:
             description="Shopping",
             amount=Decimal("-180.00"),
             currency="CAD",
-            date=today - timedelta(days=42)
+            date=today - timedelta(days=42),
         ),
     ]
 

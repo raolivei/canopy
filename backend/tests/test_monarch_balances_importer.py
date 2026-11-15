@@ -15,7 +15,7 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -54,9 +54,7 @@ def test_imports_cash_and_investment_balances_into_account_balance_history(db: S
     assert summary.inserted == 2
     assert summary.updated == 0
 
-    rows = db.execute(
-        select(AccountBalanceHistory).order_by(AccountBalanceHistory.asset_id)
-    ).scalars().all()
+    rows = db.execute(select(AccountBalanceHistory).order_by(AccountBalanceHistory.asset_id)).scalars().all()
     assert len(rows) == 2
     balances_by_name = {db.get(Asset, r.asset_id).name: r.balance for r in rows}
     assert balances_by_name["RBC Day to Day Banking (...8813)"] == Decimal("9677.84")
@@ -110,11 +108,15 @@ def test_backfilling_older_snapshot_does_not_overwrite_current_balance(db: Sessi
     db.commit()
     db.refresh(lib)
     assert lib.current_balance == Decimal("100.00")
-    history_count = db.execute(
-        select(LiabilityBalanceHistory).where(
-            LiabilityBalanceHistory.liability_id == lib.id,
+    history_count = (
+        db.execute(
+            select(LiabilityBalanceHistory).where(
+                LiabilityBalanceHistory.liability_id == lib.id,
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(history_count) == 2
 
 
@@ -135,12 +137,8 @@ def test_re_importing_the_same_file_is_a_noop(db: Session) -> None:
     assert second.inserted == 0
     assert second.updated == 0
     # Exactly one row per (asset, date) / (liability, date).
-    assert (
-        len(db.execute(select(AccountBalanceHistory)).scalars().all()) == 1
-    )
-    assert (
-        len(db.execute(select(LiabilityBalanceHistory)).scalars().all()) == 1
-    )
+    assert len(db.execute(select(AccountBalanceHistory)).scalars().all()) == 1
+    assert len(db.execute(select(LiabilityBalanceHistory)).scalars().all()) == 1
 
 
 def test_changed_balance_triggers_update_not_insert(db: Session) -> None:
@@ -225,7 +223,7 @@ def test_liability_same_day_repeated_balance_is_idempotent(db: Session) -> None:
         LiabilityBalanceHistory(
             liability_id=lib.id,
             balance=Decimal("21818.66"),
-            recorded_at=datetime(2026, 4, 15, tzinfo=timezone.utc),
+            recorded_at=datetime(2026, 4, 15, tzinfo=UTC),
         )
     )
     db.commit()

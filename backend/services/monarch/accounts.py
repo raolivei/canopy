@@ -29,7 +29,6 @@ painful.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from backend.db.models.asset import Asset, AssetType
 from backend.db.models.liability import Liability, LiabilityType
@@ -46,10 +45,10 @@ class ResolvedAccount:
 
     label: str  # original Monarch label
     account_class: AccountClass
-    asset: Optional[Asset] = None
-    liability: Optional[Liability] = None
+    asset: Asset | None = None
+    liability: Liability | None = None
     created: bool = False
-    note: Optional[str] = None
+    note: str | None = None
 
     @property
     def kind(self) -> str:
@@ -60,7 +59,7 @@ class ResolvedAccount:
         return "none"
 
     @property
-    def canopy_name(self) -> Optional[str]:
+    def canopy_name(self) -> str | None:
         if self.asset is not None:
             return self.asset.name
         if self.liability is not None:
@@ -78,9 +77,9 @@ def resolve_account(
     *,
     label: str,
     account_class: AccountClass,
-    last4: Optional[str],
+    last4: str | None,
     currency: str = "CAD",
-) -> Optional[ResolvedAccount]:
+) -> ResolvedAccount | None:
     """Resolve a single Monarch account label.
 
     Returns ``None`` when the class is ``PSEUDO`` or ``UNKNOWN`` - the
@@ -95,9 +94,7 @@ def resolve_account(
         return _resolve_liability(db, label=label, last4=last4, currency=currency)
 
     # INVESTMENT and CASH both land on an Asset row.
-    return _resolve_asset(
-        db, label=label, account_class=account_class, last4=last4, currency=currency
-    )
+    return _resolve_asset(db, label=label, account_class=account_class, last4=last4, currency=currency)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +107,7 @@ def _resolve_asset(
     *,
     label: str,
     account_class: AccountClass,
-    last4: Optional[str],
+    last4: str | None,
     currency: str,
 ) -> ResolvedAccount:
     # 1) name match
@@ -181,7 +178,7 @@ def _resolve_liability(
     db: Session,
     *,
     label: str,
-    last4: Optional[str],
+    last4: str | None,
     currency: str,
 ) -> ResolvedAccount:
     existing = db.execute(select(Liability).where(Liability.name == label)).scalar_one_or_none()
@@ -225,17 +222,9 @@ def _liability_type_for(label: str) -> LiabilityType:
     # Check credit-card markers *first* — otherwise substrings like "car"
     # inside "Mastercard"/"credit card" would mis-route every CC into a
     # car loan.
-    if any(
-        kw in lower
-        for kw in ("credit card", "credit_card", "mastercard", "visa", "amex", "american express")
-    ):
+    if any(kw in lower for kw in ("credit card", "credit_card", "mastercard", "visa", "amex", "american express")):
         return LiabilityType.CREDIT_CARD
-    if (
-        "line of credit" in lower
-        or "line_of_credit" in lower
-        or "credit line" in lower
-        or "loc" in lower
-    ):
+    if "line of credit" in lower or "line_of_credit" in lower or "credit line" in lower or "loc" in lower:
         return LiabilityType.LINE_OF_CREDIT
     if "mortgage" in lower:
         return LiabilityType.MORTGAGE

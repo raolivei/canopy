@@ -7,9 +7,13 @@ SQLite engine can create the schema and exercise the ORM end-to-end.
 
 from __future__ import annotations
 
+import pytest
+from sqlalchemy import Numeric, create_engine
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy import Numeric
+from sqlalchemy.orm import sessionmaker
+
+from backend.db.base import Base
 
 
 @compiles(ARRAY, "sqlite")
@@ -25,12 +29,6 @@ def _compile_jsonb_sqlite(_element, _compiler, **_kw):  # pragma: no cover
 @compiles(Numeric, "sqlite")
 def _compile_numeric_sqlite(element, _compiler, **_kw):  # pragma: no cover
     return "REAL"
-
-
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from backend.db.base import Base
 
 
 @pytest.fixture(scope="function")

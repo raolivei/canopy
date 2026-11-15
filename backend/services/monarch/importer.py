@@ -28,10 +28,10 @@ leaves ``commit`` / ``rollback`` to the caller (the API layer).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
-from typing import Iterable, Optional
 
 from backend.db.models.imported_event import ImportedEvent
 from backend.db.models.transaction import Transaction, TransactionType
@@ -124,8 +124,8 @@ class MonarchImporter:
         # Per-session caches for repeated lookups inside one ingest() call
         self._event_cache: set[str] = set()
         self._canonical_cache: set[str] = set()
-        self._account_cache: dict[str, Optional[ResolvedAccount]] = {}
-        self._ws_cutoff_cache: dict[str, Optional[date]] = {}
+        self._account_cache: dict[str, ResolvedAccount | None] = {}
+        self._ws_cutoff_cache: dict[str, date | None] = {}
 
     # ------------------------------------------------------------------
     # Entry points
@@ -231,7 +231,7 @@ class MonarchImporter:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _resolve_cached(self, row: MonarchRow) -> Optional[ResolvedAccount]:
+    def _resolve_cached(self, row: MonarchRow) -> ResolvedAccount | None:
         key = row.account_label
         if key in self._account_cache:
             return self._account_cache[key]
@@ -252,14 +252,14 @@ class MonarchImporter:
         assert resolved.liability is not None  # noqa: S101 - invariant
         return entity_key_for_liability(resolved.liability.id)
 
-    def _ws_cutoff(self, resolved: ResolvedAccount) -> Optional[date]:
+    def _ws_cutoff(self, resolved: ResolvedAccount) -> date | None:
         """Earliest WS-sourced transaction date for this Canopy entity.
 
         Computed once per entity per ingest() call. Used by Layer 1 to
         stop Monarch rows from colonising the time window where WS is
         the authoritative source.
         """
-        name: Optional[str] = None
+        name: str | None = None
         if resolved.asset is not None:
             name = resolved.asset.name
         elif resolved.liability is not None:
@@ -275,7 +275,7 @@ class MonarchImporter:
                 Transaction.account == name,
             )
         ).scalar_one()
-        cutoff: Optional[date] = None
+        cutoff: date | None = None
         if min_date is not None:
             cutoff = min_date.date() if hasattr(min_date, "date") else min_date
         self._ws_cutoff_cache[name] = cutoff
@@ -298,7 +298,7 @@ class MonarchImporter:
     @staticmethod
     def _to_transaction(row: MonarchRow, resolved: ResolvedAccount) -> Transaction:
         tx_type = _transaction_type_for(row)
-        occurred_at = datetime.combine(row.occurred_on, time.min, tzinfo=timezone.utc)
+        occurred_at = datetime.combine(row.occurred_on, time.min, tzinfo=UTC)
         description = row.merchant or row.original_statement or "Monarch row"
         # Canopy is CAD + USD only. Any other currency is filtered
         # upstream by AccountClass.FOREIGN; everything that reaches here

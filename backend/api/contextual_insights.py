@@ -7,10 +7,6 @@ from sqlalchemy.orm import Session
 from backend.db.session import get_db
 from backend.services.contextual_insights import (
     ContextualInsightsService,
-    BudgetInsight,
-    MoMComparison,
-    TransactionAnomaly,
-    RecurringPrediction,
 )
 
 router = APIRouter(prefix="/v1/contextual-insights", tags=["contextual-insights"])
@@ -126,9 +122,7 @@ def get_anomalies(limit: int = Query(5, ge=1, le=20), db: Session = Depends(get_
 
 
 @router.get("/recurring-predictions", response_model=list[RecurringPredictionResponse])
-def get_recurring_predictions(
-    limit: int = Query(5, ge=1, le=20), db: Session = Depends(get_db)
-):
+def get_recurring_predictions(limit: int = Query(5, ge=1, le=20), db: Session = Depends(get_db)):
     """Predict upcoming recurring transactions."""
     service = ContextualInsightsService(db)
     predictions = service.predict_recurring(limit=limit)
