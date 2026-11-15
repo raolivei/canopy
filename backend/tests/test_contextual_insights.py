@@ -19,7 +19,7 @@ class SimpleTransaction(Base):
     __tablename__ = "test_transactions"
 
     id = Column(Integer, primary_key=True)
-    transaction_date = Column(Date, nullable=False)
+    date = Column(Date, nullable=False)
     merchant = Column(String, nullable=True)
     amount = Column(DECIMAL(12, 2), nullable=False)
     category = Column(String, nullable=True)
@@ -44,25 +44,25 @@ def sample_transactions(test_db: Session):
 
     txns = [
         SimpleTransaction(
-            transaction_date=month_start,
+            date=month_start,
             merchant="Grocery Store",
             amount=Decimal("-150.00"),
             category="Groceries",
         ),
         SimpleTransaction(
-            transaction_date=month_start + timedelta(days=5),
+            date=month_start + timedelta(days=5),
             merchant="Gas Station",
             amount=Decimal("-60.00"),
             category="Transportation",
         ),
         SimpleTransaction(
-            transaction_date=month_start + timedelta(days=10),
+            date=month_start + timedelta(days=10),
             merchant="Grocery Store",
             amount=Decimal("-145.00"),
             category="Groceries",
         ),
         SimpleTransaction(
-            transaction_date=month_start + timedelta(days=15),
+            date=month_start + timedelta(days=15),
             merchant="Restaurant",
             amount=Decimal("-500.00"),
             category="Dining Out",
@@ -78,15 +78,30 @@ def sample_transactions(test_db: Session):
 class TestContextualInsightsService:
     """Test contextual insights service."""
 
+    def test_get_budget_warnings_quiet_below_threshold(self, test_db: Session, sample_transactions):
+        """No category in the fixture exceeds the high-spending threshold."""
+        service = ContextualInsightsService(test_db, transaction_model=SimpleTransaction)
+
+        assert service.get_budget_warnings() == []
+
     def test_get_budget_warnings(self, test_db: Session, sample_transactions):
         """Test budget warning detection."""
+        test_db.add(
+            SimpleTransaction(
+                date=date.today(),
+                merchant="Airline",
+                amount=Decimal("-6200.00"),
+                category="Travel",
+            )
+        )
+        test_db.commit()
         service = ContextualInsightsService(test_db, transaction_model=SimpleTransaction)
         warnings = service.get_budget_warnings()
 
-        # Should detect high spending categories
-        assert len(warnings) > 0
+        # Should detect the single high-spending category
+        assert [w.category_name for w in warnings] == ["Travel"]
         assert all(w.type in ["on_track", "warning", "critical"] for w in warnings)
-        assert all(w.percent_used > 0 for w in warnings)
+        assert all(w.percent_used > 100 for w in warnings)
 
     def test_get_mom_comparisons_no_previous_month(self, test_db: Session, sample_transactions):
         """Test MoM comparisons with no previous month data."""
@@ -124,7 +139,7 @@ class TestContextualInsightsService:
 
         for d in dates:
             txn = SimpleTransaction(
-                transaction_date=d,
+                date=d,
                 merchant="Walmart",
                 amount=Decimal("-100.00"),
                 category="Groceries",

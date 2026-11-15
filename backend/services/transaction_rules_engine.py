@@ -33,8 +33,11 @@ class RulesEngine:
     def apply_rules(self, transaction: Transaction) -> list[dict[str, Any]]:
         """Apply all active rules to a transaction.
 
-        Rules are evaluated in priority order (highest first).
-        If a rule matches and has stop_on_match=True, no further rules are evaluated.
+        Rules are evaluated in priority order (highest first). Every matching
+        rule is applied in turn, so a lower-priority rule that matches the same
+        transaction overrides fields set by a higher-priority one, unless the
+        higher-priority rule sets ``stop_on_match=True``. This mirrors ordered
+        top-to-bottom rule lists; conflict reporting is tracked in #72.
 
         Args:
             transaction: Transaction to apply rules to
@@ -281,13 +284,12 @@ class RulesEngine:
                 )
 
             elif action_type == "add_tag":
-                # Initialize tags if None
-                if transaction.tags is None:
-                    transaction.tags = []
-
-                # Add tag if not already present
-                if action_value not in transaction.tags:
-                    transaction.tags.append(action_value)
+                # Reassign rather than mutate in place: SQLAlchemy only tracks
+                # attribute assignment on ARRAY/JSON columns, so an append
+                # would not be flushed.
+                current_tags = list(transaction.tags or [])
+                if action_value not in current_tags:
+                    transaction.tags = [*current_tags, action_value]
                     applied.append(
                         {
                             "rule_id": rule.id,
