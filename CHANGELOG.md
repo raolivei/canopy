@@ -27,6 +27,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 
 ### Fixed
 - Auto-label workflow: Added concurrency group to cancel duplicate runs
+- Backend test suite green again: SQLite JSON variant for transaction tags, rules engine tag reassignment, contextual-insights test model column; rule override semantics documented and tested - #109
 - Frontend Docker build: use `npm ci` with lockfile, install verification, and registry retries; build on `ubuntu-latest`; regenerate `package-lock.json` against public npm (fixes CodeArtifact E401 in CI)
 
 ### Removed

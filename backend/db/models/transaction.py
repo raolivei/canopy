@@ -7,7 +7,7 @@ import enum
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Index, Numeric, String, Text, func
+from sqlalchemy import JSON, DateTime, Index, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -48,7 +48,9 @@ class Transaction(Base):
 
     # Additional metadata
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    # PostgreSQL stores a native text[]; SQLite (tests) falls back to JSON so
+    # Python lists bind and round-trip without a custom type adapter.
+    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String).with_variant(JSON(), "sqlite"), nullable=True)
 
     # Investment transaction fields
     ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
