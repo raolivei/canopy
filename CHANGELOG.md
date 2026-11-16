@@ -9,6 +9,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 ## [Unreleased]
 
 ### Added
+- Budgets page (`/budgets`): create/edit/delete budgets with per-category limits, month picker, budget-vs-actual chart, category table with on-track/close/over badges and drill-down to transactions; unconverted spend is listed, not guessed; quarterly periods flagged as pending #116 - #64, #65
 - Cash Flow page (`/cashflow`): period totals and savings rate, stacked monthly chart with running net, month/quarter/year comparison, spending and income breakdowns per month, month-by-month table with FX completeness; unconverted amounts are listed, never guessed - #67
 - Wallet/Tax workspace switch in the sidebar and mobile bar (persisted, deep-link aware); Wallet navigation gains Budgets and Cash Flow; `/tax` landing page states the Tax workspace is not available yet; shared navigation module - #115
 - Budgets: `month=` on status, `PUT`/`DELETE /v1/budgets/{id}/categories/{category_id}`, 409 on duplicate category names, route-level API tests - #114
