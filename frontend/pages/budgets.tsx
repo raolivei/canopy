@@ -31,6 +31,7 @@ import {
   isMonthKey,
   newCategoryDraft,
   shiftMonthKey,
+  statusPeriodLabel,
   toBudgetVsActuals,
   validateDraft,
 } from "@/utils/budgetMapping";
@@ -468,7 +469,7 @@ export default function BudgetsPage() {
               ) : (
                 <>
                   <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4" aria-label="Budget totals">
-                    <Metric label="Budget" value={fmt(data.total_budget, "CAD")} hint={monthLabel(month)} />
+                    <Metric label="Budget" value={fmt(data.total_budget, "CAD")} hint={statusPeriodLabel(data.period, data.period_start, monthLabel(month))} />
                     <Metric label="Spent" value={fmt(data.total_spent, "CAD")} hint={otherSpend > 0 ? `${fmt(otherSpend, "CAD")} outside category limits` : "All spend in listed categories"} />
                     <Metric
                       label="Remaining"
@@ -490,7 +491,7 @@ export default function BudgetsPage() {
                     <Card className="lg:col-span-3">
                       <CardHeader>
                         <CardTitle>Budget vs actual</CardTitle>
-                        <CardDescription>Per category limit for {monthLabel(month)}</CardDescription>
+                        <CardDescription>Per category limit for {statusPeriodLabel(data.period, data.period_start, monthLabel(month))}</CardDescription>
                       </CardHeader>
                       <CardContent>
                         {data.categories.length === 0 ? (

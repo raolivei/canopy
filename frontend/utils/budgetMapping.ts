@@ -21,6 +21,14 @@ export function isMonthKey(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
 
+/**
+ * Label for the period a status payload covers: the year for a yearly budget,
+ * the month otherwise. A yearly budget is still queried by month.
+ */
+export function statusPeriodLabel(period: BudgetPeriod, periodStart: string, monthText: string): string {
+  return period === "yearly" ? periodStart.slice(0, 4) : monthText;
+}
+
 export interface CategoryDraft {
   /** Stable key for React lists; ids exist only for persisted categories. */
   key: string;

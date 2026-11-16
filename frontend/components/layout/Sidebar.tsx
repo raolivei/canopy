@@ -6,7 +6,13 @@ import { ChevronLeft, Moon, Sun, Command, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
-import { useWorkspace, workspaceForPath, workspaceHome, type Workspace } from "@/hooks/useWorkspace";
+import {
+  useWorkspace,
+  workspaceForPath,
+  workspaceHome,
+  workspaceRequiredByPath,
+  type Workspace,
+} from "@/hooks/useWorkspace";
 import { navigationFor, navItemIsActive } from "./navigation";
 import { WorkspaceSwitch } from "./WorkspaceSwitch";
 
@@ -23,12 +29,13 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const { privacyMode, togglePrivacyMode, hydrated: privacyHydrated } = usePrivacyMode();
   const { workspace, setWorkspace, hydrated: workspaceHydrated } = useWorkspace();
 
-  // A deep link into the other workspace switches to it.
+  // The route decides the workspace, once per navigation. Reacting to the
+  // selection itself would undo a switch before its navigation has landed.
   useEffect(() => {
     if (!workspaceHydrated) return;
-    const fromPath = workspaceForPath(router.pathname);
-    if (fromPath === "tax" && workspace !== "tax") setWorkspace("tax");
-  }, [router.pathname, workspace, workspaceHydrated, setWorkspace]);
+    const required = workspaceRequiredByPath(router.pathname);
+    if (required) setWorkspace(required);
+  }, [router.pathname, workspaceHydrated, setWorkspace]);
 
   const changeWorkspace = (next: Workspace) => {
     if (next === workspace) return;

@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 
-import { useWorkspace, workspaceForPath, workspaceHome, WORKSPACE_STORAGE_KEY } from "@/hooks/useWorkspace";
+import { useWorkspace, workspaceForPath, workspaceHome, WORKSPACE_STORAGE_KEY, workspaceRequiredByPath } from "@/hooks/useWorkspace";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -42,6 +42,17 @@ describe("workspaceForPath / workspaceHome", () => {
     ["/tax/2025", "tax"],
   ])("%s belongs to %s", (path, expected) => {
     expect(workspaceForPath(path)).toBe(expected);
+  });
+
+  it.each([
+    ["/", "wallet"],
+    ["/budgets", "wallet"],
+    ["/settings/integrations", "wallet"],
+    ["/tax", "tax"],
+    ["/tax/2025", "tax"],
+    ["/settings", null],
+  ])("%s requires %s", (path, expected) => {
+    expect(workspaceRequiredByPath(path)).toBe(expected);
   });
 
   it("knows each workspace's landing route", () => {
