@@ -16,7 +16,7 @@ from backend.app.server import create_app
 
 # Routers that exist on disk but are deliberately not mounted yet. Each entry
 # must name the issue that mounts it; remove the entry in that PR.
-NOT_YET_MOUNTED = {"budgets": "#114"}
+NOT_YET_MOUNTED: dict[str, str] = {}
 
 
 def _router_modules() -> list[tuple[str, APIRouter]]:
