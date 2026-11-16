@@ -367,10 +367,10 @@ Available data:
 
         # Build monthly category totals
         monthly_category_totals: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-        for month_key, txns in by_month.items():
+        for month, txns in by_month.items():
             for tx in txns:
                 category = tx.category or "Uncategorized"
-                monthly_category_totals[month_key][category] += float(abs(tx.amount))
+                monthly_category_totals[month][category] += float(abs(tx.amount))
 
         # Calculate trends
         category_trends = {}
