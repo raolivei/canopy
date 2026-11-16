@@ -9,7 +9,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 ## [Unreleased]
 
 ### Added
-- Consolidated Wallet/Tax roadmap from Monarch account review; parity checks now report unavailable references instead of comparing Canopy against itself. Bank connectivity is out of scope; post-Monarch operation uses file imports and manual entry - #107, #76
+- Consolidated Wallet/Tax roadmap; parity checks now report unavailable references instead of comparing Canopy against itself. Bank connectivity is out of scope; post-cutover operation uses file imports and manual entry - #107, #76
 - 6 AI assistant tools (budget, cashflow, recurring, patterns, merchant, goals) - #75, #76
 - Golden questions regression suite for Monarch parity testing - #76
 - Contextual insights: budget warnings, MoM comparisons, anomalies, recurring predictions - #56

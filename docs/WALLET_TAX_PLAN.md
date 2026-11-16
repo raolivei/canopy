@@ -5,28 +5,28 @@ Updated: 2026-11-15 (America/Toronto). Status: assessed and planned; implementat
 ## Product direction
 
 One Canopy application with two primary workspaces: **Wallet** and **Tax**.
-Wallet should reproduce the useful workflows and analysis in the user's Monarch
-account, then improve them through explainable calculations, reliable imports,
+Wallet should reproduce the useful workflows and analysis of the user's current
+subscription finance app (the "reference app" below), then improve them through explainable calculations, reliable imports,
 local processing, and integration with Tax. Tax should organize uploaded records
 and CRA correspondence by tax year, maintain an evidence-backed ledger, and track
 actions across years. Routine implementation is authorized. If a capability proves
 infeasible, present the concrete limitation, alternatives, cost and consequence to
 the user before dropping it or substituting a materially different workflow.
 
-## Scope clarification: replace Monarch without bank connectivity
+## Scope clarification: replace the reference app without bank connectivity
 
 The user explicitly excludes bank connectivity from this build. Plaid, Finicity,
 MX, bank-login automation and new direct bank/broker connectors are not milestones
 or cancellation prerequisites. Existing integrations may remain available, but
 expanding them is outside the current scope.
 
-Use Monarch temporarily as a reference during development and migration. Prefer
+Use the reference app temporarily during development and migration. Prefer
 read-only official MCP access for the data it exposes, and the browser for interaction
 and chart behavior. Validate actual tool/schema/coverage support before promising
 migration of budgets, rules, goals or historical balances. MCP exposes data and
-operations, not Monarch's internal code or proprietary calculation algorithms.
+operations, not the vendor's internal code or proprietary calculation algorithms.
 
-After migration, Canopy must work with Monarch disconnected: bank/broker CSVs,
+After migration, Canopy must work with the reference app disconnected: bank/broker CSVs,
 statements, tax PDFs/receipts, CRA correspondence and manual entries supply new data.
 Prioritize batch upload, saved column mappings, account matching, deduplication,
 reconciliation and clear data-through dates. CSV is preferred for structured
@@ -36,12 +36,40 @@ missed payments. Automated analysis runs after import; live bank refresh is excl
 
 Before cancellation, preserve available history and configuration using supported
 exports plus validated connector reads where useful, verify missing fields/coverage,
-and exercise normal Canopy workflows with the Monarch connector disabled. Importing
-new data without Monarch is the exit check; building a replacement aggregator is not.
+and exercise normal Canopy workflows with the reference connector disabled. Importing
+new data without the reference app is the exit check; building a replacement aggregator is not.
+
+## Reference connector (temporary, developer-side only)
+
+The reference app publishes an official MCP connector with OAuth and read-only
+access. It is registered in the developer's local Claude Code configuration at
+user scope as an HTTP MCP server; authorization happens once through the
+interactive `/mcp` flow in that session. **Canopy never calls this connector.**
+It is a migration and verification aid for the person doing the cutover, not a
+product dependency, and nothing in the repository, images or cluster depends on it.
+
+Uses during migration:
+
+- Inventory which accounts, fields and date ranges the connector exposes before
+  promising any numeric comparison; gaps are recorded as unverified.
+- Validate exported history against Canopy imports: counts, source IDs and exact
+  sums at a fixed cutoff, per the verification protocol below.
+- Run the private golden-question comparison with the session as the reference
+  reader. Only sanitized outcomes (pass/fail, counts, cent-level deltas) are
+  recorded in the repository; never identifiers, balances or transaction rows.
+
+Limits and exit:
+
+- The vendor states that some aggregator-sourced accounts are not exposed and
+  that usage is rate limited; coverage is inventoried first.
+- The unofficial Python client previously listed in the workspace MCP config is
+  superseded by the official connector and should not be approved.
+- After cutover the server entry is removed from the developer's configuration
+  and the exit check is repeated with no connector present.
 
 ## Evidence and limits of this assessment
 
-- Inspected the signed-in Monarch web account on 2026-11-15: Dashboard, Reports
+- Inspected the signed-in reference app on 2026-11-15: Dashboard, Reports
   (cash flow and spending), Budget, Recurring, Goals, Investments, Forecasting,
   Transactions and transaction details/filters, Accounts, Cash Flow, Settings,
   Rules, and MCP Connector. Browsing was read-only; no account records were edited.
@@ -57,11 +85,11 @@ new data without Monarch is the exit check; building a replacement aggregator is
 - Existing epics [#47](https://github.com/raolivei/canopy/issues/47) and
   [#50](https://github.com/raolivei/canopy/issues/50) are the Wallet feature and UX
   umbrellas. Their original checklists are stale. Do not create duplicate epics.
-- Existing references to `MONARCH_PARITY.md`, a parity memory file and a Monarch
-  playbook do not resolve in the inspected local checkouts. This document is the
+- Existing references to an earlier parity document, a parity memory file and a
+  connector playbook do not resolve in the inspected local checkouts. This document is the
   current consolidated plan, not evidence those earlier artifacts were delivered.
 
-## Monarch workflow inventory and Canopy gaps
+## Reference workflow inventory and Canopy gaps
 
 | Area | Observed reference behavior | Canopy evidence and planned completion |
 |---|---|---|
@@ -74,8 +102,8 @@ new data without Monarch is the exit check; building a replacement aggregator is
 | Recurring | List/calendar, review suggestions, filters, management, next occurrences | Detection service exists; complete API + persistent confirmed schedules, exclusions, variable amounts, missed/changed bills, calendar and review UI |
 | Goals | Save up/pay down, allocation and goal creation controls | Empty reference setup; Canopy FIRE is not a savings/debt goals workflow. Add account-linked goals, allocations/contributions, progress and debt scenarios; validate full reference flow later |
 | Investments | Market/allocation views, date selectors, holdings, asset grouping, account/owner controls, chart download | Holdings/portfolio/FIRE exist; validate return methodology, cost basis, contributions vs returns, benchmark data, dividends and currency coverage |
-| Forecasting | Onboarding advertises life events and retirement scenarios | Canopy FIRE provides a starting point; add scenario assumptions, income/expense events, debt, inflation and tax assumptions with explicit uncertainty; full Monarch behavior unverified |
-| Categories/rules | Category groups, tags, merchant settings; rules can rename, categorize and split, and apply top-to-bottom | Taxonomy and rules service exist; add CRUD/preview UI and audit/undo. Existing first-match semantics differ from Monarch's described ordered rules; make behavior explicit and test conflicts |
+| Forecasting | Onboarding advertises life events and retirement scenarios | Canopy FIRE provides a starting point; add scenario assumptions, income/expense events, debt, inflation and tax assumptions with explicit uncertainty; full reference behavior unverified |
+| Categories/rules | Category groups, tags, merchant settings; rules can rename, categorize and split, and apply top-to-bottom | Taxonomy and rules service exist; add CRUD/preview UI and audit/undo. Existing semantics must match the reference app's ordered top-to-bottom rules; make behavior explicit and test conflicts |
 | Assistant | Contextual prompts, transaction explanation, weekly recap entry points | Provider/tool abstractions exist; add grounded answers, source links and period/filter context. Actual response quality and connector coverage remain unverified |
 | Household/settings | Members, preferences, notifications, businesses, data/security settings | Navigation observed, permission behavior unverified. Design ownership/scoping now; implement shared views, roles and notifications after core single-user flows |
 
@@ -177,11 +205,11 @@ assessment; recommendations here have not changed GitHub issue state.
 | #70–#72 | Taxonomy/engine closed, rules UI open | Reuse foundations; complete category administration, preview, rule-order semantics and split invariants |
 | #51 / #54–#57 | Closed skeleton/button/chart/insights/accessibility work | Verify on new screens; component-level completion does not establish page coverage |
 | #52 / #53 / #58–#60 | Open recovery/confirmations/filter/export/bulk work | Apply consistently to Wallet and Tax; sensitive form persistence must avoid leaking records into browser storage |
-| #73 / #74 | Open Monarch API spike/scheduled sync | Re-scope #73 to temporary official read-only reference access; defer permanent scheduled Monarch sync (#74) |
+| #73 / #74 | Open reference API spike/scheduled sync | Re-scope #73 to the temporary developer-side connector described below; defer permanent scheduled sync (#74) |
 | #75–#77 | Tools closed, golden questions/provider deployment open | Remove false parity evidence, finish real calculations, expand tool coverage and test actual tool selection |
-| #78 / #79 / #80 | Open metrics/playbook/cutover | Redact financial values, document official connector and coverage, require reconciled history + working CSV/document imports with Monarch disconnected before cutover |
+| #78 / #79 / #80 | Open metrics/playbook/cutover | Redact financial values, document official connector and coverage, require reconciled history + working CSV/document imports with the reference app disconnected before cutover |
 | #82–#84 | Open query limits/N+1/aggregation | Aggregate complete periods in SQL; paginate listings. Never cap rows silently to make a financial total faster |
-| #21 / #23 | Open broker/payment integrations, code already exists | Existing code may remain; expansion is outside this build and these issues do not block Monarch cancellation |
+| #21 / #23 | Open broker/payment integrations, code already exists | Existing code may remain; expansion is outside this build and these issues do not block cancellation |
 | #24 | Open dividend/income streams | Fit within Wallet investments and connect supporting documents to Tax |
 | #26 | Open legacy property feature | Manual value/history/equity first; automated valuation and Brazil scope require feasibility review |
 | #16 | Open ML categorization | Preserve user categories and corrections; start with rules and measured confidence before committing to a heavy ML stack |
@@ -207,7 +235,7 @@ existing Wallet epics and a Tax epic when publishing the implementation backlog.
 | 2. Wallet daily use | Milestone 1; transactions, categories/rules, budgets, cash flow, recurring, navigation | End-to-end create/edit/review/filter/drill-down/export workflows work with consistent totals, mobile/keyboard/error recovery |
 | 3. Tax first release | Milestone 1 document controls and navigation; T1–T4 | Mixed-year PDF/scan batch produces source-linked reviewable facts, preserves amendments, shows yearly ledger and CRA action timeline; no unreviewed deadline treated as confirmed |
 | 4. Full analysis | Milestone 2; reports, recaps, goals, forecast, investment analysis; T5 after milestone 3 | Same period/filter yields same numbers across UI/API/export/assistant; forecast assumptions visible; tax citations and Wallet matches verified |
-| 5. Parallel use/cutover | All agreed must-have capabilities and CSV/document/manual ingestion | Two complete monthly review cycles reconciled, available history/configuration preserved with gaps resolved, normal workflows verified with Monarch disconnected, rollback/restore proven; user decides subscription cancellation |
+| 5. Parallel use/cutover | All agreed must-have capabilities and CSV/document/manual ingestion | Two complete monthly review cycles reconciled, available history/configuration preserved with gaps resolved, normal workflows verified with the reference app disconnected, rollback/restore proven; user decides subscription cancellation |
 
 Use small releasable changes with feature flags where useful, preserving existing
 Wallet routes. Avoid a year-long divergent branch. Reuse image publishing and Flux
@@ -236,33 +264,37 @@ The current golden-question implementation also contains placeholder budget and
 subscription answers and a net-worth calculation based on income. Removing its
 self-comparison fallback is only the first fix; it remains unsuitable for cutover
 certification until calculations, official connector schemas, pagination, provenance
-and coverage checks are complete. Its API currently supplies no Monarch client.
+and coverage checks are complete. Its API supplies no reference client; comparisons run through the developer-side connector described below.
 
 ## Feasibility decisions and user checkpoints
 
 | Capability | Current evidence | Next decision |
 |---|---|---|
-| Official Monarch connector | Account settings expose `https://api.monarch.com/mcp`; no tools connected. Official documentation supports OAuth/read-only access | Prefer this for authorized reference comparisons over the old unofficial-client proposal. A new persistent connection requires the user's OAuth consent; browser assessment already works |
-| Connector completeness | Monarch documents that Finicity-sourced data is unavailable through MCP, plus usage limits | Inventory account coverage before numeric comparisons; use supported exports/UI where needed, with explicit incomplete coverage. Do not switch bank providers automatically |
+| Official reference connector | The vendor publishes an official MCP endpoint with OAuth, read-only access. Registered in the developer's local assistant at user scope on 2026-11-15; authorization pending | Use it for authorized reference comparisons instead of the earlier unofficial-client proposal. Canopy itself never calls it (see "Reference connector" below) |
+| Connector completeness | The vendor documents that some aggregator-sourced accounts are unavailable through the connector, plus usage limits | Inventory account coverage before numeric comparisons; use supported exports/UI where needed, with explicit incomplete coverage. Do not switch bank providers automatically |
 | Independent bank sync | Explicitly excluded by the user | No Plaid/Finicity/MX integration, bank-login automation or new direct connectors in this build; use CSV/documents/manual entries |
 | Goals/forecasting | Setup/onboarding observed; full behavior unverified | Continue read-only reference review or use a disposable test profile before changing the live plan |
 | OCR/LLM capacity | Local provider abstractions exist; document performance unmeasured | Benchmark representative synthetic PDFs/scans on target hardware; ask before external document processing or extra infrastructure spending |
 | Automatic CRA filing/responses | Records/preparation feasible; certified filing is a separate integration | Keep draft/export workflow; ask about any filing integration rather than implying uploads file a return |
 | Household/business/international scope | Settings and legacy issues exist; tax need currently CRA-focused | Model ownership now. Clarify additional taxpayers, business returns or jurisdictions before their dependent implementation; preserve current CAD/USD behavior |
 
-Sources: [Monarch connector documentation](https://help.monarch.com/hc/en-us/articles/50207234679956-Monarch-MCP-Connector),
-updated November 13, 2026; signed-in UI observations above; repository code and linked
-GitHub issues. The post-Monarch ingestion strategy is CSV/document upload and manual entry.
+Sources: the vendor's connector documentation (updated November 13, 2026); signed-in
+UI observations above; repository code and linked GitHub issues. The post-cutover
+ingestion strategy is CSV/document upload and manual entry.
 No bank subscription, provider access or data coverage is assumed.
 
 ## Work completed in this change
 
 - Recorded this assessment and issue/dependency map; linked it from README.
-- Removed the golden-question fallback that used Canopy's own answers as Monarch
+- Registered the official reference connector in the developer's local assistant
+  configuration (user scope, read-only, authorization pending). No Canopy code
+  depends on it.
+- Removed the golden-question fallback that used Canopy's own answers as external
   references. Missing/failed references now produce unavailable failures; execution
   errors remain in the denominator, respect stop-on-failure and hide exception bodies.
 - Added regression tests for absent/failing references, error accounting and genuine
-  mismatches. This change does not connect Monarch, enable tax uploads or establish parity.
+  mismatches. This change does not connect the reference app to Canopy, enable tax uploads or
+  establish parity.
 
 Next implementation slice: shared calculation contract and actual route/service
 integration tests, then budget/cash-flow workflows and the document security foundation.
