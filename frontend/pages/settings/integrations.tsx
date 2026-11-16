@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import PageLayout, { PageHeader } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -66,9 +67,11 @@ function IntegrationMark({ id }: { id: string }) {
   const src = INTEGRATION_LOGOS[id];
   if (!src) return null;
   return (
-    <img
+    <Image
       src={src}
       alt=""
+      width={40}
+      height={40}
       className={cn(
         "h-10 w-10 shrink-0 object-contain",
         id === "wise" && "dark:brightness-0 dark:invert",

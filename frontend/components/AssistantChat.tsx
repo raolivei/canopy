@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Copy, Check, TrendingUp, DollarSign, PieChart, Calendar } from 'lucide-react';
@@ -33,26 +33,29 @@ export function AssistantChat({ conversationId, onConversationStart }: Assistant
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+  const loadConversation = useCallback(
+    async (id: number) => {
+      try {
+        const res = await fetch(`${API_URL}/v1/assistant/conversations/${id}`);
+        const data = await res.json();
+        setMessages(data.messages);
+        setCurrentConversationId(data.id);
+      } catch (error) {
+        console.error('Failed to load conversation:', error);
+      }
+    },
+    [API_URL],
+  );
+
   useEffect(() => {
     if (conversationId) {
       loadConversation(conversationId);
     }
-  }, [conversationId]);
+  }, [conversationId, loadConversation]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const loadConversation = async (id: number) => {
-    try {
-      const res = await fetch(`${API_URL}/v1/assistant/conversations/${id}`);
-      const data = await res.json();
-      setMessages(data.messages);
-      setCurrentConversationId(data.id);
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-    }
-  };
 
   const copyToClipboard = async (text: string, messageId: number) => {
     try {

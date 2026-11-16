@@ -1,0 +1,42 @@
+name: CI
+
+# Quality gate for every pull request and for main, built from the shared
+# reusable workflows in raolivei/github-workflows. Image builds live in
+# build-and-push.yml and the VERSION bump check in pr.yml.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    name: Backend
+    uses: raolivei/github-workflows/.github/workflows/python-ci.yml@main
+    with:
+      python-version: "3.11"
+      working-directory: backend
+      package-manager: pip
+      run-ruff: true
+      run-ruff-format: true
+      run-mypy: false
+      run-pytest: true
+      pytest-args: -q
+      runs-on: ubuntu-latest
+
+  frontend:
+    name: Frontend
+    uses: raolivei/github-workflows/.github/workflows/node-ci.yml@main
+    with:
+      node-version: "20"
+      working-directory: frontend
+      install-args: --legacy-peer-deps
+      runs-on: ubuntu-latest

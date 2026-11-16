@@ -128,9 +128,11 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                   aria-label="Canopy home"
                   className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
-                  <img
+                  <Image
                     src="/brand/canopy-icon.svg"
                     alt="Canopy"
+                    width={32}
+                    height={32}
                     className="w-8 h-8 rounded-lg"
                   />
                   <span className="font-semibold text-slate-900 dark:text-white">
@@ -152,9 +154,11 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
                   aria-label="Canopy home"
                   className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
-                  <img
+                  <Image
                     src="/brand/canopy-icon.svg"
                     alt="Canopy"
+                    width={32}
+                    height={32}
                     className="w-8 h-8 rounded-lg"
                   />
                 </Link>

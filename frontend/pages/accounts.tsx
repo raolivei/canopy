@@ -244,7 +244,7 @@ export default function Accounts() {
     },
   });
 
-  const accounts = data?.accounts ?? [];
+  const accounts = useMemo(() => data?.accounts ?? [], [data]);
   const hasAccounts = accounts.length > 0;
   const totalsByCcy = data?.totals_by_currency;
   const totalsCombined = data?.totals_combined;
