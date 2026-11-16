@@ -70,6 +70,31 @@ describe("CategoryBreakdown", () => {
     expect(screen.getByText("Entertainment")).toBeInTheDocument();
   });
 
+  it("rounds legend percentages to one decimal place", () => {
+    render(
+      <CategoryBreakdown
+        data={[
+          { category: "Housing", amount: 1850, pct: 52.03806373397017 },
+          { category: "Dining", amount: 260.8, pct: 7.334554118179849 },
+        ]}
+      />
+    );
+
+    expect(screen.getByText("52.0%")).toBeInTheDocument();
+    expect(screen.getByText("7.3%")).toBeInTheDocument();
+    expect(screen.queryByText(/\d\.\d{2,}%/)).not.toBeInTheDocument();
+  });
+
+  it("shows a dash for a share that is not a number", () => {
+    render(
+      <CategoryBreakdown
+        data={[{ category: "Unknown", amount: 0, pct: NaN }]}
+      />
+    );
+
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
   it("hides legend when showLegend is false", () => {
     const { container } = render(
       <CategoryBreakdown data={mockData} showLegend={false} />

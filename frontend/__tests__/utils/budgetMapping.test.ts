@@ -7,6 +7,7 @@ import {
   hasErrors,
   isMonthKey,
   shiftMonthKey,
+  statusPeriodLabel,
   toBudgetVsActuals,
   validateDraft,
 } from "@/utils/budgetMapping";
@@ -113,5 +114,12 @@ describe("toBudgetVsActuals", () => {
         },
       ]),
     ).toEqual([{ category: "Groceries", budget: 600, actual: 450, variance: -150, variancePct: -25 }]);
+  });
+});
+
+describe("statusPeriodLabel", () => {
+  it("names the year for a yearly budget and the month otherwise", () => {
+    expect(statusPeriodLabel("yearly", "2026-01-01", "Nov 2026")).toBe("2026");
+    expect(statusPeriodLabel("monthly", "2026-11-01", "Nov 2026")).toBe("Nov 2026");
   });
 });

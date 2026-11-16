@@ -75,6 +75,43 @@ describe("Sidebar workspace switch", () => {
     fireEvent.click(screen.getByRole("button", { name: "Wallet" }));
     expect(push).toHaveBeenCalledWith("/");
   });
+
+  it("keeps Wallet selected when leaving Tax through the switch", async () => {
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, "tax");
+    pathname = "/tax";
+    const { rerender } = render(<Sidebar />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tax" })).toHaveAttribute("aria-pressed", "true"));
+
+    // The route is still /tax until the navigation lands.
+    fireEvent.click(screen.getByRole("button", { name: "Wallet" }));
+    expect(push).toHaveBeenCalledWith("/");
+    expect(screen.getByRole("button", { name: "Wallet" })).toHaveAttribute("aria-pressed", "true");
+    expect(window.localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBe("wallet");
+
+    pathname = "/";
+    rerender(<Sidebar />);
+    expect(screen.getByRole("button", { name: "Wallet" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("link", { name: /Holdings/ })).toBeInTheDocument();
+  });
+
+  it("returns to Wallet on a Wallet page even when Tax was stored", async () => {
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, "tax");
+    pathname = "/budgets";
+    render(<Sidebar />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Wallet" })).toHaveAttribute("aria-pressed", "true"));
+    expect(window.localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBe("wallet");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the current workspace on a shared page", async () => {
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, "tax");
+    pathname = "/settings";
+    render(<Sidebar />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tax" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("link", { name: /Tax overview/ })).toBeInTheDocument();
+  });
 });
 
 describe("MobileNav", () => {
