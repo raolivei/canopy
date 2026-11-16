@@ -9,6 +9,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 ## [Unreleased]
 
 ### Added
+- Wallet/Tax workspace switch in the sidebar and mobile bar (persisted, deep-link aware); Wallet navigation gains Budgets and Cash Flow; `/tax` landing page states the Tax workspace is not available yet; shared navigation module - #115
 - Budgets: `month=` on status, `PUT`/`DELETE /v1/budgets/{id}/categories/{category_id}`, 409 on duplicate category names, route-level API tests - #114
 - `GET /v1/cashflow/comparison` (month/quarter/year vs prior period), `kind=income|expense` on category breakdown, `reporting_currency` on all cash-flow endpoints; route-level API tests via a shared `client` fixture - #113
 - Shared calculation contract (`backend/services/calculation/`, `docs/CALCULATION_CONTRACT.md`): half-open calendar periods, flow classification by type, per-currency Decimal totals with explicit FX provenance and no fallback rate, SQL-side monthly aggregation; `Money` response type; assistant tools and query builder use calendar months instead of 30-day windows - #112

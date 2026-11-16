@@ -2,56 +2,13 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import {
-  Home,
-  DollarSign,
-  TrendingUp,
-  Settings,
-  Wallet,
-  Upload,
-  Target,
-  Plug,
-  ChevronLeft,
-  ChevronDown,
-  Moon,
-  BarChart2,
-  Sun,
-  Command,
-  UploadCloud,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { ChevronLeft, Moon, Sun, Command, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
 import { usePrivacyMode } from "@/hooks/usePrivacyMode";
-
-const primaryNavigation = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "Holdings", href: "/portfolio", icon: TrendingUp },
-  { name: "Accounts", href: "/accounts", icon: Wallet },
-  { name: "Transactions", href: "/transactions", icon: DollarSign },
-  { name: "Import", href: "/import", icon: UploadCloud },
-  { name: "Insights", href: "/insights", icon: Target },
-  { name: "Annual Report", href: "/report", icon: BarChart2 },
-  { name: "Integrations", href: "/settings/integrations", icon: Plug },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: typeof Home;
-}
-
-function navItemIsActive(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  if (href === "/") return false;
-  if (href === "/settings") {
-    return pathname === "/settings";
-  }
-  const prefix = href.endsWith("/") ? href : `${href}/`;
-  return pathname.startsWith(prefix);
-}
+import { useWorkspace, workspaceForPath, workspaceHome, type Workspace } from "@/hooks/useWorkspace";
+import { navigationFor, navItemIsActive } from "./navigation";
+import { WorkspaceSwitch } from "./WorkspaceSwitch";
 
 
 interface SidebarProps {
@@ -64,6 +21,24 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const { privacyMode, togglePrivacyMode, hydrated: privacyHydrated } = usePrivacyMode();
+  const { workspace, setWorkspace, hydrated: workspaceHydrated } = useWorkspace();
+
+  // A deep link into the other workspace switches to it.
+  useEffect(() => {
+    if (!workspaceHydrated) return;
+    const fromPath = workspaceForPath(router.pathname);
+    if (fromPath === "tax" && workspace !== "tax") setWorkspace("tax");
+  }, [router.pathname, workspace, workspaceHydrated, setWorkspace]);
+
+  const changeWorkspace = (next: Workspace) => {
+    if (next === workspace) return;
+    setWorkspace(next);
+    if (workspaceForPath(router.pathname) !== next) {
+      router.push(workspaceHome(next));
+    }
+  };
+
+  const navigation = navigationFor(workspace);
 
   useEffect(() => {
     setIsMounted(true);
@@ -177,6 +152,11 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
           )}
         </div>
 
+        {/* Workspace */}
+        <div className={cn("px-3 pt-3", onCommandPaletteOpen ? "pb-1" : "pb-2")}>
+          <WorkspaceSwitch workspace={workspace} onChange={changeWorkspace} collapsed={isCollapsed} />
+        </div>
+
         {/* Command Palette Trigger */}
         {onCommandPaletteOpen && (
           <div className="px-3 py-2">
@@ -205,7 +185,7 @@ export default function Sidebar({ onCommandPaletteOpen }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {primaryNavigation.map((item) => {
+          {navigation.map((item) => {
             const isActive = navItemIsActive(router.pathname, item.href);
             const Icon = item.icon;
 
