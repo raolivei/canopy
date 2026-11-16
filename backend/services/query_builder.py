@@ -1,10 +1,11 @@
 """Fluent query builder for financial analytics - eliminates SQL boilerplate."""
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 from backend.db.models.transaction import Transaction as TransactionModel
+from backend.services.calculation import month_bounds, months_back
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,8 +19,8 @@ class TransactionQuery:
         self._results = None
 
     def last_months(self, n: int) -> "TransactionQuery":
-        """Filter to last N months."""
-        start_date = date.today() - timedelta(days=30 * n)
+        """Filter to the last ``n`` calendar months, including the current one."""
+        start_date, _ = month_bounds(*months_back(date.today(), n)[0])
         self.filters.append(TransactionModel.date >= start_date)
         return self
 

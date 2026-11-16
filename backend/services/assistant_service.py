@@ -10,6 +10,15 @@ from typing import Any
 
 from backend.db.models.asset import Asset as AssetModel
 from backend.db.models.transaction import Transaction as TransactionModel
+from backend.services.calculation import (
+    bucket_by_month,
+    month_bounds,
+    month_key,
+    monthly_flows,
+    months_back,
+    rate_lookup,
+    to_reporting,
+)
 from backend.services.portfolio_calculator import PortfolioCalculator
 from backend.services.query_builder import (
     TransactionQuery,
@@ -454,30 +463,25 @@ Available data:
         portfolio = self.get_portfolio_summary()
         current_net_worth = portfolio.get("total_value", 0)
 
-        # Get monthly savings (average of last 3 months)
+        # Monthly savings: average net cash flow over the last 3 calendar months,
+        # per the calculation contract (SQL aggregation, per-currency totals,
+        # CAD reporting with explicit FX; unconverted amounts are excluded and
+        # flagged rather than summed across currencies).
         today = datetime.now().date()
-        monthly_savings = []
-
-        for month_offset in range(3):
-            month_start = today.replace(day=1) - timedelta(days=30 * month_offset)
-            month_start = month_start.replace(day=1)
-
-            # Get first day of next month
-            if month_start.month == 12:
-                month_end = month_start.replace(year=month_start.year + 1, month=1, day=1) - timedelta(days=1)
-            else:
-                month_end = month_start.replace(month=month_start.month + 1, day=1) - timedelta(days=1)
-
-            query = select(TransactionModel).where(
-                TransactionModel.date >= month_start, TransactionModel.date <= month_end
+        window = months_back(today, 3)
+        window_start, _ = month_bounds(*window[0])
+        _, window_end = month_bounds(*window[-1])
+        by_month = bucket_by_month(monthly_flows(self.db, window_start, window_end))
+        lookup = rate_lookup(self.db)
+        monthly_savings: list[float] = []
+        fx_complete = True
+        for year, month in window:
+            _, next_month = month_bounds(year, month)
+            totals = to_reporting(
+                by_month.get(month_key(year, month), {}), "CAD", lookup, next_month - timedelta(days=1)
             )
-            transactions = self.db.execute(query).scalars().all()
-
-            income = sum(float(tx.amount) for tx in transactions if tx.type == "income")
-            expenses = sum(float(abs(tx.amount)) for tx in transactions if tx.type == "expense")
-            savings = income - expenses
-
-            monthly_savings.append(savings)
+            fx_complete = fx_complete and totals.fx_complete
+            monthly_savings.append(float(totals.net))
 
         avg_monthly_savings = sum(monthly_savings) / len(monthly_savings) if monthly_savings else 0
 
@@ -518,6 +522,8 @@ Available data:
             },
             "fire_timeline": fire_goal if current_net_worth > 0 else None,
             "overall_progress": "on_track" if avg_monthly_savings > 0 else "behind",
+            "fx_complete": fx_complete,
+            "currency": "CAD",
         }
 
     def budget_status(self, month: str | None = None) -> dict[str, Any]:
@@ -681,7 +687,8 @@ Available data:
     def recurring_analysis(self, months: int = 3) -> dict[str, Any]:
         """Analyze recurring transactions (subscriptions, payments) with frequency and next dates."""
         end_date = date.today()
-        start_date = end_date - timedelta(days=months * 30)
+        # Last N calendar months, including the current partial month.
+        start_date, _ = month_bounds(*months_back(end_date, months)[0])
 
         # Get transactions in range
         query = select(TransactionModel).where(
