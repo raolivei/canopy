@@ -32,8 +32,13 @@ def _router_modules() -> list[tuple[str, APIRouter]]:
     return found
 
 
-def _mounted(app) -> set[tuple[str, frozenset[str]]]:
-    return {(r.path, frozenset(r.methods)) for r in app.routes if isinstance(r, APIRoute)}
+def _mounted(app) -> set[tuple[str, str]]:
+    """Every served ``(path, METHOD)``, read from the OpenAPI schema.
+
+    ``app.routes`` is not used: newer FastAPI versions keep an included router
+    as one wrapper entry instead of copying its routes onto the application.
+    """
+    return {(path, method.upper()) for path, operations in app.openapi()["paths"].items() for method in operations}
 
 
 def test_every_api_router_is_mounted() -> None:
@@ -43,7 +48,9 @@ def test_every_api_router_is_mounted() -> None:
         if name in NOT_YET_MOUNTED:
             continue
         for route in router.routes:
-            if isinstance(route, APIRoute) and (route.path, frozenset(route.methods)) not in mounted:
+            if not isinstance(route, APIRoute) or not route.include_in_schema:
+                continue
+            if any((route.path, method) not in mounted for method in route.methods):
                 missing.setdefault(name, []).append(route.path)
     assert not missing, f"routers with unmounted routes: {missing}"
 
