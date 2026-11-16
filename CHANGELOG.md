@@ -26,6 +26,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 - Ruff config inlined in backend/pyproject.toml (shared extend path did not exist); mechanical lint and format fixes across the backend - #108
 
 ### Fixed
+- Alembic history loadable again: category taxonomy migration re-identified as `20260616_0015a` (was a duplicate of the budget tables id), guarded for databases that already ran it; single-head test added - #110
 - Auto-label workflow: Added concurrency group to cancel duplicate runs
 - Backend test suite green again: SQLite JSON variant for transaction tags, rules engine tag reassignment, contextual-insights test model column; rule override semantics documented and tested - #109
 - Frontend Docker build: use `npm ci` with lockfile, install verification, and registry retries; build on `ubuntu-latest`; regenerate `package-lock.json` against public npm (fixes CodeArtifact E401 in CI)

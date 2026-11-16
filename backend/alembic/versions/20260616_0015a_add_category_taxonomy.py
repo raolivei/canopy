@@ -1,24 +1,34 @@
 """Add category taxonomy model
 
-Revision ID: 20260616_0015
-Revises: 20260615_0014
+Revision ID: 20260616_0015a
+Revises: 20260616_0015
+Create Date: 2026-06-16
+
+Originally issued with the same revision id as the budget-tables migration,
+which made the history unloadable. Re-identified as 20260616_0015a on top of
+20260616_0015; the table creation is guarded so a database that already ran
+the original file is not broken.
 Create Date: 2026-06-16
 
 """
-from alembic import op
+from alembic import context, op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 import uuid
 
 # revision identifiers, used by Alembic.
-revision = '20260616_0015'
-down_revision = '20260615_0014'
+revision = '20260616_0015a'
+down_revision = '20260616_0015'
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
     """Create categories table and seed with standard PFM categories."""
+    if not context.is_offline_mode() and sa.inspect(op.get_bind()).has_table('categories'):
+        # Applied under the duplicated revision id before the re-identification.
+        # (Offline --sql generation has no live connection to inspect.)
+        return
 
     # Create categories table
     op.create_table('categories',
