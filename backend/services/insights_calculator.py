@@ -11,7 +11,6 @@ Provides:
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Optional
 
 from backend.db.models import (
     Asset,
@@ -43,12 +42,12 @@ class NetWorthSummary:
     real_estate_equity_cad: Decimal = Decimal("0")
 
     # Change tracking
-    change_1d: Optional[Decimal] = None
-    change_1d_percent: Optional[Decimal] = None
-    change_1m: Optional[Decimal] = None
-    change_1m_percent: Optional[Decimal] = None
-    change_ytd: Optional[Decimal] = None
-    change_ytd_percent: Optional[Decimal] = None
+    change_1d: Decimal | None = None
+    change_1d_percent: Decimal | None = None
+    change_1m: Decimal | None = None
+    change_1m_percent: Decimal | None = None
+    change_ytd: Decimal | None = None
+    change_ytd_percent: Decimal | None = None
 
 
 @dataclass
@@ -67,10 +66,10 @@ class GrowthMetrics:
     monthly_growth_rate: Decimal = Decimal("0")
     yearly_growth_rate: Decimal = Decimal("0")
     average_monthly_growth: Decimal = Decimal("0")
-    best_month: Optional[date] = None
-    best_month_return: Optional[Decimal] = None
-    worst_month: Optional[date] = None
-    worst_month_return: Optional[Decimal] = None
+    best_month: date | None = None
+    best_month_return: Decimal | None = None
+    worst_month: date | None = None
+    worst_month_return: Decimal | None = None
 
 
 class InsightsCalculator:
@@ -149,12 +148,7 @@ class InsightsCalculator:
         """Calculate net worth changes over different periods."""
         today = date.today()
 
-        snapshots = (
-            self.db.query(PortfolioSnapshot)
-            .order_by(PortfolioSnapshot.snapshot_date.desc())
-            .limit(365)
-            .all()
-        )
+        snapshots = self.db.query(PortfolioSnapshot).order_by(PortfolioSnapshot.snapshot_date.desc()).limit(365).all()
         if not snapshots:
             return
 
@@ -167,21 +161,15 @@ class InsightsCalculator:
             if summary.change_1d is None and sd <= one_day_ago:
                 summary.change_1d = summary.net_worth_cad - snapshot.total_value
                 if snapshot.total_value > 0:
-                    summary.change_1d_percent = (
-                        summary.change_1d / snapshot.total_value
-                    ) * 100
+                    summary.change_1d_percent = (summary.change_1d / snapshot.total_value) * 100
             if summary.change_1m is None and sd <= one_month_ago:
                 summary.change_1m = summary.net_worth_cad - snapshot.total_value
                 if snapshot.total_value > 0:
-                    summary.change_1m_percent = (
-                        summary.change_1m / snapshot.total_value
-                    ) * 100
+                    summary.change_1m_percent = (summary.change_1m / snapshot.total_value) * 100
             if summary.change_ytd is None and sd <= year_start:
                 summary.change_ytd = summary.net_worth_cad - snapshot.total_value
                 if snapshot.total_value > 0:
-                    summary.change_ytd_percent = (
-                        summary.change_ytd / snapshot.total_value
-                    ) * 100
+                    summary.change_ytd_percent = (summary.change_ytd / snapshot.total_value) * 100
 
     def calculate_allocation(self) -> AllocationBreakdown:
         """Calculate asset allocation breakdown (CAD-based percentages)."""
@@ -228,31 +216,19 @@ class InsightsCalculator:
             country_totals[country] = country_totals.get(country, Decimal("0")) + value
 
             institution = asset.institution or "Other"
-            institution_totals[institution] = (
-                institution_totals.get(institution, Decimal("0")) + value
-            )
+            institution_totals[institution] = institution_totals.get(institution, Decimal("0")) + value
 
         if total_cad > 0:
-            allocation.by_type = {
-                k: (v / total_cad) * 100 for k, v in type_totals.items()
-            }
-            allocation.by_country = {
-                k: (v / total_cad) * 100 for k, v in country_totals.items()
-            }
-            allocation.by_institution = {
-                k: (v / total_cad) * 100 for k, v in institution_totals.items()
-            }
+            allocation.by_type = {k: (v / total_cad) * 100 for k, v in type_totals.items()}
+            allocation.by_country = {k: (v / total_cad) * 100 for k, v in country_totals.items()}
+            allocation.by_institution = {k: (v / total_cad) * 100 for k, v in institution_totals.items()}
 
         return allocation
 
     def calculate_growth_metrics(self) -> GrowthMetrics:
         """Calculate portfolio growth metrics from historical snapshots."""
         metrics = GrowthMetrics()
-        snapshots = (
-            self.db.query(PortfolioSnapshot)
-            .order_by(PortfolioSnapshot.snapshot_date.asc())
-            .all()
-        )
+        snapshots = self.db.query(PortfolioSnapshot).order_by(PortfolioSnapshot.snapshot_date.asc()).all()
 
         if len(snapshots) < 2:
             return metrics
@@ -262,15 +238,11 @@ class InsightsCalculator:
             prev = snapshots[i - 1]
             curr = snapshots[i]
             if prev.total_value > 0:
-                return_pct = (
-                    (curr.total_value - prev.total_value) / prev.total_value
-                ) * 100
+                return_pct = ((curr.total_value - prev.total_value) / prev.total_value) * 100
                 monthly_returns.append((curr.snapshot_date, return_pct))
 
         if monthly_returns:
-            metrics.average_monthly_growth = sum(
-                r[1] for r in monthly_returns
-            ) / len(monthly_returns)
+            metrics.average_monthly_growth = sum(r[1] for r in monthly_returns) / len(monthly_returns)
             best = max(monthly_returns, key=lambda x: x[1])
             worst = min(monthly_returns, key=lambda x: x[1])
             metrics.best_month = best[0]
@@ -281,20 +253,14 @@ class InsightsCalculator:
         first_snapshot = snapshots[0]
         last_snapshot = snapshots[-1]
         if first_snapshot.total_value > 0:
-            total_return = (
-                last_snapshot.total_value - first_snapshot.total_value
-            ) / first_snapshot.total_value
+            total_return = (last_snapshot.total_value - first_snapshot.total_value) / first_snapshot.total_value
             days = (last_snapshot.snapshot_date - first_snapshot.snapshot_date).days
             years = days / 365.25
             if years > 0:
-                metrics.yearly_growth_rate = (
-                    (1 + total_return) ** (Decimal("1") / Decimal(years)) - 1
-                ) * 100
+                metrics.yearly_growth_rate = ((1 + total_return) ** (Decimal("1") / Decimal(years)) - 1) * 100
                 months = days / 30.44
                 if months > 0:
-                    metrics.monthly_growth_rate = (
-                        (1 + total_return) ** (Decimal("1") / Decimal(months)) - 1
-                    ) * 100
+                    metrics.monthly_growth_rate = ((1 + total_return) ** (Decimal("1") / Decimal(months)) - 1) * 100
 
         return metrics
 
@@ -336,7 +302,7 @@ def get_insights_summary(db: Session) -> dict:
     allocation = calculator.calculate_allocation()
     growth = calculator.calculate_growth_metrics()
 
-    def _f(v: Optional[Decimal]) -> Optional[float]:
+    def _f(v: Decimal | None) -> float | None:
         return float(v) if v is not None else None
 
     return {
@@ -358,9 +324,7 @@ def get_insights_summary(db: Session) -> dict:
         "allocation": {
             "by_type": {k: float(v) for k, v in allocation.by_type.items()},
             "by_country": {k: float(v) for k, v in allocation.by_country.items()},
-            "by_institution": {
-                k: float(v) for k, v in allocation.by_institution.items()
-            },
+            "by_institution": {k: float(v) for k, v in allocation.by_institution.items()},
         },
         "growth": {
             "monthly_rate": float(growth.monthly_growth_rate),

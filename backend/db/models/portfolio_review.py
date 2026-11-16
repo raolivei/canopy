@@ -9,7 +9,7 @@ multi-region portfolios.
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     Date,
@@ -45,16 +45,10 @@ class PortfolioReview(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     as_of_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    label: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    source: Mapped[str] = mapped_column(
-        String(32), nullable=False, default=ReviewSource.CSV_IMPORT.value
-    )
-    total_value_cad: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=18, scale=4), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    label: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default=ReviewSource.CSV_IMPORT.value)
+    total_value_cad: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=4), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     lines: Mapped[list["PortfolioReviewLine"]] = relationship(
         "PortfolioReviewLine",
@@ -63,9 +57,7 @@ class PortfolioReview(Base):
         order_by="PortfolioReviewLine.sort_order",
     )
 
-    __table_args__ = (
-        UniqueConstraint("as_of_date", name="uq_portfolio_reviews_as_of_date"),
-    )
+    __table_args__ = (UniqueConstraint("as_of_date", name="uq_portfolio_reviews_as_of_date"),)
 
 
 class PortfolioReviewLine(Base):
@@ -84,30 +76,18 @@ class PortfolioReviewLine(Base):
     investment: Mapped[str] = mapped_column(String(512), nullable=False)
     platform: Mapped[str] = mapped_column(String(256), nullable=False, default="")
 
-    value_cad: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=18, scale=4), nullable=True
-    )
+    value_cad: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=4), nullable=True)
 
-    pct_global: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=10, scale=6), nullable=True
-    )
-    return_pct: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=10, scale=6), nullable=True
-    )
-    div_per_year: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=18, scale=4), nullable=True
-    )
-    yield_pct: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(precision=10, scale=6), nullable=True
-    )
+    pct_global: Mapped[Decimal | None] = mapped_column(Numeric(precision=10, scale=6), nullable=True)
+    return_pct: Mapped[Decimal | None] = mapped_column(Numeric(precision=10, scale=6), nullable=True)
+    div_per_year: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=4), nullable=True)
+    yield_pct: Mapped[Decimal | None] = mapped_column(Numeric(precision=10, scale=6), nullable=True)
 
-    target_pct: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    delta: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    conviction: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
-    action: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    target_pct: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    delta: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    conviction: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    action: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
-    raw_row: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    raw_row: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
-    review: Mapped["PortfolioReview"] = relationship(
-        "PortfolioReview", back_populates="lines"
-    )
+    review: Mapped["PortfolioReview"] = relationship("PortfolioReview", back_populates="lines")

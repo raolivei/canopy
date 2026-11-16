@@ -6,7 +6,7 @@ Canopy - Personal Finance Platform
 import enum
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -85,10 +85,10 @@ class Asset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Institution and location
-    institution: Mapped[Optional[str]] = mapped_column(
+    institution: Mapped[str | None] = mapped_column(
         String(100), nullable=True
     )  # RBC, Wealthsimple, Nubank, Clear, XP, etc.
-    country: Mapped[Optional[str]] = mapped_column(String(2), nullable=True, default="CA")  # ISO 3166-1 alpha-2
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True, default="CA")  # ISO 3166-1 alpha-2
 
     # Liability tracking
     is_liability: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -97,24 +97,24 @@ class Asset(Base):
     ownership_percentage: Mapped[Decimal] = mapped_column(Numeric(precision=5, scale=4), default=Decimal("1.0"))
 
     # Sync source for automatic updates (stored as string to match migration)
-    sync_source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="MANUAL")
+    sync_source: Mapped[str | None] = mapped_column(String(50), nullable=True, default="MANUAL")
 
     # External account ID for linking to APIs (Questrade account ID, etc.)
-    external_account_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    external_account_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Current price/balance (cached from last fetch)
-    current_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
-    price_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_price: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=8), nullable=True)
+    price_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # For liabilities: interest rate and credit limit
-    interest_rate: Mapped[Optional[Decimal]] = mapped_column(
+    interest_rate: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=6, scale=4),  # e.g., 0.1999 = 19.99%
         nullable=True,
     )
-    credit_limit: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
+    credit_limit: Mapped[Decimal | None] = mapped_column(Numeric(precision=18, scale=2), nullable=True)
 
     # Notes for additional context
-    notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     lots: Mapped[list["Lot"]] = relationship("Lot", back_populates="asset", cascade="all, delete-orphan")
@@ -143,7 +143,7 @@ class Asset(Base):
         return (self.sync_source or "").upper() == "WISE" or sym.startswith("WISE_")
 
     @property
-    def effective_value(self) -> Optional[Decimal]:
+    def effective_value(self) -> Decimal | None:
         """Get the effective value considering ownership percentage.
 
         For shared assets (like the 50/50 apartment), this returns

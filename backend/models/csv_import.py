@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -53,30 +53,30 @@ class FieldMapping(BaseModel):
 
     date_column: str
     description_column: str
-    amount_column: Optional[str] = None  # Optional if using debit/credit columns
-    type_column: Optional[str] = None  # For determining income/expense
-    category_column: Optional[str] = None
-    account_column: Optional[str] = None
-    currency_column: Optional[str] = None
-    balance_column: Optional[str] = None  # For reconciliation
+    amount_column: str | None = None  # Optional if using debit/credit columns
+    type_column: str | None = None  # For determining income/expense
+    category_column: str | None = None
+    account_column: str | None = None
+    currency_column: str | None = None
+    balance_column: str | None = None  # For reconciliation
 
     # Additional columns for better data extraction
-    debit_column: Optional[str] = None  # Some banks split debit/credit
-    credit_column: Optional[str] = None
-    transaction_id_column: Optional[str] = None  # For duplicate detection
+    debit_column: str | None = None  # Some banks split debit/credit
+    credit_column: str | None = None
+    transaction_id_column: str | None = None  # For duplicate detection
 
     # Monarch-style enhanced fields
-    merchant_column: Optional[str] = None  # Clean merchant name
-    original_statement_column: Optional[str] = None  # Raw bank text
-    notes_column: Optional[str] = None  # User notes
-    tags_column: Optional[str] = None  # Tags (comma-separated or similar)
+    merchant_column: str | None = None  # Clean merchant name
+    original_statement_column: str | None = None  # Raw bank text
+    notes_column: str | None = None  # User notes
+    tags_column: str | None = None  # Tags (comma-separated or similar)
 
     # Investment-specific fields
-    ticker_column: Optional[str] = None
-    shares_column: Optional[str] = None
-    price_column: Optional[str] = None
-    fees_column: Optional[str] = None
-    operation_column: Optional[str] = None  # Buy/Sell/Dividend
+    ticker_column: str | None = None
+    shares_column: str | None = None
+    price_column: str | None = None
+    fees_column: str | None = None
+    operation_column: str | None = None  # Buy/Sell/Dividend
 
     # Date parsing configuration
     date_format: str = "%Y-%m-%d"  # Default format
@@ -93,14 +93,14 @@ class CSVImportConfig(BaseModel):
     bank_format: BankFormat = BankFormat.GENERIC
     field_mapping: FieldMapping
     default_currency: str = "CAD"
-    default_account: Optional[str] = None
+    default_account: str | None = None
     skip_rows: int = 0  # Number of header rows to skip
     skip_duplicates: bool = True
-    date_range_start: Optional[datetime] = None
-    date_range_end: Optional[datetime] = None
+    date_range_start: datetime | None = None
+    date_range_end: datetime | None = None
 
     # Type inference rules
-    type_inference_rules: Optional[Dict[str, str]] = None  # keyword -> type mapping
+    type_inference_rules: dict[str, str] | None = None  # keyword -> type mapping
 
 
 class TransactionPreview(BaseModel):
@@ -111,27 +111,27 @@ class TransactionPreview(BaseModel):
     amount: float
     currency: str
     type: str
-    category: Optional[str] = None
+    category: str | None = None
     date: datetime
-    account: Optional[str] = None
+    account: str | None = None
 
     # Monarch-style enhanced fields
-    merchant: Optional[str] = None
-    original_statement: Optional[str] = None
-    notes: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
+    merchant: str | None = None
+    original_statement: str | None = None
+    notes: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
     # Investment fields
-    ticker: Optional[str] = None
-    shares: Optional[float] = None
-    price_per_share: Optional[float] = None
-    fees: Optional[float] = None
+    ticker: str | None = None
+    shares: float | None = None
+    price_per_share: float | None = None
+    fees: float | None = None
 
     is_duplicate: bool = False
-    duplicate_reason: Optional[str] = None
+    duplicate_reason: str | None = None
     has_error: bool = False
-    error_message: Optional[str] = None
-    raw_data: Dict[str, Any] = Field(default_factory=dict)  # Original CSV row
+    error_message: str | None = None
+    raw_data: dict[str, Any] = Field(default_factory=dict)  # Original CSV row
 
 
 class CSVImportPreview(BaseModel):
@@ -141,10 +141,10 @@ class CSVImportPreview(BaseModel):
     valid_rows: int
     duplicate_rows: int
     error_rows: int
-    transactions: List[TransactionPreview]
-    detected_currency: Optional[str] = None
-    detected_account: Optional[str] = None
-    date_range: Optional[Dict[str, datetime]] = None
+    transactions: list[TransactionPreview]
+    detected_currency: str | None = None
+    detected_account: str | None = None
+    date_range: dict[str, datetime] | None = None
 
 
 class CSVImportRequest(BaseModel):
@@ -153,7 +153,7 @@ class CSVImportRequest(BaseModel):
     import_id: str
     skip_duplicates: bool = True
     skip_errors: bool = True
-    selected_rows: Optional[List[int]] = None  # If None, import all valid rows
+    selected_rows: list[int] | None = None  # If None, import all valid rows
 
 
 class ImportResult(BaseModel):
@@ -165,8 +165,8 @@ class ImportResult(BaseModel):
     imported_count: int
     skipped_count: int
     error_count: int
-    errors: List[Dict[str, Any]] = Field(default_factory=list)
-    imported_transaction_ids: List[int] = Field(default_factory=list)
+    errors: list[dict[str, Any]] = Field(default_factory=list)
+    imported_transaction_ids: list[int] = Field(default_factory=list)
     duration_seconds: float = 0.0
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -183,12 +183,12 @@ class ImportHistory(BaseModel):
     skipped_count: int
     error_count: int
     created_at: datetime
-    completed_at: Optional[datetime] = None
-    config: Optional[CSVImportConfig] = None
+    completed_at: datetime | None = None
+    config: CSVImportConfig | None = None
 
 
 class ImportHistoryList(BaseModel):
     """List of import history records"""
 
-    imports: List[ImportHistory]
+    imports: list[ImportHistory]
     total: int

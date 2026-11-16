@@ -25,7 +25,6 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
 
 
 class AccountClass(str, enum.Enum):
@@ -65,9 +64,9 @@ class WsFileMeta:
     account_label: str
     account_kind: WsAccountKind
     account_class: AccountClass
-    account_number: Optional[str]
-    statement_period_start: Optional[date]
-    skip_reason: Optional[str] = None
+    account_number: str | None
+    statement_period_start: date | None
+    skip_reason: str | None = None
 
     @property
     def is_skipped(self) -> bool:
@@ -78,7 +77,7 @@ _DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 _ACCOUNT_NUMBER_RE = re.compile(r"([A-Z0-9]{8,})CAD", re.I)
 
 
-def _extract_date(stem: str) -> Optional[date]:
+def _extract_date(stem: str) -> date | None:
     m = _DATE_RE.search(stem)
     if not m:
         return None
@@ -88,7 +87,7 @@ def _extract_date(stem: str) -> Optional[date]:
         return None
 
 
-def _extract_account_number(stem: str) -> Optional[str]:
+def _extract_account_number(stem: str) -> str | None:
     m = _ACCOUNT_NUMBER_RE.search(stem)
     if not m:
         return None

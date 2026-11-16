@@ -7,14 +7,13 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from backend.db.models.transaction import Transaction as TransactionModel
 from backend.models.recurring import (
     RecurringPattern,
     RecurringPrediction,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 class RecurringDetectionService:
@@ -111,9 +110,7 @@ class RecurringDetectionService:
             avg_amount = sum(amounts) / len(amounts)
 
             # Check if amounts are within ±10% variance
-            within_variance = all(
-                abs(amount - avg_amount) / avg_amount <= 0.10 for amount in amounts
-            )
+            within_variance = all(abs(amount - avg_amount) / avg_amount <= 0.10 for amount in amounts)
 
             if not within_variance:
                 continue
@@ -126,9 +123,7 @@ class RecurringDetectionService:
             occurrence_score = min(len(txns) / 10, 1.0)  # Max at 10 occurrences
 
             # Interval consistency: how close intervals are to frequency_days
-            interval_variance = sum(
-                abs(interval - frequency_days) for interval in intervals
-            ) / len(intervals)
+            interval_variance = sum(abs(interval - frequency_days) for interval in intervals) / len(intervals)
             interval_score = max(0, 1.0 - (interval_variance / frequency_days))
 
             confidence = (occurrence_score * 0.5) + (interval_score * 0.5)
@@ -156,9 +151,7 @@ class RecurringDetectionService:
 
         return patterns
 
-    def get_recurring_predictions(
-        self, next_days: int = 30
-    ) -> list[RecurringPrediction]:
+    def get_recurring_predictions(self, next_days: int = 30) -> list[RecurringPrediction]:
         """Get predictions for recurring transactions in the next N days.
 
         Args:

@@ -1,6 +1,6 @@
 """Tests for CashflowService monthly income/expense metrics."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -13,7 +13,6 @@ from backend.services.cashflow_service import CashflowService
 @pytest.fixture
 def three_month_transactions(db):
     """Create sample transactions spanning 3 months."""
-    base_date = date(2026, 3, 1)
 
     transactions = [
         # March 2026 - Income: 5000, Expenses: 2000
@@ -41,7 +40,6 @@ def three_month_transactions(db):
             date=datetime(2026, 3, 1),
             category="Housing",
         ),
-
         # April 2026 - Income: 5000, Expenses: 2500
         TransactionModel(
             description="Salary",
@@ -75,7 +73,6 @@ def three_month_transactions(db):
             date=datetime(2026, 4, 5),
             category="Bills & Utilities",
         ),
-
         # May 2026 - Income: 5000, Expenses: 3000
         TransactionModel(
             description="Salary",

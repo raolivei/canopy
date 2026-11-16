@@ -16,7 +16,6 @@ don't break historical net-worth conversion.
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import (
     Date,
@@ -46,14 +45,10 @@ class FxRate(Base):
     # Where the rate came from — right now always "bank_of_canada", but
     # left open so a manual / alternate-source entry is trivially
     # distinguishable later.
-    source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        UniqueConstraint("pair", "as_of_date", name="uq_fx_rates_pair_date"),
-    )
+    __table_args__ = (UniqueConstraint("pair", "as_of_date", name="uq_fx_rates_pair_date"),)
 
     def __repr__(self) -> str:
         return f"<FxRate({self.pair} {self.as_of_date} = {self.rate})>"

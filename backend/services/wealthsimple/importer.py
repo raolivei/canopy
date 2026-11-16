@@ -18,10 +18,10 @@ from __future__ import annotations
 
 import hashlib
 from calendar import monthrange
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Iterable, Optional
 
 from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.asset import Asset, AssetType
@@ -84,7 +84,7 @@ class FileReport:
     by_kind: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     skipped: bool = False
-    skip_reason: Optional[str] = None
+    skip_reason: str | None = None
 
     @property
     def account_display(self) -> str:
@@ -145,7 +145,7 @@ def _hash_event(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _statement_end(statement_start: Optional[date], fallback: date) -> date:
+def _statement_end(statement_start: date | None, fallback: date) -> date:
     """Return the last day of the statement's month.
 
     Wealthsimple names files with the statement period's *start* date
@@ -256,13 +256,13 @@ class WealthsimpleImporter:
         # Iterate rows
         last_row_by_currency: dict[str, ParsedRow] = {}
         cc_delta = Decimal("0")
-        cc_last_post: Optional[date] = None
+        cc_last_post: date | None = None
         parsed_rows: list[ParsedRow] = []
         detected_shape = ShapeKind.UNKNOWN
 
         for shape, _header, row_dict in iter_rows(content):
             detected_shape = shape
-            parsed: Optional[ParsedRow]
+            parsed: ParsedRow | None
             if shape == ShapeKind.SHAPE_A:
                 parsed = parse_shape_a(row_dict)
             elif shape == ShapeKind.SHAPE_B:
@@ -295,8 +295,8 @@ class WealthsimpleImporter:
             return report
 
         # Resolve target asset/liability once, outside the row loop
-        asset: Optional[Asset] = None
-        liability: Optional[Liability] = None
+        asset: Asset | None = None
+        liability: Liability | None = None
         if meta.account_class in {AccountClass.INVESTMENT, AccountClass.CASH}:
             asset = self._upsert_account_asset(meta)
             summary.assets_touched.add(asset.symbol)
@@ -306,7 +306,7 @@ class WealthsimpleImporter:
 
         # Compute the cross-source entity key once per file - every row in
         # the same statement resolves to the same Canopy entity.
-        entity_key: Optional[str] = None
+        entity_key: str | None = None
         if asset is not None:
             entity_key = entity_key_for_asset(asset.id)
         elif liability is not None:
@@ -395,7 +395,7 @@ class WealthsimpleImporter:
                         summary.liability_snapshots_added += 1
                     # LOC balance column is the outstanding principal
                     liability.current_balance = row.balance
-                    liability.balance_updated_at = datetime.now(timezone.utc)
+                    liability.balance_updated_at = datetime.now(UTC)
             elif meta.account_kind == WsAccountKind.CREDIT_CARD:
                 # Recompute cumulative balance across *all* imported CC rows to
                 # date (in case earlier statements were imported too). Sum of
@@ -403,12 +403,12 @@ class WealthsimpleImporter:
                 # add opening_balance for pre-history correction.
                 ledger_delta = self._credit_card_ledger_delta(liability.id)
                 liability.current_balance = (liability.opening_balance or Decimal("0")) + ledger_delta
-                liability.balance_updated_at = datetime.now(timezone.utc)
+                liability.balance_updated_at = datetime.now(UTC)
                 if cc_last_post is not None:
                     added = self._upsert_liability_snapshot(
                         liability_id=liability.id,
                         balance=liability.current_balance,
-                        recorded_at=datetime.combine(cc_last_post, datetime.min.time(), tzinfo=timezone.utc),
+                        recorded_at=datetime.combine(cc_last_post, datetime.min.time(), tzinfo=UTC),
                         is_statement_balance=True,
                     )
                     if added:
@@ -509,7 +509,7 @@ class WealthsimpleImporter:
         row: ParsedRow,
         summary: ImportSummary,
         event_hash: str,
-        canonical_hash: Optional[str],
+        canonical_hash: str | None,
         filename: str,
     ) -> None:
         # Always write a Transaction
@@ -587,7 +587,7 @@ class WealthsimpleImporter:
         row: ParsedRow,
         summary: ImportSummary,
         event_hash: str,
-        canonical_hash: Optional[str],
+        canonical_hash: str | None,
         filename: str,
     ) -> None:
         tx = self._create_transaction(row=row, account_label=liability.name)
@@ -609,7 +609,7 @@ class WealthsimpleImporter:
     def _create_transaction(self, row: ParsedRow, account_label: str) -> Transaction:
         tx_type = _row_to_transaction_type(row.kind, row.amount)
         category = _KIND_CATEGORY.get(row.kind)
-        occurred_at = datetime.combine(row.occurred_on, datetime.min.time(), tzinfo=timezone.utc)
+        occurred_at = datetime.combine(row.occurred_on, datetime.min.time(), tzinfo=UTC)
         return Transaction(
             description=row.description[:500] or row.raw_code or "Wealthsimple row",
             amount=row.amount,
@@ -691,9 +691,9 @@ class WealthsimpleImporter:
     def _record_event(
         self,
         hashed: str,
-        canonical: Optional[str],
+        canonical: str | None,
         target_table: str,
-        target_id: Optional[int],
+        target_id: int | None,
         filename: str,
     ) -> None:
         self.db.add(
@@ -747,7 +747,7 @@ class WealthsimpleImporter:
         when = (
             recorded_at
             if isinstance(recorded_at, datetime)
-            else datetime.combine(recorded_at, datetime.min.time(), tzinfo=timezone.utc)
+            else datetime.combine(recorded_at, datetime.min.time(), tzinfo=UTC)
         )
         # Simple idempotency: skip if a row with the same liability + day + balance exists.
         existing = (

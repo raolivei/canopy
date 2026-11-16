@@ -1,14 +1,12 @@
 """Fluent query builder for financial analytics - eliminates SQL boilerplate."""
 
-from datetime import date, timedelta
-from decimal import Decimal
-from typing import Any, Callable, Iterator
 from collections import defaultdict
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import date, timedelta
+from typing import Any
 
 from backend.db.models.transaction import Transaction as TransactionModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 class TransactionQuery:

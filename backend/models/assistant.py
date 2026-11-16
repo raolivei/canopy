@@ -1,7 +1,7 @@
 """Pydantic models for AI Assistant API."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +10,7 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
     query: str = Field(..., min_length=1, max_length=1000, description="User's question")
-    conversation_id: Optional[int] = Field(None, description="Conversation ID for follow-up questions")
+    conversation_id: int | None = Field(None, description="Conversation ID for follow-up questions")
 
 
 class FunctionCall(BaseModel):
@@ -37,7 +37,7 @@ class Message(BaseModel):
     id: int
     role: str  # 'user' or 'assistant'
     content: str
-    functions_called: Optional[list[FunctionCall]] = None
+    functions_called: list[FunctionCall] | None = None
     created_at: datetime
 
 
@@ -56,7 +56,7 @@ class Conversation(BaseModel):
 class BudgetStatusRequest(BaseModel):
     """Request for budget status."""
 
-    month: Optional[str] = Field(None, description="Month in YYYY-MM format, defaults to current month")
+    month: str | None = Field(None, description="Month in YYYY-MM format, defaults to current month")
 
 
 class BudgetAlert(BaseModel):
@@ -85,7 +85,7 @@ class BudgetStatusResponse(BaseModel):
 class CashflowSummaryRequest(BaseModel):
     """Request for cashflow summary."""
 
-    month: Optional[str] = Field(None, description="Month in YYYY-MM format, defaults to current month")
+    month: str | None = Field(None, description="Month in YYYY-MM format, defaults to current month")
 
 
 class CashflowSummaryResponse(BaseModel):
@@ -112,7 +112,7 @@ class RecurringTransaction(BaseModel):
     category: str
     average_amount: float
     frequency: str  # "daily", "weekly", "monthly", "annual"
-    next_date: Optional[str] = None
+    next_date: str | None = None
     annual_cost: float
 
 
@@ -136,9 +136,9 @@ class CategoryTrend(BaseModel):
 
     category: str
     current_month: float
-    previous_month: Optional[float]
+    previous_month: float | None
     trend: str  # "up", "down", "stable"
-    percent_change: Optional[float]
+    percent_change: float | None
 
 
 class SpendingAnomalyAlert(BaseModel):
@@ -190,6 +190,7 @@ class MerchantInsightsResponse(BaseModel):
 
 class GoalProgressRequest(BaseModel):
     """Request for goal progress."""
+
     pass
 
 
@@ -201,7 +202,7 @@ class SavingsGoal(BaseModel):
     current_amount: float
     percent_complete: float
     monthly_contribution: float
-    months_to_goal: Optional[float]
+    months_to_goal: float | None
     status: str  # "on_track", "behind", "completed"
 
 
@@ -212,7 +213,7 @@ class NetWorthTarget(BaseModel):
     current: float
     percent_complete: float
     monthly_growth: float
-    months_to_target: Optional[float]
+    months_to_target: float | None
 
 
 class FireTimeline(BaseModel):
@@ -222,7 +223,7 @@ class FireTimeline(BaseModel):
     current_portfolio: float
     monthly_savings: float
     assumed_annual_return: float
-    years_to_fire: Optional[float]
+    years_to_fire: float | None
 
 
 class GoalProgressResponse(BaseModel):
@@ -230,5 +231,5 @@ class GoalProgressResponse(BaseModel):
 
     savings_goals: list[SavingsGoal]
     net_worth: NetWorthTarget
-    fire_timeline: Optional[FireTimeline]
+    fire_timeline: FireTimeline | None
     overall_progress: str  # "ahead", "on_track", "behind"

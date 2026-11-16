@@ -1,17 +1,16 @@
 """Cashflow API endpoints for income, expenses, and burn rate analysis."""
 
-from datetime import date, datetime
-from typing import Optional
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.db.session import DbSession
 from backend.models.cashflow import (
-    CategoryBreakdownResponse,
     BurnRateResponse,
     CashflowTrendResponse,
-    MonthlySummaryResponse,
+    CategoryBreakdownResponse,
     MonthlySummary,
+    MonthlySummaryResponse,
 )
 from backend.services.cashflow_service import CashflowService
 
@@ -38,14 +37,10 @@ async def get_monthly_summary(
         start = datetime.strptime(start_date, "%Y-%m-%d").date()
         end = datetime.strptime(end_date, "%Y-%m-%d").date()
     except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid date format: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}") from e
 
     if start > end:
-        raise HTTPException(
-            status_code=400, detail="Start date must be before or equal to end date"
-        )
+        raise HTTPException(status_code=400, detail="Start date must be before or equal to end date")
 
     service = CashflowService(db)
     monthly_data = service.get_monthly_summary(start, end)
@@ -90,9 +85,7 @@ async def get_cashflow_trend(
 @router.get("/categories", response_model=CategoryBreakdownResponse)
 async def get_category_breakdown(
     db: DbSession,
-    month: Optional[str] = Query(
-        None, description="Month in YYYY-MM format (defaults to current month)"
-    ),
+    month: str | None = Query(None, description="Month in YYYY-MM format (defaults to current month)"),
 ):
     """Get expense breakdown by category for a specific month.
 
@@ -110,9 +103,7 @@ async def get_category_breakdown(
             # Validate month format
             datetime.strptime(month, "%Y-%m")
         except ValueError as e:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid month format: {str(e)}"
-            ) from e
+            raise HTTPException(status_code=400, detail=f"Invalid month format: {str(e)}") from e
 
     service = CashflowService(db)
     breakdown_data = service.get_category_breakdown(month)

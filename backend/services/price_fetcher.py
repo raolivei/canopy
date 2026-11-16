@@ -3,7 +3,6 @@
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional
 
 import yfinance as yf
 from backend.db.models.asset import Asset, AssetType
@@ -33,7 +32,7 @@ class PriceFetcher:
 
         return symbol
 
-    def fetch_current_price(self, symbol: str) -> Optional[Decimal]:
+    def fetch_current_price(self, symbol: str) -> Decimal | None:
         """Fetch current price for a symbol from Yahoo Finance.
 
         Args:
@@ -156,7 +155,7 @@ class PriceFetcher:
 
 
 # Standalone function for API use
-def fetch_quote(symbol: str) -> Optional[dict]:
+def fetch_quote(symbol: str) -> dict | None:
     """Fetch a stock/crypto quote without database access.
 
     Returns dict with symbol, price, currency, name, etc.

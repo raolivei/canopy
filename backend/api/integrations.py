@@ -1,8 +1,7 @@
 """API endpoints for third-party integrations (Wise, Questrade, etc.)."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -45,8 +44,8 @@ class WiseTransactionResponse(BaseModel):
     amount: float
     currency: str
     transaction_type: str
-    reference: Optional[str] = None
-    merchant: Optional[str] = None
+    reference: str | None = None
+    merchant: str | None = None
 
 
 @router.get("/wise/status")
@@ -86,8 +85,8 @@ async def test_wise_connection(request: WiseConnectRequest):
             raise HTTPException(
                 status_code=401,
                 detail="Invalid or expired API token. Generate a new Personal Token in Wise Settings → API tokens.",
-            )
-        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}")
+            ) from e
+        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}") from e
 
 
 @router.post("/wise/balances", response_model=list[WiseBalanceResponse])
@@ -108,7 +107,7 @@ async def get_wise_balances(request: WiseConnectRequest):
             ]
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch balances: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch balances: {str(e)}") from e
 
 
 class WiseTransactionsRequest(BaseModel):
@@ -116,7 +115,7 @@ class WiseTransactionsRequest(BaseModel):
 
     api_token: str
     sandbox: bool = False
-    currency: Optional[str] = None
+    currency: str | None = None
     days: int = 90
 
 
@@ -160,13 +159,13 @@ async def get_wise_transactions(request: WiseTransactionsRequest):
             ]
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch transactions: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch transactions: {str(e)}") from e
 
 
 class WiseSyncRequest(BaseModel):
     """Request to sync Wise data into Canopy (assets + transactions)."""
 
-    api_token: Optional[str] = None  # If omitted, uses WISE_API_TOKEN from env
+    api_token: str | None = None  # If omitted, uses WISE_API_TOKEN from env
     sandbox: bool = False
     days: int = 90
 
@@ -204,7 +203,7 @@ async def sync_wise_to_canopy(request: WiseSyncRequest, db: DbSession):
     transactions_imported = 0
     currencies: list[str] = []
     skipped_currencies: list[str] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     with WiseIntegrationService(token, sandbox=request.sandbox) as wise:
         all_balances = wise.get_balances()
@@ -286,7 +285,7 @@ class QuestradeConnectRequest(BaseModel):
     A non-empty body value wins over the environment.
     """
 
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
 
 
 class QuestradeAccountResponse(BaseModel):
@@ -302,11 +301,11 @@ class QuestradePositionResponse(BaseModel):
     symbol_id: int
     symbol: str
     open_quantity: Decimal
-    current_market_value: Optional[Decimal] = None
-    current_price: Optional[Decimal] = None
-    average_entry_price: Optional[Decimal] = None
-    open_pnl: Optional[Decimal] = None
-    closed_pnl: Optional[Decimal] = None
+    current_market_value: Decimal | None = None
+    current_price: Decimal | None = None
+    average_entry_price: Decimal | None = None
+    open_pnl: Decimal | None = None
+    closed_pnl: Decimal | None = None
 
 
 class QuestradeSyncResponse(BaseModel):
@@ -381,8 +380,8 @@ async def test_questrade_connection(request: QuestradeConnectRequest):
             raise HTTPException(
                 status_code=401,
                 detail="Invalid or expired refresh token. In Questrade: API Centre → your personal app → New manual authorization → copy the token (see questrade.com/api/documentation/getting-started).",
-            )
-        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}")
+            ) from e
+        raise HTTPException(status_code=400, detail=f"Connection failed: {msg}") from e
 
 
 @router.post("/questrade/accounts", response_model=list[QuestradeAccountResponse])
@@ -406,7 +405,7 @@ async def get_questrade_accounts(request: QuestradeConnectRequest):
                 for a in accounts
             ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/questrade/positions", response_model=list[QuestradePositionResponse])
@@ -435,7 +434,7 @@ async def get_questrade_positions(
                 for p in positions
             ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/questrade/sync", response_model=QuestradeSyncResponse)
@@ -479,9 +478,7 @@ async def sync_questrade(request: QuestradeConnectRequest, db: DbSession):
 
                 account_label = f"Questrade-{acc.number}"
                 lot = db.execute(
-                    select(Lot)
-                    .where(Lot.asset_id == asset.id)
-                    .where(Lot.account == account_label)
+                    select(Lot).where(Lot.asset_id == asset.id).where(Lot.account == account_label)
                 ).scalar_one_or_none()
 
                 if lot:

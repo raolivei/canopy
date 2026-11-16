@@ -181,12 +181,8 @@ async def commit_import(
     tx_payload, bal_payload = _split_by_kind(payload)
 
     try:
-        tx_summary = (
-            MonarchImporter(db).ingest(tx_payload) if tx_payload else None
-        )
-        bal_summary = (
-            MonarchBalancesImporter(db).ingest(bal_payload) if bal_payload else None
-        )
+        tx_summary = MonarchImporter(db).ingest(tx_payload) if tx_payload else None
+        bal_summary = MonarchBalancesImporter(db).ingest(bal_payload) if bal_payload else None
         db.commit()
     except Exception as exc:  # noqa: BLE001 — surface to client
         db.rollback()

@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
+from typing import Any
 
 # Section markers (first cell may include emoji + text).
 # We only recognize the Canada section; other sections are treated as
@@ -37,8 +37,18 @@ _DATE_RE = re.compile(
     re.I,
 )
 _MONTHS = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
 }
 
 
@@ -51,7 +61,7 @@ def _empty_cell(s: str) -> bool:
     return False
 
 
-def _parse_decimal(s: str) -> Optional[Decimal]:
+def _parse_decimal(s: str) -> Decimal | None:
     if _empty_cell(s):
         return None
     s = s.strip().replace(",", "").replace("~", "")
@@ -66,12 +76,12 @@ def _parse_decimal(s: str) -> Optional[Decimal]:
         return None
 
 
-def _parse_percent_decimal(s: str) -> Optional[Decimal]:
+def _parse_percent_decimal(s: str) -> Decimal | None:
     """Store e.g. 33.5 for 33.50% (chart code can scale if needed)."""
     return _parse_decimal(s)
 
 
-def _parse_int(s: str) -> Optional[int]:
+def _parse_int(s: str) -> int | None:
     if _empty_cell(s):
         return None
     try:
@@ -93,7 +103,7 @@ def _delimiter_for_line(line: str) -> str:
     return ","
 
 
-def _parse_date_line(line: str) -> Optional[date]:
+def _parse_date_line(line: str) -> date | None:
     m = _DATE_RE.search(line)
     if not m:
         return None
@@ -111,15 +121,15 @@ def _parse_date_line(line: str) -> Optional[date]:
 class ParsedLine:
     investment: str
     platform: str
-    value_cad: Optional[Decimal]
-    pct_global: Optional[Decimal]
-    return_pct: Optional[Decimal]
-    div_per_year: Optional[Decimal]
-    yield_pct: Optional[Decimal]
-    target_pct: Optional[str]
-    delta: Optional[str]
-    conviction: Optional[int]
-    action: Optional[str]
+    value_cad: Decimal | None
+    pct_global: Decimal | None
+    return_pct: Decimal | None
+    div_per_year: Decimal | None
+    yield_pct: Decimal | None
+    target_pct: str | None
+    delta: str | None
+    conviction: int | None
+    action: str | None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -127,7 +137,7 @@ class ParsedLine:
 class ParsedPortfolioReview:
     as_of_date: date
     lines: list[ParsedLine]
-    label: Optional[str] = None
+    label: str | None = None
 
 
 def _normalize_header_cell(h: str) -> str:
@@ -202,7 +212,7 @@ def _is_section_other(first_cell: str, line: str) -> bool:
 def _extract_line_from_row(
     row: dict[str, str],
     raw_list: list[str],
-) -> Optional[ParsedLine]:
+) -> ParsedLine | None:
     inv = (row.get("investment") or "").strip()
     if not inv:
         return None
@@ -230,7 +240,7 @@ def _extract_line_from_row(
 def parse_portfolio_review_text(content: str) -> ParsedPortfolioReview:
     """Parse full file content (UTF-8). Only the Canada section is consumed."""
     lines_out: list[ParsedLine] = []
-    as_of: Optional[date] = None
+    as_of: date | None = None
     in_canada_section = False
     headers: list[str] = []
 

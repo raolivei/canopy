@@ -4,20 +4,18 @@ Simplifies AssistantService by extracting tool implementations into
 composable functions with consistent signatures.
 """
 
-from datetime import datetime, timedelta, date
-from decimal import Decimal
-from typing import Any, Protocol
 from collections import defaultdict
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import date, datetime, timedelta
+from typing import Any, Protocol
 
 from backend.db.models.transaction import Transaction
-from backend.db.models.asset import Asset
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 class ToolFunction(Protocol):
     """Protocol for assistant tool functions."""
+
     def __call__(self, db: Session, **kwargs) -> dict[str, Any]: ...
 
 
@@ -28,11 +26,7 @@ def _date_range(months: int = 1) -> tuple[date, date]:
 
 
 def _transactions_in_range(
-    db: Session,
-    start: date,
-    end: date,
-    tx_type: str | None = None,
-    **filters
+    db: Session, start: date, end: date, tx_type: str | None = None, **filters
 ) -> list[Transaction]:
     """Query transactions with common filters."""
     query = select(Transaction).where(Transaction.date.between(start, end))
@@ -50,7 +44,7 @@ def budget_status(db: Session, month: str | None = None) -> dict[str, Any]:
     return {
         "month": month or datetime.now().strftime("%Y-%m"),
         "status": "no_budgets_configured",
-        "message": "Budget tracking not yet configured"
+        "message": "Budget tracking not yet configured",
     }
 
 
@@ -77,7 +71,7 @@ def cashflow_summary(db: Session, month: str | None = None) -> dict[str, Any]:
         "income": income,
         "expenses": expenses,
         "savings": savings,
-        "savings_rate": round(savings_rate, 2)
+        "savings_rate": round(savings_rate, 2),
     }
 
 
@@ -99,7 +93,7 @@ def recurring_analysis(db: Session, months: int = 3) -> dict[str, Any]:
             continue
 
         dates = sorted([d for d, _ in dates_amounts])
-        intervals = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+        intervals = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
         avg_interval = sum(intervals) / len(intervals)
 
         # Monthly pattern: 25-35 day intervals
@@ -108,19 +102,21 @@ def recurring_analysis(db: Session, months: int = 3) -> dict[str, Any]:
             avg_amount = sum(amounts) / len(amounts)
             next_date = dates[-1] + timedelta(days=int(avg_interval))
 
-            recurring.append({
-                "merchant": merchant,
-                "avg_interval_days": round(avg_interval, 1),
-                "avg_amount": round(avg_amount, 2),
-                "last_payment": dates[-1].isoformat(),
-                "predicted_next": next_date.isoformat(),
-                "confidence": min(0.9, len(dates_amounts) / 12),  # Higher confidence with more data
-            })
+            recurring.append(
+                {
+                    "merchant": merchant,
+                    "avg_interval_days": round(avg_interval, 1),
+                    "avg_amount": round(avg_amount, 2),
+                    "last_payment": dates[-1].isoformat(),
+                    "predicted_next": next_date.isoformat(),
+                    "confidence": min(0.9, len(dates_amounts) / 12),  # Higher confidence with more data
+                }
+            )
 
     return {
         "analysis_months": months,
         "recurring_found": len(recurring),
-        "subscriptions": sorted(recurring, key=lambda x: x["avg_amount"], reverse=True)
+        "subscriptions": sorted(recurring, key=lambda x: x["avg_amount"], reverse=True),
     }
 
 
@@ -141,10 +137,9 @@ def spending_patterns(db: Session, months: int = 3) -> dict[str, Any]:
     all_categories = set().union(*[set(m.keys()) for m in monthly_totals.values()])
 
     for category in all_categories:
-        months_data = sorted([
-            (month, monthly_totals[month].get(category, 0))
-            for month in sorted(monthly_totals.keys())
-        ])
+        months_data = sorted(
+            [(month, monthly_totals[month].get(category, 0)) for month in sorted(monthly_totals.keys())]
+        )
 
         if len(months_data) >= 2:
             prev, curr = months_data[-2][1], months_data[-1][1]
@@ -154,8 +149,12 @@ def spending_patterns(db: Session, months: int = 3) -> dict[str, Any]:
                 "category": category,
                 "current": curr,
                 "previous": prev,
-                "trend": "up" if change_pct and change_pct > 5 else "down" if change_pct and change_pct < -5 else "stable",
-                "change_percent": change_pct
+                "trend": "up"
+                if change_pct and change_pct > 5
+                else "down"
+                if change_pct and change_pct < -5
+                else "stable",
+                "change_percent": change_pct,
             }
 
     sorted_trends = sorted(category_trends.values(), key=lambda x: x["current"], reverse=True)[:10]
@@ -165,7 +164,7 @@ def spending_patterns(db: Session, months: int = 3) -> dict[str, Any]:
         "analysis_months": months,
         "top_categories": sorted_trends,
         "total_spending": round(total, 2),
-        "average_monthly": round(total / max(months, 1), 2)
+        "average_monthly": round(total / max(months, 1), 2),
     }
 
 
@@ -189,27 +188,20 @@ def merchant_insights(db: Session, months: int = 3, top_n: int = 10) -> dict[str
             "total_spent": round(stats["total"], 2),
             "transaction_count": stats["count"],
             "average_transaction": round(stats["total"] / stats["count"], 2),
-            "frequency": "monthly" if stats["count"] / months >= 1 else "occasional"
+            "frequency": "monthly" if stats["count"] / months >= 1 else "occasional",
         }
         for name, stats in merchant_stats.items()
     ]
 
     sorted_merchants = sorted(merchants, key=lambda x: x["total_spent"], reverse=True)[:top_n]
 
-    return {
-        "analysis_months": months,
-        "top_merchants": sorted_merchants,
-        "total_unique_merchants": len(merchant_stats)
-    }
+    return {"analysis_months": months, "top_merchants": sorted_merchants, "total_unique_merchants": len(merchant_stats)}
 
 
 def goal_progress(db: Session) -> dict[str, Any]:
     """Savings goals, net worth targets, FIRE timeline."""
     # Stub - would integrate with portfolio calculator
-    return {
-        "status": "not_configured",
-        "message": "Goal tracking not yet configured"
-    }
+    return {"status": "not_configured", "message": "Goal tracking not yet configured"}
 
 
 # Tool registry for dynamic discovery

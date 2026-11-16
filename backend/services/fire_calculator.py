@@ -13,7 +13,6 @@ Provides:
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from backend.db.models.portfolio_snapshot import PortfolioSnapshot
 from backend.services.insights_calculator import InsightsCalculator
@@ -33,8 +32,8 @@ class FIREMetrics:
     progress_percentage: Decimal  # How close to FIRE (%)
 
     # Timeline
-    years_to_fire: Optional[float]  # Years until FIRE at current rate
-    fire_date: Optional[date]  # Projected FIRE date
+    years_to_fire: float | None  # Years until FIRE at current rate
+    fire_date: date | None  # Projected FIRE date
 
     # At FIRE
     monthly_income_at_fire: Decimal  # Safe withdrawal amount per month
@@ -65,13 +64,13 @@ class WhatIfScenario:
     """Results of a what-if scenario analysis."""
 
     name: str
-    years_to_fire: Optional[float]
-    fire_date: Optional[date]
+    years_to_fire: float | None
+    fire_date: date | None
     final_net_worth: Decimal
-    difference_years: Optional[float]  # vs baseline
+    difference_years: float | None  # vs baseline
 
 
-def infer_annual_return_from_portfolio_snapshots(db: Session) -> tuple[Optional[Decimal], Optional[int]]:
+def infer_annual_return_from_portfolio_snapshots(db: Session) -> tuple[Decimal | None, int | None]:
     """Geometric annual return (CAGR) from ``portfolio_snapshots`` total_value, if enough history.
 
     Snapshots come from the portfolio snapshot job (holdings-based); they approximate
@@ -80,11 +79,7 @@ def infer_annual_return_from_portfolio_snapshots(db: Session) -> tuple[Optional[
     Returns:
         (annual_return_decimal, span_days) e.g. (Decimal('0.072'), 400) or (None, None).
     """
-    snapshots = (
-        db.query(PortfolioSnapshot)
-        .order_by(PortfolioSnapshot.snapshot_date.asc())
-        .all()
-    )
+    snapshots = db.query(PortfolioSnapshot).order_by(PortfolioSnapshot.snapshot_date.asc()).all()
     if len(snapshots) < 2:
         return None, None
     first, last = snapshots[0], snapshots[-1]
@@ -115,7 +110,7 @@ class FIRECalculator:
     DEFAULT_RETURN = Decimal("0.07")  # 7% annual return
     DEFAULT_INFLATION = Decimal("0.025")  # 2.5% inflation
 
-    def __init__(self, db: Optional[Session] = None):
+    def __init__(self, db: Session | None = None):
         self.db = db
 
     def calculate_fire_number(
@@ -140,7 +135,7 @@ class FIRECalculator:
         fire_number: Decimal,
         monthly_savings: Decimal,
         annual_return: Decimal = None,
-    ) -> Optional[float]:
+    ) -> float | None:
         """Calculate years until reaching FIRE number.
 
         Uses the future value formula with regular contributions:
@@ -207,9 +202,7 @@ class FIRECalculator:
         annual_expenses = monthly_expenses * 12
 
         fire_number = self.calculate_fire_number(annual_expenses, swr)
-        progress = (
-            current_net_worth / fire_number * 100 if fire_number > 0 else Decimal("0")
-        )
+        progress = current_net_worth / fire_number * 100 if fire_number > 0 else Decimal("0")
 
         years = self.calculate_years_to_fire(
             current_net_worth,
@@ -291,7 +284,7 @@ class FIRECalculator:
         current_net_worth: Decimal,
         monthly_expenses: Decimal,
         monthly_savings: Decimal,
-        baseline_annual_return: Optional[Decimal] = None,
+        baseline_annual_return: Decimal | None = None,
     ) -> list[WhatIfScenario]:
         """Run common what-if scenarios (CAD).
 
@@ -312,9 +305,7 @@ class FIRECalculator:
 
         scenarios: list[WhatIfScenario] = []
 
-        baseline_years = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings, base_ret
-        )
+        baseline_years = self.calculate_years_to_fire(current_net_worth, fire_number, monthly_savings, base_ret)
         scenarios.append(
             WhatIfScenario(
                 name="Baseline",
@@ -353,9 +344,7 @@ class FIRECalculator:
 
         reduced_expenses = annual_expenses * Decimal("0.9")
         reduced_fire = self.calculate_fire_number(reduced_expenses)
-        years_reduced = self.calculate_years_to_fire(
-            current_net_worth, reduced_fire, monthly_savings, base_ret
-        )
+        years_reduced = self.calculate_years_to_fire(current_net_worth, reduced_fire, monthly_savings, base_ret)
         scenarios.append(
             WhatIfScenario(
                 name="Reduce expenses 10%",
@@ -366,9 +355,7 @@ class FIRECalculator:
             )
         )
 
-        years_8pct = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings, Decimal("0.08")
-        )
+        years_8pct = self.calculate_years_to_fire(current_net_worth, fire_number, monthly_savings, Decimal("0.08"))
         scenarios.append(
             WhatIfScenario(
                 name="8% annual return",
@@ -379,9 +366,7 @@ class FIRECalculator:
             )
         )
 
-        years_5pct = self.calculate_years_to_fire(
-            current_net_worth, fire_number, monthly_savings, Decimal("0.05")
-        )
+        years_5pct = self.calculate_years_to_fire(current_net_worth, fire_number, monthly_savings, Decimal("0.05"))
         scenarios.append(
             WhatIfScenario(
                 name="5% annual return",
@@ -394,14 +379,14 @@ class FIRECalculator:
 
         return scenarios
 
-    def _years_to_date(self, years: Optional[float]) -> Optional[date]:
+    def _years_to_date(self, years: float | None) -> date | None:
         """Convert years from now to a date."""
         if years is None:
             return None
         today = date.today()
         return date(today.year + int(years), today.month, today.day)
 
-    def _diff_years(self, baseline: Optional[float], new: Optional[float]) -> Optional[float]:
+    def _diff_years(self, baseline: float | None, new: float | None) -> float | None:
         """Calculate difference in years (negative = faster)."""
         if baseline is None or new is None:
             return None
@@ -424,8 +409,8 @@ def get_fire_summary(
     insights_calc = InsightsCalculator(db)
     net_worth = insights_calc.calculate_net_worth()
 
-    hist_ret: Optional[Decimal] = None
-    span_days: Optional[int] = None
+    hist_ret: Decimal | None = None
+    span_days: int | None = None
     if use_historical_return:
         hist_ret, span_days = infer_annual_return_from_portfolio_snapshots(db)
 

@@ -1,9 +1,10 @@
 """Query safety limits to prevent OOM on large datasets."""
 
 import logging
+from collections.abc import Callable
 from functools import wraps
 from time import time
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +27,7 @@ def log_slow_query(method_name: str, duration_ms: float) -> None:
     """Log warning for slow queries."""
     if duration_ms > WARN_THRESHOLD_MS:
         level = logger.error if duration_ms > ERROR_THRESHOLD_MS else logger.warning
-        level(
-            f"🐢 SLOW QUERY: {method_name} took {duration_ms:.0f}ms "
-            f"(threshold: {WARN_THRESHOLD_MS}ms)"
-        )
+        level(f"🐢 SLOW QUERY: {method_name} took {duration_ms:.0f}ms (threshold: {WARN_THRESHOLD_MS}ms)")
 
 
 def monitored_query(func: Callable) -> Callable:
@@ -57,7 +55,7 @@ def monitored_query(func: Callable) -> Callable:
 
 def apply_safety_limit(query, limit: int = DEFAULT_QUERY_LIMIT):
     """Apply safety LIMIT to SQLAlchemy query if not already set."""
-    if not hasattr(query, '_limit_clause') or query._limit_clause is None:
+    if not hasattr(query, "_limit_clause") or query._limit_clause is None:
         logger.debug(f"Applying safety limit: {limit} rows")
         return query.limit(limit)
     return query

@@ -1,10 +1,6 @@
 """Portfolio calculation service for metrics, cost basis, and performance."""
 
 from decimal import Decimal
-from typing import Optional
-
-from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session
 
 from backend.db.models.account_balance_history import AccountBalanceHistory
 from backend.db.models.asset import Asset, AssetType
@@ -16,6 +12,8 @@ from backend.models.portfolio_schemas import (
     PortfolioAllocation,
     PortfolioSummary,
 )
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import Session
 
 # Asset types where current_price represents the total balance (not a per-unit price)
 BALANCE_BASED_ASSET_TYPES = {
@@ -80,7 +78,7 @@ class PortfolioCalculator:
         self,
         asset: Asset,
         *,
-        balance_map: Optional[dict[int, Decimal]] = None,
+        balance_map: dict[int, Decimal] | None = None,
     ) -> HoldingSummary:
         """Calculate summary metrics for a single holding.
 
@@ -96,11 +94,7 @@ class PortfolioCalculator:
             # Prefer Monarch / Wealthsimple balance history over stale current_price.
             # Wise only writes ``current_price`` on sync — never ``AccountBalanceHistory``.
             # A matched CSV snapshot can still insert history rows; those must not zero out Wise.
-            if (
-                not asset.is_wise_api_asset
-                and balance_map is not None
-                and asset.id in balance_map
-            ):
+            if not asset.is_wise_api_asset and balance_map is not None and asset.id in balance_map:
                 market_value = balance_map[asset.id]
             else:
                 market_value = asset.current_price if asset.current_price else Decimal("0")
@@ -208,11 +202,7 @@ class PortfolioCalculator:
         """Calculate complete portfolio summary with all holdings."""
         assets = self.db.execute(select(Asset)).scalars().all()
 
-        balance_ids = [
-            a.id
-            for a in assets
-            if not a.is_liability and a.asset_type in BALANCE_BASED_ASSET_TYPES
-        ]
+        balance_ids = [a.id for a in assets if not a.is_liability and a.asset_type in BALANCE_BASED_ASSET_TYPES]
         balance_map = self.native_balances_from_history(balance_ids)
 
         holdings = []

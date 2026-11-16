@@ -9,7 +9,6 @@ Provides endpoints for:
 """
 
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -40,12 +39,12 @@ class NetWorthResponse(BaseModel):
     investment_assets_cad: float
     retirement_assets_cad: float
     real_estate_equity_cad: float
-    change_1d: Optional[float] = None
-    change_1d_percent: Optional[float] = None
-    change_1m: Optional[float] = None
-    change_1m_percent: Optional[float] = None
-    change_ytd: Optional[float] = None
-    change_ytd_percent: Optional[float] = None
+    change_1d: float | None = None
+    change_1d_percent: float | None = None
+    change_1m: float | None = None
+    change_1m_percent: float | None = None
+    change_ytd: float | None = None
+    change_ytd_percent: float | None = None
 
 
 class AllocationResponse(BaseModel):
@@ -62,10 +61,10 @@ class GrowthResponse(BaseModel):
     monthly_rate: float
     yearly_rate: float
     average_monthly: float
-    best_month: Optional[str] = None
-    best_month_return: Optional[float] = None
-    worst_month: Optional[str] = None
-    worst_month_return: Optional[float] = None
+    best_month: str | None = None
+    best_month_return: float | None = None
+    worst_month: str | None = None
+    worst_month_return: float | None = None
 
 
 class InsightsSummaryResponse(BaseModel):
@@ -82,8 +81,8 @@ class FIREMetricsResponse(BaseModel):
     fire_number: float
     current_net_worth: float
     progress_percentage: float
-    years_to_fire: Optional[float] = None
-    fire_date: Optional[str] = None
+    years_to_fire: float | None = None
+    fire_date: str | None = None
     monthly_income_at_fire: float
     annual_income_at_fire: float
     monthly_expenses: float
@@ -91,8 +90,8 @@ class FIREMetricsResponse(BaseModel):
     safe_withdrawal_rate: float
     expected_return: float
     return_assumption_source: str = "default"
-    historical_annual_return_pct: Optional[float] = None
-    historical_data_span_days: Optional[int] = None
+    historical_annual_return_pct: float | None = None
+    historical_data_span_days: int | None = None
 
 
 class ProjectionPointResponse(BaseModel):
@@ -106,10 +105,10 @@ class ProjectionPointResponse(BaseModel):
 
 class ScenarioResponse(BaseModel):
     name: str
-    years_to_fire: Optional[float] = None
-    fire_date: Optional[str] = None
+    years_to_fire: float | None = None
+    fire_date: str | None = None
     final_net_worth: float
-    difference_years: Optional[float] = None
+    difference_years: float | None = None
 
 
 class FIRESummaryResponse(BaseModel):
@@ -123,18 +122,14 @@ class FIRECalculationRequest(BaseModel):
 
     monthly_expenses: float = Field(default=5000, description="Monthly expenses in CAD")
     monthly_savings: float = Field(default=2000, description="Monthly savings in CAD")
-    safe_withdrawal_rate: float = Field(
-        default=0.04, description="Safe withdrawal rate (e.g., 0.04 for 4%)"
-    )
-    expected_return: float = Field(
-        default=0.07, description="Expected annual return (e.g., 0.07 for 7%)"
-    )
+    safe_withdrawal_rate: float = Field(default=0.04, description="Safe withdrawal rate (e.g., 0.04 for 4%)")
+    expected_return: float = Field(default=0.07, description="Expected annual return (e.g., 0.07 for 7%)")
 
 
 class HistoricalDataPoint(BaseModel):
     date: str
     net_worth: float
-    cost_basis: Optional[float] = None
+    cost_basis: float | None = None
 
 
 # =============================================================================
@@ -159,7 +154,7 @@ def get_net_worth(db: Session = Depends(get_db)):
     calculator = InsightsCalculator(db)
     net_worth = calculator.calculate_net_worth()
 
-    def _f(v: Optional[Decimal]) -> Optional[float]:
+    def _f(v: Decimal | None) -> float | None:
         return float(v) if v is not None else None
 
     return NetWorthResponse(
@@ -199,13 +194,9 @@ def get_growth_metrics(db: Session = Depends(get_db)):
         yearly_rate=float(growth.yearly_growth_rate),
         average_monthly=float(growth.average_monthly_growth),
         best_month=growth.best_month.isoformat() if growth.best_month else None,
-        best_month_return=float(growth.best_month_return)
-        if growth.best_month_return
-        else None,
+        best_month_return=float(growth.best_month_return) if growth.best_month_return else None,
         worst_month=growth.worst_month.isoformat() if growth.worst_month else None,
-        worst_month_return=float(growth.worst_month_return)
-        if growth.worst_month_return
-        else None,
+        worst_month_return=float(growth.worst_month_return) if growth.worst_month_return else None,
     )
 
 
@@ -315,7 +306,7 @@ def calculate_fire(request: FIRECalculationRequest, db: Session = Depends(get_db
 
 @router.get("/projections", response_model=list[ProjectionPointResponse])
 def get_projections(
-    current_net_worth: Optional[float] = Query(default=None),
+    current_net_worth: float | None = Query(default=None),
     monthly_savings: float = Query(default=2000),
     years: int = Query(default=30),
     annual_return: float = Query(default=0.07),

@@ -8,7 +8,7 @@ the correct per-date FX conversion.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -105,12 +105,12 @@ def _seed_portfolio(db: Session) -> None:
             LiabilityBalanceHistory(
                 liability_id=visa.id,
                 balance=Decimal("200"),
-                recorded_at=datetime(2026, 1, 31, tzinfo=timezone.utc),
+                recorded_at=datetime(2026, 1, 31, tzinfo=UTC),
             ),
             LiabilityBalanceHistory(
                 liability_id=visa.id,
                 balance=Decimal("150"),
-                recorded_at=datetime(2026, 2, 28, tzinfo=timezone.utc),
+                recorded_at=datetime(2026, 2, 28, tzinfo=UTC),
             ),
         ]
     )
@@ -159,9 +159,7 @@ def test_timeline_emits_cad_usd_and_combined_slices_per_point(db: Session) -> No
     assert p1.combined_cad.net_worth == Decimal("1475.00")
 
     # Combined USD @ rate=1.35: USD+CAD/rate; debt=0 + 200/1.35
-    assert p1.combined_usd.investments == Decimal("500") + Decimal("1000") / Decimal(
-        "1.35"
-    )
+    assert p1.combined_usd.investments == Decimal("500") + Decimal("1000") / Decimal("1.35")
     assert p1.combined_usd.debt == Decimal("200") / Decimal("1.35")
 
     assert p1.fx_rate == Decimal("1.35")

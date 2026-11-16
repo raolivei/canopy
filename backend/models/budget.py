@@ -2,7 +2,6 @@
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -45,17 +44,17 @@ class BudgetCreate(BaseModel):
     name: str = Field(..., max_length=200)
     amount: float = Field(..., gt=0)
     period: BudgetPeriodType = BudgetPeriodType.MONTHLY
-    user_id: Optional[int] = None
+    user_id: int | None = None
     categories: list[BudgetCategoryCreate] = Field(default_factory=list)
 
 
 class BudgetUpdate(BaseModel):
     """Request model for updating a budget."""
 
-    name: Optional[str] = Field(None, max_length=200)
-    amount: Optional[float] = Field(None, gt=0)
-    period: Optional[BudgetPeriodType] = None
-    active: Optional[bool] = None
+    name: str | None = Field(None, max_length=200)
+    amount: float | None = Field(None, gt=0)
+    period: BudgetPeriodType | None = None
+    active: bool | None = None
 
 
 class Budget(BaseModel):
@@ -65,7 +64,7 @@ class Budget(BaseModel):
     name: str
     amount: float
     period: BudgetPeriodType
-    user_id: Optional[int] = None
+    user_id: int | None = None
     active: bool
     created_at: datetime
     updated_at: datetime

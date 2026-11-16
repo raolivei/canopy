@@ -4,8 +4,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, DECIMAL
-from sqlalchemy.orm import sessionmaker, Session, declarative_base
+from sqlalchemy import DECIMAL, Column, DateTime, Integer, String, create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
 from backend.services.recurring_detection_service import RecurringDetectionService
 
 # Create minimal Transaction model for testing
@@ -35,6 +36,7 @@ def test_db():
 
     # Monkey-patch to use TestTransactionModel
     import backend.services.recurring_detection_service as rds
+
     original_model = rds.TransactionModel
     rds.TransactionModel = TestTransactionModel
 
@@ -71,8 +73,7 @@ def weekly_groceries(test_db: Session):
     """Weekly Loblaws groceries - 12 weeks, ~$150 ±5%."""
     today = date.today()
     txns = []
-    amounts = [150.00, 147.50, 152.30, 148.00, 151.75, 149.20,
-               150.50, 148.80, 152.00, 147.00, 151.00, 149.50]
+    amounts = [150.00, 147.50, 152.30, 148.00, 151.75, 149.20, 150.50, 148.80, 152.00, 147.00, 151.00, 149.50]
 
     for i, amt in enumerate(amounts):
         txn = TestTransactionModel(

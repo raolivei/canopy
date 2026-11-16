@@ -36,7 +36,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Optional
 
 from backend.services.monarch.parser import (
     AccountClass,
@@ -61,7 +60,7 @@ class BalanceRow:
     account_label: str
     account_class: AccountClass
     currency: str
-    account_last4: Optional[str]
+    account_last4: str | None
 
 
 @dataclass
@@ -117,9 +116,7 @@ def parse_monarch_balances_csv(text: str) -> BalancesParseResult:
         return result
     missing = [c for c in REQUIRED_COLUMNS if c not in reader.fieldnames]
     if missing:
-        result.warnings.append(
-            "Header is missing required column(s): " + ", ".join(missing)
-        )
+        result.warnings.append("Header is missing required column(s): " + ", ".join(missing))
         return result
     result.header_ok = True
 
@@ -136,8 +133,7 @@ def parse_monarch_balances_csv(text: str) -> BalancesParseResult:
         if row.account_class == AccountClass.UNKNOWN:
             result.skipped_unknown += 1
             result.warnings.append(
-                f"Line {i}: account '{row.account_label}' did not match any "
-                "known classifier; row skipped."
+                f"Line {i}: account '{row.account_label}' did not match any known classifier; row skipped."
             )
             continue
         result.rows.append(row)
@@ -158,7 +154,7 @@ def _normalise(
     *,
     line_no: int,
     out: BalancesParseResult,
-) -> Optional[BalanceRow]:
+) -> BalanceRow | None:
     date_str = (raw.get("Date") or "").strip()
     m = _DATE_RE.match(date_str)
     if not m:

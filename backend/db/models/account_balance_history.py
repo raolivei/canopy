@@ -7,7 +7,6 @@ timeline without needing daily PortfolioSnapshots.
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import (
     Date,
@@ -33,7 +32,7 @@ class AccountBalanceHistory(Base):
     as_of_date: Mapped[date] = mapped_column(Date, index=True)
     balance: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=2))
     currency: Mapped[str] = mapped_column(String(10), default="CAD")
-    source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Multi-currency: Wealthsimple investment accounts can carry both a CAD

@@ -3,30 +3,29 @@
 import json
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta, date
-from decimal import Decimal
-from typing import Any, Optional
 from collections import defaultdict
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import Any
 
+from backend.db.models.asset import Asset as AssetModel
+from backend.db.models.transaction import Transaction as TransactionModel
+from backend.services.portfolio_calculator import PortfolioCalculator
+from backend.services.query_builder import (
+    TransactionQuery,
+    calculate_trend,
+    detect_anomaly,
+    sum_amounts,
+)
 from ollama import Client as OllamaClient
 from openai import OpenAI
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
-from backend.db.models.transaction import Transaction as TransactionModel
-from backend.db.models.asset import Asset as AssetModel
-from backend.services.portfolio_calculator import PortfolioCalculator
-from backend.services.query_builder import (
-    TransactionQuery,
-    calculate_trend,
-    sum_amounts,
-    detect_anomaly,
-)
-
 
 class LLMProvider(ABC):
     """Abstract base class for LLM providers."""
-    
+
     @abstractmethod
     def chat(self, messages: list[dict], tools: list[dict]) -> dict:
         """Send chat request to LLM."""
@@ -35,58 +34,46 @@ class LLMProvider(ABC):
 
 class OpenClawProvider(LLMProvider):
     """OpenClaw provider (OpenAI-compatible API)."""
-    
+
     def __init__(self, base_url: str, model: str, api_key: str = "not-needed"):
         self.client = OpenAI(base_url=base_url, api_key=api_key)
         self.model = model
-    
+
     def chat(self, messages: list[dict], tools: list[dict]) -> dict:
         """Send chat request to OpenClaw."""
         response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            tools=tools,
-            tool_choice="auto"
+            model=self.model, messages=messages, tools=tools, tool_choice="auto"
         )
-        
+
         message = response.choices[0].message
-        
+
         # Convert to common format
         result = {"message": {"content": message.content or ""}}
-        
+
         if message.tool_calls:
             result["message"]["tool_calls"] = [
-                {
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": json.loads(tc.function.arguments)
-                    }
-                }
+                {"function": {"name": tc.function.name, "arguments": json.loads(tc.function.arguments)}}
                 for tc in message.tool_calls
             ]
-        
+
         return result
 
 
 class OllamaProvider(LLMProvider):
     """Ollama provider (local LLM)."""
-    
+
     def __init__(self, host: str, model: str):
         self.client = OllamaClient(host=host)
         self.model = model
-    
+
     def chat(self, messages: list[dict], tools: list[dict]) -> dict:
         """Send chat request to Ollama."""
-        return self.client.chat(
-            model=self.model,
-            messages=messages,
-            tools=tools
-        )
+        return self.client.chat(model=self.model, messages=messages, tools=tools)
 
 
 class AssistantService:
     """AI assistant for answering financial questions."""
-    
+
     SYSTEM_PROMPT = """You are a financial assistant for Canopy, a self-hosted Canadian investment tracker.
 
 You have access to the user's financial data through function calls. Use these functions to answer questions accurately.
@@ -103,7 +90,7 @@ Available data:
 - Transactions (income, expenses, transfers)
 - Portfolio holdings and asset allocation
 - Net worth and account balances"""
-    
+
     FUNCTION_DEFINITIONS = [
         {
             "type": "function",
@@ -115,35 +102,23 @@ Available data:
                     "properties": {
                         "search": {
                             "type": "string",
-                            "description": "Search term for description, merchant, notes, or category"
+                            "description": "Search term for description, merchant, notes, or category",
                         },
                         "category": {
                             "type": "string",
-                            "description": "Filter by category (e.g., 'Gas', 'Groceries', 'Dining')"
+                            "description": "Filter by category (e.g., 'Gas', 'Groceries', 'Dining')",
                         },
-                        "start_date": {
-                            "type": "string",
-                            "description": "Start date in YYYY-MM-DD format"
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "description": "End date in YYYY-MM-DD format"
-                        },
-                        "min_amount": {
-                            "type": "number",
-                            "description": "Minimum transaction amount (absolute value)"
-                        },
-                        "max_amount": {
-                            "type": "number",
-                            "description": "Maximum transaction amount (absolute value)"
-                        },
+                        "start_date": {"type": "string", "description": "Start date in YYYY-MM-DD format"},
+                        "end_date": {"type": "string", "description": "End date in YYYY-MM-DD format"},
+                        "min_amount": {"type": "number", "description": "Minimum transaction amount (absolute value)"},
+                        "max_amount": {"type": "number", "description": "Maximum transaction amount (absolute value)"},
                         "limit": {
                             "type": "integer",
-                            "description": "Maximum number of transactions to return (default: 100)"
-                        }
-                    }
-                }
-            }
+                            "description": "Maximum number of transactions to return (default: 100)",
+                        },
+                    },
+                },
+            },
         },
         {
             "type": "function",
@@ -153,29 +128,20 @@ Available data:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "start_date": {
-                            "type": "string",
-                            "description": "Start date in YYYY-MM-DD format"
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "description": "End date in YYYY-MM-DD format"
-                        }
+                        "start_date": {"type": "string", "description": "Start date in YYYY-MM-DD format"},
+                        "end_date": {"type": "string", "description": "End date in YYYY-MM-DD format"},
                     },
-                    "required": ["start_date", "end_date"]
-                }
-            }
+                    "required": ["start_date", "end_date"],
+                },
+            },
         },
         {
             "type": "function",
             "function": {
                 "name": "get_portfolio_summary",
                 "description": "Get current portfolio summary including total value, holdings, asset allocation, and net worth",
-                "parameters": {
-                    "type": "object",
-                    "properties": {}
-                }
-            }
+                "parameters": {"type": "object", "properties": {}},
+            },
         },
         {
             "type": "function",
@@ -187,11 +153,11 @@ Available data:
                     "properties": {
                         "month": {
                             "type": "string",
-                            "description": "Month in YYYY-MM format (defaults to current month)"
+                            "description": "Month in YYYY-MM format (defaults to current month)",
                         }
-                    }
-                }
-            }
+                    },
+                },
+            },
         },
         {
             "type": "function",
@@ -203,11 +169,11 @@ Available data:
                     "properties": {
                         "month": {
                             "type": "string",
-                            "description": "Month in YYYY-MM format (defaults to current month)"
+                            "description": "Month in YYYY-MM format (defaults to current month)",
                         }
-                    }
-                }
-            }
+                    },
+                },
+            },
         },
         {
             "type": "function",
@@ -217,13 +183,10 @@ Available data:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "months": {
-                            "type": "integer",
-                            "description": "Number of months to analyze (default: 3)"
-                        }
-                    }
-                }
-            }
+                        "months": {"type": "integer", "description": "Number of months to analyze (default: 3)"}
+                    },
+                },
+            },
         },
         {
             "type": "function",
@@ -233,13 +196,10 @@ Available data:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "months": {
-                            "type": "integer",
-                            "description": "Number of months to analyze (default: 3)"
-                        }
-                    }
-                }
-            }
+                        "months": {"type": "integer", "description": "Number of months to analyze (default: 3)"}
+                    },
+                },
+            },
         },
         {
             "type": "function",
@@ -249,44 +209,35 @@ Available data:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "months": {
-                            "type": "integer",
-                            "description": "Number of months to analyze (default: 3)"
-                        },
-                        "top_n": {
-                            "type": "integer",
-                            "description": "Number of top merchants to return (default: 10)"
-                        }
-                    }
-                }
-            }
+                        "months": {"type": "integer", "description": "Number of months to analyze (default: 3)"},
+                        "top_n": {"type": "integer", "description": "Number of top merchants to return (default: 10)"},
+                    },
+                },
+            },
         },
         {
             "type": "function",
             "function": {
                 "name": "goal_progress",
                 "description": "Get progress on savings goals, net worth targets, and FIRE timeline",
-                "parameters": {
-                    "type": "object",
-                    "properties": {}
-                }
-            }
-        }
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
     ]
-    
+
     def __init__(
         self,
         db: Session,
         provider_type: str = "ollama",
-        openclaw_url: Optional[str] = None,
+        openclaw_url: str | None = None,
         openclaw_model: str = "llama3.1:70b",
         ollama_host: str = "http://localhost:11434",
-        ollama_model: str = "llama3.1:8b"
+        ollama_model: str = "llama3.1:8b",
     ):
         """Initialize assistant service."""
         self.db = db
         self.portfolio_calc = PortfolioCalculator(db)
-        
+
         # Initialize LLM provider
         if provider_type == "openclaw":
             if not openclaw_url:
@@ -296,20 +247,20 @@ Available data:
             self.provider = OllamaProvider(ollama_host, ollama_model)
         else:
             raise ValueError(f"Unknown provider_type: {provider_type}")
-    
+
     def get_transactions(
         self,
-        search: Optional[str] = None,
-        category: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        min_amount: Optional[float] = None,
-        max_amount: Optional[float] = None,
-        limit: int = 100
+        search: str | None = None,
+        category: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        min_amount: float | None = None,
+        max_amount: float | None = None,
+        limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Query transactions from database."""
         query = select(TransactionModel)
-        
+
         if search:
             term = f"%{search}%"
             query = query.where(
@@ -330,10 +281,10 @@ Available data:
             query = query.where(func.abs(TransactionModel.amount) >= Decimal(str(min_amount)))
         if max_amount is not None:
             query = query.where(func.abs(TransactionModel.amount) <= Decimal(str(max_amount)))
-        
+
         query = query.order_by(desc(TransactionModel.date)).limit(limit)
         transactions = self.db.execute(query).scalars().all()
-        
+
         return [
             {
                 "id": tx.id,
@@ -343,29 +294,29 @@ Available data:
                 "date": tx.date.isoformat(),
                 "category": tx.category,
                 "merchant": tx.merchant,
-                "type": tx.type
+                "type": tx.type,
             }
             for tx in transactions
         ]
-    
+
     def get_spending_summary(self, start_date: str, end_date: str) -> dict[str, Any]:
         """Get spending summary for date range."""
         query = select(TransactionModel).where(
             TransactionModel.date >= datetime.fromisoformat(start_date),
-            TransactionModel.date <= datetime.fromisoformat(end_date)
+            TransactionModel.date <= datetime.fromisoformat(end_date),
         )
-        
+
         transactions = self.db.execute(query).scalars().all()
-        
+
         income = sum(float(tx.amount) for tx in transactions if tx.type == "income")
         expenses = sum(float(abs(tx.amount)) for tx in transactions if tx.type == "expense")
-        
+
         # Group by category
         category_totals: dict[str, float] = {}
         for tx in transactions:
             if tx.type == "expense" and tx.category:
                 category_totals[tx.category] = category_totals.get(tx.category, 0) + float(abs(tx.amount))
-        
+
         return {
             "start_date": start_date,
             "end_date": end_date,
@@ -373,42 +324,36 @@ Available data:
             "total_expenses": expenses,
             "net": income - expenses,
             "expenses_by_category": category_totals,
-            "currency": "CAD"
+            "currency": "CAD",
         }
-    
+
     def get_portfolio_summary(self) -> dict[str, Any]:
         """Get portfolio summary with holdings and net worth."""
         # Get all assets
         assets = self.db.execute(select(AssetModel)).scalars().all()
-        
+
         total_value = Decimal(0)
         holdings = []
-        
+
         for asset in assets:
             balance_map = self.portfolio_calc.native_balances_from_history([asset.id])
             balance = balance_map.get(asset.id, Decimal(0))
-            
+
             if balance != 0:
-                holdings.append({
-                    "name": asset.name,
-                    "type": asset.type,
-                    "balance": float(balance),
-                    "currency": "CAD"
-                })
+                holdings.append({"name": asset.name, "type": asset.type, "balance": float(balance), "currency": "CAD"})
                 total_value += balance
-        
+
         return {
             "total_value": float(total_value),
             "currency": "CAD",
             "holdings_count": len(holdings),
-            "holdings": holdings[:10]  # Limit to top 10
+            "holdings": holdings[:10],  # Limit to top 10
         }
-    
+
     def spending_patterns(self, months: int = 3) -> dict[str, Any]:
         """Analyze spending patterns by category with trends and anomalies."""
         # Group by category and month
         query = TransactionQuery(self.db).last_months(months).expenses()
-        by_category = query.group_by_category()
         by_month = TransactionQuery(self.db).last_months(months).expenses().group_by_month()
 
         # Build monthly category totals
@@ -423,10 +368,12 @@ Available data:
         all_categories = set().union(*[set(m.keys()) for m in monthly_category_totals.values()])
 
         for category in all_categories:
-            months_data = sorted([
-                (month, monthly_category_totals[month].get(category, 0))
-                for month in sorted(monthly_category_totals.keys())
-            ])
+            months_data = sorted(
+                [
+                    (month, monthly_category_totals[month].get(category, 0))
+                    for month in sorted(monthly_category_totals.keys())
+                ]
+            )
 
             if len(months_data) >= 2:
                 prev = months_data[-2][1]
@@ -437,7 +384,7 @@ Available data:
                     "category": category,
                     "current_month": curr,
                     "previous_month": prev,
-                    **trend_data
+                    **trend_data,
                 }
 
         # Detect anomalies
@@ -445,18 +392,10 @@ Available data:
         for category, data in category_trends.items():
             anomaly = detect_anomaly(data["current_month"], data["previous_month"])
             if anomaly:
-                anomalies.append({
-                    "category": category,
-                    "amount": data["current_month"],
-                    **anomaly
-                })
+                anomalies.append({"category": category, "amount": data["current_month"], **anomaly})
 
         # Sort and limit results
-        sorted_trends = sorted(
-            category_trends.values(),
-            key=lambda x: x["current_month"],
-            reverse=True
-        )[:10]
+        sorted_trends = sorted(category_trends.values(), key=lambda x: x["current_month"], reverse=True)[:10]
 
         all_txns = query.execute()
         total_spending = sum_amounts(all_txns)
@@ -467,7 +406,7 @@ Available data:
             "top_categories": sorted_trends,
             "anomalies": sorted(anomalies, key=lambda x: x["percent_above_average"], reverse=True)[:5],
             "total_spending": total_spending,
-            "average_monthly": avg_monthly
+            "average_monthly": avg_monthly,
         }
 
     def merchant_insights(self, months: int = 3, top_n: int = 10) -> dict[str, Any]:
@@ -487,14 +426,16 @@ Available data:
             else:
                 frequency = "occasional"
 
-            merchants_list.append({
-                "merchant": merchant,
-                "category": txns[0].category or "Uncategorized",
-                "total_spent": total_spent,
-                "transaction_count": transaction_count,
-                "average_transaction": total_spent / max(transaction_count, 1),
-                "frequency": frequency
-            })
+            merchants_list.append(
+                {
+                    "merchant": merchant,
+                    "category": txns[0].category or "Uncategorized",
+                    "total_spent": total_spent,
+                    "transaction_count": transaction_count,
+                    "average_transaction": total_spent / max(transaction_count, 1),
+                    "frequency": frequency,
+                }
+            )
 
         # Sort and limit
         sorted_merchants = sorted(merchants_list, key=lambda x: x["total_spent"], reverse=True)[:top_n]
@@ -504,7 +445,7 @@ Available data:
             "analysis_months": months,
             "top_merchants": sorted_merchants,
             "total_unique_merchants": len(merchants_list),
-            "total_merchant_spending": total_spending
+            "total_merchant_spending": total_spending,
         }
 
     def goal_progress(self) -> dict[str, Any]:
@@ -528,8 +469,7 @@ Available data:
                 month_end = month_start.replace(month=month_start.month + 1, day=1) - timedelta(days=1)
 
             query = select(TransactionModel).where(
-                TransactionModel.date >= month_start,
-                TransactionModel.date <= month_end
+                TransactionModel.date >= month_start, TransactionModel.date <= month_end
             )
             transactions = self.db.execute(query).scalars().all()
 
@@ -547,7 +487,7 @@ Available data:
             "current_portfolio": current_net_worth,
             "monthly_savings": avg_monthly_savings,
             "assumed_annual_return": 0.07,
-            "years_to_fire": None
+            "years_to_fire": None,
         }
 
         # Simple calculation: FIRE when portfolio = 25x annual expenses
@@ -555,8 +495,7 @@ Available data:
         if avg_monthly_savings > 0 and current_net_worth > 0:
             monthly_expenses = 0
             query = select(TransactionModel).where(
-                TransactionModel.type == "expense",
-                TransactionModel.date >= today - timedelta(days=90)
+                TransactionModel.type == "expense", TransactionModel.date >= today - timedelta(days=90)
             )
             transactions = self.db.execute(query).scalars().all()
             monthly_expenses = sum(float(abs(tx.amount)) for tx in transactions) / 3 if transactions else 0
@@ -575,13 +514,13 @@ Available data:
                 "current": current_net_worth,
                 "percent_complete": 50.0 if current_net_worth > 0 else 0,
                 "monthly_growth": avg_monthly_savings,
-                "months_to_target": 24 if avg_monthly_savings > 0 else None
+                "months_to_target": 24 if avg_monthly_savings > 0 else None,
             },
             "fire_timeline": fire_goal if current_net_worth > 0 else None,
-            "overall_progress": "on_track" if avg_monthly_savings > 0 else "behind"
+            "overall_progress": "on_track" if avg_monthly_savings > 0 else "behind",
         }
 
-    def budget_status(self, month: Optional[str] = None) -> dict[str, Any]:
+    def budget_status(self, month: str | None = None) -> dict[str, Any]:
         """Get current budget vs target, month progress %, and overspend alerts."""
         if month is None:
             today = date.today()
@@ -598,10 +537,7 @@ Available data:
             month_end = date(year, month_num + 1, 1) - timedelta(days=1)
 
         # Get transactions for month
-        query = select(TransactionModel).where(
-            TransactionModel.date >= month_start,
-            TransactionModel.date <= month_end
-        )
+        query = select(TransactionModel).where(TransactionModel.date >= month_start, TransactionModel.date <= month_end)
         transactions = self.db.execute(query).scalars().all()
 
         # Group by category
@@ -626,7 +562,7 @@ Available data:
             "Transportation": 400,
             "Utilities": 200,
             "Entertainment": 150,
-            "Shopping": 400
+            "Shopping": 400,
         }
 
         total_budget = sum(category_budgets.values())
@@ -652,13 +588,9 @@ Available data:
                     status = "on_track"
                     on_track += 1
 
-                alerts.append({
-                    "category": category,
-                    "spent": spent,
-                    "budget": budget,
-                    "percent_used": percent,
-                    "status": status
-                })
+                alerts.append(
+                    {"category": category, "spent": spent, "budget": budget, "percent_used": percent, "status": status}
+                )
 
         return {
             "month": month,
@@ -670,10 +602,10 @@ Available data:
             "on_track_categories": on_track,
             "warning_categories": warning,
             "critical_categories": critical,
-            "currency": "CAD"
+            "currency": "CAD",
         }
 
-    def cashflow_summary(self, month: Optional[str] = None) -> dict[str, Any]:
+    def cashflow_summary(self, month: str | None = None) -> dict[str, Any]:
         """Get income, expenses, and savings for current or specified month with trends."""
         if month is None:
             today = date.today()
@@ -690,10 +622,7 @@ Available data:
             month_end = date(year, month_num + 1, 1) - timedelta(days=1)
 
         # Get transactions for current month
-        query = select(TransactionModel).where(
-            TransactionModel.date >= month_start,
-            TransactionModel.date <= month_end
-        )
+        query = select(TransactionModel).where(TransactionModel.date >= month_start, TransactionModel.date <= month_end)
         current_txns = self.db.execute(query).scalars().all()
 
         current_income = sum(float(tx.amount) for tx in current_txns if tx.type == "income")
@@ -710,8 +639,7 @@ Available data:
             prev_month_end = date(prev_year, prev_month_num + 1, 1) - timedelta(days=1)
 
         prev_query = select(TransactionModel).where(
-            TransactionModel.date >= prev_month_start,
-            TransactionModel.date <= prev_month_end
+            TransactionModel.date >= prev_month_start, TransactionModel.date <= prev_month_end
         )
         prev_txns = self.db.execute(prev_query).scalars().all()
 
@@ -720,7 +648,6 @@ Available data:
 
         # Calculate savings
         current_savings = current_income - current_expenses
-        prev_savings = prev_income - prev_expenses
 
         # Savings rate
         savings_rate = (current_savings / current_income * 100) if current_income > 0 else 0
@@ -738,9 +665,17 @@ Available data:
             "net_savings": current_savings,
             "savings_rate": savings_rate,
             "expense_breakdown": expense_breakdown,
-            "income_trend": "up" if current_income > prev_income else "down" if current_income < prev_income else "stable",
-            "expense_trend": "up" if current_expenses > prev_expenses else "down" if current_expenses < prev_expenses else "stable",
-            "currency": "CAD"
+            "income_trend": "up"
+            if current_income > prev_income
+            else "down"
+            if current_income < prev_income
+            else "stable",
+            "expense_trend": "up"
+            if current_expenses > prev_expenses
+            else "down"
+            if current_expenses < prev_expenses
+            else "stable",
+            "currency": "CAD",
         }
 
     def recurring_analysis(self, months: int = 3) -> dict[str, Any]:
@@ -750,9 +685,7 @@ Available data:
 
         # Get transactions in range
         query = select(TransactionModel).where(
-            TransactionModel.date >= start_date,
-            TransactionModel.date <= end_date,
-            TransactionModel.type == "expense"
+            TransactionModel.date >= start_date, TransactionModel.date <= end_date, TransactionModel.type == "expense"
         )
         transactions = self.db.execute(query).scalars().all()
 
@@ -760,11 +693,9 @@ Available data:
         merchant_data: dict[str, list] = defaultdict(list)
         for tx in transactions:
             if tx.merchant:
-                merchant_data[tx.merchant].append({
-                    "date": tx.date,
-                    "amount": float(abs(tx.amount)),
-                    "category": tx.category
-                })
+                merchant_data[tx.merchant].append(
+                    {"date": tx.date, "amount": float(abs(tx.amount)), "category": tx.category}
+                )
 
         recurring_txns = []
 
@@ -828,22 +759,30 @@ Available data:
 
             category = txns_sorted[0].get("category", "Other")
 
-            recurring_txns.append({
-                "merchant": merchant,
-                "category": category,
-                "average_amount": avg_amount,
-                "frequency": frequency,
-                "next_date": next_date.isoformat(),
-                "annual_cost": annual_cost,
-                "transaction_count": len(txns_sorted)
-            })
+            recurring_txns.append(
+                {
+                    "merchant": merchant,
+                    "category": category,
+                    "average_amount": avg_amount,
+                    "frequency": frequency,
+                    "next_date": next_date.isoformat(),
+                    "annual_cost": annual_cost,
+                    "transaction_count": len(txns_sorted),
+                }
+            )
 
         total_monthly = sum(
-            t["average_amount"] if t["frequency"] == "monthly" else
-            t["average_amount"] * 52 / 12 if t["frequency"] == "weekly" else
-            t["average_amount"] * 365 / 12 if t["frequency"] == "daily" else
-            t["average_amount"] * 4 / 12 if t["frequency"] == "quarterly" else
-            t["average_amount"] / 12 if t["frequency"] == "annual" else 0
+            t["average_amount"]
+            if t["frequency"] == "monthly"
+            else t["average_amount"] * 52 / 12
+            if t["frequency"] == "weekly"
+            else t["average_amount"] * 365 / 12
+            if t["frequency"] == "daily"
+            else t["average_amount"] * 4 / 12
+            if t["frequency"] == "quarterly"
+            else t["average_amount"] / 12
+            if t["frequency"] == "annual"
+            else 0
             for t in recurring_txns
         )
 
@@ -855,7 +794,7 @@ Available data:
             "total_annual_recurring": total_annual,
             "analysis_months": months,
             "transactions": sorted(recurring_txns, key=lambda x: x["annual_cost"], reverse=True),
-            "currency": "CAD"
+            "currency": "CAD",
         }
 
     def execute_function(self, function_name: str, arguments: dict[str, Any]) -> Any:
@@ -880,55 +819,48 @@ Available data:
             return self.goal_progress(**arguments)
         else:
             raise ValueError(f"Unknown function: {function_name}")
-    
-    def chat(self, query: str, conversation_history: Optional[list[dict]] = None) -> dict[str, Any]:
+
+    def chat(self, query: str, conversation_history: list[dict] | None = None) -> dict[str, Any]:
         """Process a chat query and return response."""
         start_time = time.time()
-        
+
         # Build messages
         messages = [{"role": "system", "content": self.SYSTEM_PROMPT}]
         if conversation_history:
             messages.extend(conversation_history)
         messages.append({"role": "user", "content": query})
-        
+
         functions_called = []
         max_iterations = 5  # Prevent infinite loops
-        
+
         for _ in range(max_iterations):
             # Call LLM with function calling
             response = self.provider.chat(messages, self.FUNCTION_DEFINITIONS)
-            
+
             # Check if LLM wants to call a function
             if response.get("message", {}).get("tool_calls"):
                 for tool_call in response["message"]["tool_calls"]:
                     function_name = tool_call["function"]["name"]
                     arguments = tool_call["function"]["arguments"]
-                    
+
                     # Execute function
                     result = self.execute_function(function_name, arguments)
-                    functions_called.append({
-                        "name": function_name,
-                        "arguments": arguments,
-                        "result": result
-                    })
-                    
+                    functions_called.append({"name": function_name, "arguments": arguments, "result": result})
+
                     # Add function result to messages
-                    messages.append({
-                        "role": "tool",
-                        "content": json.dumps(result)
-                    })
+                    messages.append({"role": "tool", "content": json.dumps(result)})
             else:
                 # LLM is done, return final response
                 execution_time_ms = int((time.time() - start_time) * 1000)
                 return {
                     "response": response["message"]["content"],
                     "functions_called": functions_called,
-                    "execution_time_ms": execution_time_ms
+                    "execution_time_ms": execution_time_ms,
                 }
-        
+
         # Max iterations reached
         return {
             "response": "I'm having trouble processing your request. Please try rephrasing.",
             "functions_called": functions_called,
-            "execution_time_ms": int((time.time() - start_time) * 1000)
+            "execution_time_ms": int((time.time() - start_time) * 1000),
         }
