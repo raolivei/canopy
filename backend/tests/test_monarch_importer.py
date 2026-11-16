@@ -214,6 +214,87 @@ def test_layer2_canonical_hash_blocks_cross_source_duplicate(db: Session) -> Non
     assert rep.skipped_ws_covered == 0
 
 
+def test_two_distinct_rows_with_same_account_date_and_amount_are_both_kept(db: Session) -> None:
+    """Two equal payments on one day are two transactions (#143)."""
+    f = _file(
+        "2026-10-02,Payer A,Other Income,Chequing (...0000),E-TRANSFER PAYER A,,300.00,",
+        "2026-10-02,Payer B,Other Income,Chequing (...0000),E-TRANSFER PAYER B,,300.00,",
+    )
+    summary = MonarchImporter(db).ingest([f])
+    db.commit()
+
+    rep = summary.files[0]
+    assert rep.imported == 2
+    assert rep.skipped_canonical_dup == 0
+    assert sorted(t.merchant for t in db.execute(select(Transaction)).scalars()) == ["Payer A", "Payer B"]
+
+    # Re-uploading the same file still adds nothing.
+    again = MonarchImporter(db).ingest([f]).files[0]
+    db.commit()
+    assert again.imported == 0
+    assert again.skipped_source_dup == 2
+
+
+def test_identical_rows_in_one_file_are_still_collapsed(db: Session) -> None:
+    """A pending copy and its posted copy carry the same text; keep one."""
+    f = _file(
+        "2026-10-04,Car Rental,Travel,Visa Credit Card (...1111),CAR RENTAL,,-779.58,",
+        "2026-10-04,Car Rental,Travel,Visa Credit Card (...1111),CAR RENTAL,,-779.58,",
+    )
+    rep = MonarchImporter(db).ingest([f]).files[0]
+    db.commit()
+
+    assert rep.imported == 1
+    assert rep.skipped_source_dup == 1
+
+
+def test_later_export_adds_a_new_row_that_shares_account_date_and_amount(db: Session) -> None:
+    """An overlapping export must not lose the row the first one lacked."""
+    first = _file("2026-10-02,Payer A,Other Income,Chequing (...0000),E-TRANSFER PAYER A,,300.00,")
+    MonarchImporter(db).ingest([first])
+    db.commit()
+
+    second = _file(
+        "2026-10-02,Payer B,Other Income,Chequing (...0000),E-TRANSFER PAYER B,,300.00,",
+        "2026-10-02,Payer A,Other Income,Chequing (...0000),E-TRANSFER PAYER A,,300.00,",
+        filename="monarch-transactions-y.csv",
+    )
+    rep = MonarchImporter(db).ingest([second]).files[0]
+    db.commit()
+
+    assert rep.imported == 1
+    assert rep.skipped_source_dup == 1
+    assert len(db.execute(select(Transaction)).scalars().all()) == 2
+
+
+def test_cross_source_event_absorbs_one_row_only(db: Session) -> None:
+    """One statement event pairs with one row; the second row is new."""
+    asset = Asset(symbol="CHQ", name="Chequing (...0000)", asset_type=AssetType.BANK_CHECKING, currency="CAD")
+    db.add(asset)
+    db.flush()
+    when = datetime(2026, 10, 2, tzinfo=UTC).date()
+    db.add(
+        ImportedEvent(
+            hash="statement-source-hash",
+            canonical_hash=canonical_event_hash(entity_key_for_asset(asset.id), when, Decimal("300.00")),
+            source="wealthsimple_csv",
+            target_table="transactions",
+            target_id=None,
+        )
+    )
+    db.commit()
+
+    f = _file(
+        "2026-10-02,Payer A,Other Income,Chequing (...0000),E-TRANSFER PAYER A,,300.00,",
+        "2026-10-02,Payer B,Other Income,Chequing (...0000),E-TRANSFER PAYER B,,300.00,",
+    )
+    rep = MonarchImporter(db).ingest([f]).files[0]
+    db.commit()
+
+    assert rep.imported == 1
+    assert rep.skipped_canonical_dup == 1
+
+
 # ---------------------------------------------------------------------------
 # Foreign / pseudo accounts
 # ---------------------------------------------------------------------------
