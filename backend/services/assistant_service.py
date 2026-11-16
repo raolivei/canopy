@@ -688,7 +688,7 @@ Available data:
         """Analyze recurring transactions (subscriptions, payments) with frequency and next dates."""
         end_date = date.today()
         # Last N calendar months, including the current partial month.
-        start_date, _ = month_bounds(*months_back(end_date, months)[0])
+        start_date = month_bounds(*months_back(end_date, months)[0])[0] if months >= 1 else end_date
 
         # Get transactions in range
         query = select(TransactionModel).where(

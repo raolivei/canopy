@@ -23,6 +23,8 @@ class ToolFunction(Protocol):
 def _date_range(months: int = 1) -> tuple[date, date]:
     """First day of the calendar month ``months`` back, through today."""
     today = datetime.now().date()
+    if months < 1:
+        return today, today
     start, _ = month_bounds(*months_back(today, months)[0])
     return start, today
 
