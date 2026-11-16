@@ -1,28 +1,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import {
-  Home,
-  TrendingUp,
-  Wallet,
-  Menu,
-  UploadCloud,
-  DollarSign,
-} from "lucide-react";
 import { cn } from "@/utils/cn";
-
-const mobileNavItems = [
-  { name: "Home", href: "/", icon: Home },
-  { name: "Import", href: "/import", icon: UploadCloud },
-  { name: "Holdings", href: "/portfolio", icon: TrendingUp },
-  { name: "Txns", href: "/transactions", icon: DollarSign },
-  { name: "Accounts", href: "/accounts", icon: Wallet },
-  { name: "More", href: "/settings", icon: Menu },
-];
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { mobileNavigationFor, mobileNavItemIsActive } from "./navigation";
 
 export default function MobileNav() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
+  const { workspace } = useWorkspace();
 
   useEffect(() => {
     setIsMounted(true);
@@ -30,33 +16,23 @@ export default function MobileNav() {
 
   if (!isMounted) return null;
 
+  const items = mobileNavigationFor(workspace);
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-area-pb">
+    <nav
+      aria-label={`${workspace === "tax" ? "Tax" : "Wallet"} navigation`}
+      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-area-pb"
+    >
       <div className="flex items-center justify-around h-16">
-        {mobileNavItems.map((item) => {
-          const path = router.pathname;
-          const isActive =
-            item.name === "Import"
-              ? (
-                  path === "/import" ||
-                  path === "/portfolio/wealthsimple-import" ||
-                  path === "/portfolio/monarch-import" ||
-                  path === "/portfolio/import" ||
-                  path.startsWith("/portfolio/import/") ||
-                  path.startsWith("/import/")
-                )
-              : item.href === "/transactions"
-                ? path === "/transactions"
-                : item.href === "/settings"
-                  ? path === "/settings" || path.startsWith("/settings/")
-                  : path === item.href ||
-                    (item.href !== "/" && path.startsWith(`${item.href}/`));
+        {items.map((item) => {
+          const isActive = mobileNavItemIsActive(router.pathname, item);
           const Icon = item.icon;
 
           return (
             <Link
               key={item.name}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex flex-col items-center justify-center w-full h-full gap-1",
                 "text-xs font-medium transition-colors",
