@@ -5,98 +5,45 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api import (
+    accounts,
+    admin,
+    assistant,
+    cashflow,
+    contextual_insights,
+    csv_import,
+    fx,
+    insights,
+    integrations,
+    monarch_import,
+    portfolio,
+    portfolio_reviews,
+    transactions,
+    wealthsimple_import,
+)
 from backend.api.v1.routes import router as v1_router
 from backend.app.config import get_settings
 
-# Import transaction and CSV import routers if they exist
-try:
-    from backend.api import csv_import, transactions
-
-    HAS_TRANSACTION_ROUTERS = True
-except ImportError:
-    HAS_TRANSACTION_ROUTERS = False
-
-# Import portfolio router
-try:
-    from backend.api import portfolio
-
-    HAS_PORTFOLIO_ROUTER = True
-except ImportError:
-    HAS_PORTFOLIO_ROUTER = False
-
-try:
-    from backend.api import portfolio_reviews
-
-    HAS_PORTFOLIO_REVIEWS_ROUTER = True
-except ImportError:
-    HAS_PORTFOLIO_REVIEWS_ROUTER = False
-
-try:
-    from backend.api import wealthsimple_import
-
-    HAS_WEALTHSIMPLE_IMPORT_ROUTER = True
-except ImportError:
-    HAS_WEALTHSIMPLE_IMPORT_ROUTER = False
-
-try:
-    from backend.api import monarch_import
-
-    HAS_MONARCH_IMPORT_ROUTER = True
-except ImportError:
-    HAS_MONARCH_IMPORT_ROUTER = False
-
-try:
-    from backend.api import admin as admin_api
-
-    HAS_ADMIN_ROUTER = True
-except ImportError:
-    HAS_ADMIN_ROUTER = False
-
-try:
-    from backend.api import accounts as accounts_api
-
-    HAS_ACCOUNTS_ROUTER = True
-except ImportError:
-    HAS_ACCOUNTS_ROUTER = False
-
-try:
-    from backend.api import fx as fx_api
-
-    HAS_FX_ROUTER = True
-except ImportError:
-    HAS_FX_ROUTER = False
-
-# Import integrations router
-try:
-    from backend.api import integrations
-
-    HAS_INTEGRATIONS_ROUTER = True
-except ImportError:
-    HAS_INTEGRATIONS_ROUTER = False
-
-# Import insights router
-try:
-    from backend.api import insights
-
-    HAS_INSIGHTS_ROUTER = True
-except ImportError:
-    HAS_INSIGHTS_ROUTER = False
-
-# Import assistant router
-try:
-    from backend.api import assistant
-
-    HAS_ASSISTANT_ROUTER = True
-except ImportError:
-    HAS_ASSISTANT_ROUTER = False
-
-# Import contextual insights router
-try:
-    from backend.api import contextual_insights
-
-    HAS_CONTEXTUAL_INSIGHTS_ROUTER = True
-except ImportError:
-    HAS_CONTEXTUAL_INSIGHTS_ROUTER = False
+# Every router is imported unconditionally: a broken module must fail the
+# application at start-up, not silently drop its routes.
+# `backend/api/budgets.py` is mounted in #114 once its routes are repaired.
+ROUTERS = [
+    v1_router,
+    transactions.router,
+    csv_import.router,
+    portfolio.router,
+    portfolio_reviews.router,
+    wealthsimple_import.router,
+    monarch_import.router,
+    admin.router,
+    accounts.router,
+    fx.router,
+    integrations.router,
+    insights.router,
+    assistant.router,
+    contextual_insights.router,
+    cashflow.router,
+]
 
 
 def _cors_allow_origins() -> list[str]:
@@ -128,7 +75,6 @@ def create_app() -> FastAPI:
         version="1.0.0",
     )
 
-    # Add CORS middleware for frontend communication
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_allow_origins(),
@@ -137,51 +83,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include v1 router (health, summary endpoints)
-    app.include_router(v1_router)
-
-    # Include transaction + CSV import routers if available
-    if HAS_TRANSACTION_ROUTERS:
-        app.include_router(transactions.router)
-        app.include_router(csv_import.router)
-
-    # Include portfolio router if available
-    if HAS_PORTFOLIO_ROUTER:
-        app.include_router(portfolio.router)
-
-    if HAS_PORTFOLIO_REVIEWS_ROUTER:
-        app.include_router(portfolio_reviews.router)
-
-    if HAS_WEALTHSIMPLE_IMPORT_ROUTER:
-        app.include_router(wealthsimple_import.router)
-
-    if HAS_MONARCH_IMPORT_ROUTER:
-        app.include_router(monarch_import.router)
-
-    if HAS_ADMIN_ROUTER:
-        app.include_router(admin_api.router)
-
-    if HAS_ACCOUNTS_ROUTER:
-        app.include_router(accounts_api.router)
-
-    if HAS_FX_ROUTER:
-        app.include_router(fx_api.router)
-
-    # Include integrations router if available
-    if HAS_INTEGRATIONS_ROUTER:
-        app.include_router(integrations.router)
-
-    # Include insights router if available
-    if HAS_INSIGHTS_ROUTER:
-        app.include_router(insights.router)
-
-    # Include assistant router if available
-    if HAS_ASSISTANT_ROUTER:
-        app.include_router(assistant.router)
-
-    # Include contextual insights router if available
-    if HAS_CONTEXTUAL_INSIGHTS_ROUTER:
-        app.include_router(contextual_insights.router)
+    for router in ROUTERS:
+        app.include_router(router)
 
     return app
 

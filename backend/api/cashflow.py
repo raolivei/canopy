@@ -1,6 +1,8 @@
-"""Cashflow API endpoints for income, expenses, and burn rate analysis."""
+"""Cash-flow API: monthly summary, trend, category breakdown, burn rate, period comparison."""
 
-from datetime import datetime
+from __future__ import annotations
+
+from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -9,126 +11,98 @@ from backend.models.cashflow import (
     BurnRateResponse,
     CashflowTrendResponse,
     CategoryBreakdownResponse,
-    MonthlySummary,
+    ComparisonResponse,
+    FlowKind,
     MonthlySummaryResponse,
+    PeriodKind,
+    ReportingCurrency,
 )
+from backend.services.calculation import parse_month
 from backend.services.cashflow_service import CashflowService
 
 router = APIRouter(prefix="/v1/cashflow", tags=["cashflow"])
 
+ReportingQuery = Query("CAD", description="Currency every total is expressed in")
+
+
+def _parse_date(value: str, name: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid {name}: expected YYYY-MM-DD") from exc
+
+
+def _validate_month(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        parse_month(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return value
+
 
 @router.get("/summary", response_model=MonthlySummaryResponse)
-async def get_monthly_summary(
+def get_monthly_summary(
     db: DbSession,
-    start_date: str = Query(..., description="Start date in YYYY-MM-DD format"),
-    end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
-):
-    """Get monthly income, expenses, and net cashflow for a date range.
-
-    Args:
-        db: Database session
-        start_date: Start date in YYYY-MM-DD format
-        end_date: End date in YYYY-MM-DD format
-
-    Returns:
-        Monthly summary data with income, expenses, and net for each month
-    """
-    try:
-        start = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end = datetime.strptime(end_date, "%Y-%m-%d").date()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}") from e
-
+    start_date: str = Query(..., description="YYYY-MM-DD, inclusive"),
+    end_date: str = Query(..., description="YYYY-MM-DD, inclusive"),
+    reporting_currency: ReportingCurrency = ReportingQuery,
+) -> MonthlySummaryResponse:
+    """Income, expenses and net per calendar month; months without data are zero-filled."""
+    start = _parse_date(start_date, "start_date")
+    end = _parse_date(end_date, "end_date")
     if start > end:
-        raise HTTPException(status_code=400, detail="Start date must be before or equal to end date")
+        raise HTTPException(status_code=400, detail="start_date must be on or before end_date")
 
-    service = CashflowService(db)
-    monthly_data = service.get_monthly_summary(start, end)
-
+    data = CashflowService(db, reporting_currency).get_monthly_summary(start, end)
     return MonthlySummaryResponse(
-        data=[MonthlySummary(**m) for m in monthly_data],
-        total_months=len(monthly_data),
+        data=data,
+        total_months=len(data),
+        currency=reporting_currency,
+        fx_complete=all(m["fx_complete"] for m in data),
     )
 
 
 @router.get("/trend", response_model=CashflowTrendResponse)
-async def get_cashflow_trend(
+def get_cashflow_trend(
     db: DbSession,
-    months: int = Query(12, ge=1, le=60, description="Number of months to analyze"),
-):
-    """Get cashflow trend analysis over N months.
-
-    Calculates average income, expenses, and net cashflow, and determines
-    if the trend is improving, declining, or stable.
-
-    Args:
-        db: Database session
-        months: Number of months to analyze (default: 12, max: 60)
-
-    Returns:
-        Cashflow trend data with monthly breakdown and trend analysis
-    """
-    service = CashflowService(db)
-    trend_data = service.get_cashflow_trend(months)
-
-    return CashflowTrendResponse(
-        months=trend_data["months"],
-        monthly_data=[MonthlySummary(**m) for m in trend_data["monthly_data"]],
-        average_income=trend_data["average_income"],
-        average_expenses=trend_data["average_expenses"],
-        average_net=trend_data["average_net"],
-        trend=trend_data["trend"],
-        currency=trend_data["currency"],
-    )
+    months: int = Query(12, ge=1, le=60, description="Calendar months including the current one"),
+    reporting_currency: ReportingCurrency = ReportingQuery,
+) -> CashflowTrendResponse:
+    """Monthly data for the trailing window with averages and a trend label."""
+    return CashflowTrendResponse(**CashflowService(db, reporting_currency).get_cashflow_trend(months))
 
 
 @router.get("/categories", response_model=CategoryBreakdownResponse)
-async def get_category_breakdown(
+def get_category_breakdown(
     db: DbSession,
-    month: str | None = Query(None, description="Month in YYYY-MM format (defaults to current month)"),
-):
-    """Get expense breakdown by category for a specific month.
-
-    Shows total expenses and percentage breakdown for each spending category.
-
-    Args:
-        db: Database session
-        month: Month in YYYY-MM format (defaults to current month)
-
-    Returns:
-        Category breakdown with amounts and percentages
-    """
-    if month is not None:
-        try:
-            # Validate month format
-            datetime.strptime(month, "%Y-%m")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid month format: {str(e)}") from e
-
-    service = CashflowService(db)
-    breakdown_data = service.get_category_breakdown(month)
-
-    return CategoryBreakdownResponse(**breakdown_data)
+    month: str | None = Query(None, description="YYYY-MM (defaults to the current month)"),
+    kind: FlowKind = Query("expense", description="Which flows to break down"),
+    reporting_currency: ReportingCurrency = ReportingQuery,
+) -> CategoryBreakdownResponse:
+    """Totals per category for one month."""
+    month = _validate_month(month)
+    return CategoryBreakdownResponse(**CashflowService(db, reporting_currency).get_category_breakdown(month, kind=kind))
 
 
 @router.get("/burn-rate", response_model=BurnRateResponse)
-async def get_burn_rate(
+def get_burn_rate(
     db: DbSession,
-    months: int = Query(3, ge=1, le=24, description="Number of months to analyze"),
-):
-    """Calculate average monthly spending (burn rate).
+    months: int = Query(3, ge=1, le=24, description="Calendar months including the current one"),
+    reporting_currency: ReportingCurrency = ReportingQuery,
+) -> BurnRateResponse:
+    """Average monthly spending and its volatility over the window."""
+    return BurnRateResponse(**CashflowService(db, reporting_currency).calculate_burn_rate(months))
 
-    Analyzes spending patterns over N months to determine average monthly
-    expenses, volatility, and min/max spending months.
 
-    Args:
-        db: Database session
-        months: Number of months to analyze (default: 3, max: 24)
-
-    Returns:
-        Burn rate metrics including average monthly spending and volatility
-    """
-    service = CashflowService(db)
-    burn_data = service.calculate_burn_rate(months)
-
-    return BurnRateResponse(**burn_data)
+@router.get("/comparison", response_model=ComparisonResponse)
+def get_comparison(
+    db: DbSession,
+    kind: PeriodKind = Query("month", description="Period kind to compare"),
+    reference: str | None = Query(None, description="YYYY-MM inside the current period (defaults to today)"),
+    reporting_currency: ReportingCurrency = ReportingQuery,
+) -> ComparisonResponse:
+    """The period containing ``reference`` versus the one before it."""
+    reference = _validate_month(reference)
+    return ComparisonResponse(**CashflowService(db, reporting_currency).get_comparison(kind, reference))
