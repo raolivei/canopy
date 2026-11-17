@@ -31,6 +31,13 @@ interface CategoryBreakdownProps {
 }
 
 /**
+ * Legend share, one decimal place. The API sends an unrounded float.
+ */
+export function formatLegendPct(pct: number): string {
+  return Number.isFinite(pct) ? `${pct.toFixed(1)}%` : "—";
+}
+
+/**
  * Custom label renderer for pie chart.
  * Only shows percentage if slice is large enough (>4%).
  */
@@ -136,8 +143,8 @@ export function CategoryBreakdown({
                 <span className="font-medium text-slate-900 dark:text-white">
                   {formatCurrencyCompact(cat.amount, currency)}
                 </span>
-                <span className="text-slate-400 w-8 text-right">
-                  {cat.pct}%
+                <span className="text-slate-400 w-11 text-right tabular-nums">
+                  {formatLegendPct(cat.pct)}
                 </span>
               </div>
             </div>

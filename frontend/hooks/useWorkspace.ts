@@ -37,6 +37,18 @@ export function workspaceForPath(pathname: string): Workspace {
   return pathname === "/tax" || pathname.startsWith("/tax/") ? "tax" : "wallet";
 }
 
+/** Routes listed in both workspaces' navigation; they keep the current selection. */
+const SHARED_PATHS = new Set(["/settings"]);
+
+/**
+ * The workspace a route forces the navigation into, or ``null`` when the route
+ * is shared. Used when the route changes, so the sidebar never shows one
+ * workspace's menu on the other workspace's page.
+ */
+export function workspaceRequiredByPath(pathname: string): Workspace | null {
+  return SHARED_PATHS.has(pathname) ? null : workspaceForPath(pathname);
+}
+
 /** Landing route of a workspace. */
 export function workspaceHome(workspace: Workspace): string {
   return workspace === "tax" ? "/tax" : "/";
