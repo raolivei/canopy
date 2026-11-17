@@ -1,116 +1,96 @@
-"""Pydantic models for Budget API request/response."""
+"""Pydantic schemas for the budget API (single source for requests and responses)."""
+
+from __future__ import annotations
 
 from datetime import date, datetime
-from enum import Enum
+from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from backend.db.models.budget import BudgetPeriodType
+from backend.models.cashflow import CurrencyFlowOut, FxProvenanceOut
+from backend.models.money import Money
 
-class BudgetPeriodType(str, Enum):
-    """Period type for budget recurrence."""
-
-    MONTHLY = "monthly"
-    YEARLY = "yearly"
-
-
-class BudgetCategoryBase(BaseModel):
-    """Base model for budget category."""
-
-    category_name: str = Field(..., max_length=100)
-    amount_limit: float = Field(..., gt=0)
+BudgetHealth = Literal["under", "warning", "over"]
 
 
-class BudgetCategoryCreate(BudgetCategoryBase):
-    """Request model for creating a budget category."""
+class BudgetCategoryCreate(BaseModel):
+    category_name: str = Field(min_length=1, max_length=100)
+    amount_limit: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
 
-    pass
+
+class BudgetCategoryUpdate(BaseModel):
+    category_name: str | None = Field(None, min_length=1, max_length=100)
+    amount_limit: Decimal | None = Field(None, gt=0, max_digits=18, decimal_places=2)
 
 
-class BudgetCategory(BudgetCategoryBase):
-    """Response model for budget category."""
+class BudgetCategory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     budget_id: int
+    category_name: str
+    amount_limit: Money
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class BudgetCreate(BaseModel):
-    """Request model for creating a budget."""
-
-    name: str = Field(..., max_length=200)
-    amount: float = Field(..., gt=0)
+    name: str = Field(min_length=1, max_length=200)
+    amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     period: BudgetPeriodType = BudgetPeriodType.MONTHLY
-    user_id: int | None = None
     categories: list[BudgetCategoryCreate] = Field(default_factory=list)
 
 
 class BudgetUpdate(BaseModel):
-    """Request model for updating a budget."""
-
-    name: str | None = Field(None, max_length=200)
-    amount: float | None = Field(None, gt=0)
+    name: str | None = Field(None, min_length=1, max_length=200)
+    amount: Decimal | None = Field(None, gt=0, max_digits=18, decimal_places=2)
     period: BudgetPeriodType | None = None
     active: bool | None = None
 
 
 class Budget(BaseModel):
-    """Response model for budget."""
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
-    amount: float
+    amount: Money
+    currency: str = Field("CAD", description="Budgets are kept in CAD")
     period: BudgetPeriodType
-    user_id: int | None = None
     active: bool
     created_at: datetime
     updated_at: datetime
     categories: list[BudgetCategory] = Field(default_factory=list)
 
-    class Config:
-        from_attributes = True
+
+class CategoryStatus(BaseModel):
+    category_id: int
+    category_name: str
+    amount_limit: Money
+    actual_spent: Money
+    remaining: Money
+    percentage_used: float = Field(ge=0)
+    status: BudgetHealth
+    by_currency: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
+    fx_complete: bool
+    unconverted: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
 
 
 class BudgetStatus(BaseModel):
-    """Budget status for current period."""
-
     budget_id: int
     budget_name: str
-    budget_amount: float
     period: BudgetPeriodType
     period_start: date
-    period_end: date
-    actual_spent: float
-    remaining: float
-    percentage_used: float
-    is_over_budget: bool
-
-
-class CategorySpending(BaseModel):
-    """Category-level spending within a budget."""
-
-    category_name: str
-    amount_limit: float
-    actual_spent: float
-    remaining: float
-    percentage_used: float
-    is_over_budget: bool
-
-
-class BudgetTracking(BaseModel):
-    """Detailed budget tracking with category breakdown."""
-
-    budget_id: int
-    budget_name: str
-    budget_amount: float
-    period: BudgetPeriodType
-    period_start: date
-    period_end: date
-    total_spent: float
-    total_remaining: float
-    percentage_used: float
-    is_over_budget: bool
-    categories: list[CategorySpending] = Field(default_factory=list)
+    period_end: date = Field(description="Last day of the period (inclusive)")
+    currency: str
+    total_budget: Money
+    total_spent: Money = Field(description="All expense spend in the period, in the budget currency")
+    remaining: Money
+    percentage_used: float = Field(ge=0)
+    status: BudgetHealth
+    fx_complete: bool
+    spent_by_currency: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
+    unconverted: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
+    fx: list[FxProvenanceOut] = Field(default_factory=list)
+    categories: list[CategoryStatus] = Field(default_factory=list)

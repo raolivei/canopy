@@ -9,6 +9,7 @@ from backend.api import (
     accounts,
     admin,
     assistant,
+    budgets,
     cashflow,
     contextual_insights,
     csv_import,
@@ -26,7 +27,6 @@ from backend.app.config import get_settings
 
 # Every router is imported unconditionally: a broken module must fail the
 # application at start-up, not silently drop its routes.
-# `backend/api/budgets.py` is mounted in #114 once its routes are repaired.
 ROUTERS = [
     v1_router,
     transactions.router,
@@ -43,6 +43,7 @@ ROUTERS = [
     assistant.router,
     contextual_insights.router,
     cashflow.router,
+    budgets.router,
 ]
 
 
