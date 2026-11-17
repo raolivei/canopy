@@ -14,9 +14,10 @@ Given parsed :class:`MonarchRow` objects, this service:
 
    * **Layer 2 - canonical-hash backstop.** Every row's
      ``(entity_key, date, amount)`` fingerprint is checked against the
-     ``imported_events.canonical_hash`` column. A hit means the same
-     real-world transaction has already been written, regardless of
-     source.
+     ``imported_events.canonical_hash`` column. Each event another
+     source wrote with that fingerprint absorbs one row. Rows beyond
+     that count are separate real-world transactions (two equal
+     payments on one day) and are kept.
 
 3. Persists kept rows as :class:`Transaction` with ``import_source =
    'monarch_csv'`` and records an :class:`ImportedEvent` per row so
@@ -123,7 +124,10 @@ class MonarchImporter:
         self.db = db
         # Per-session caches for repeated lookups inside one ingest() call
         self._event_cache: set[str] = set()
-        self._canonical_cache: set[str] = set()
+        # canonical hash -> events other sources had written before this
+        # ingest saw it, and how many of them rows have already matched
+        self._foreign_canonical: dict[str, int] = {}
+        self._foreign_matched: dict[str, int] = {}
         self._account_cache: dict[str, ResolvedAccount | None] = {}
         self._ws_cutoff_cache: dict[str, date | None] = {}
 
@@ -191,13 +195,11 @@ class MonarchImporter:
             report.skipped_ws_covered += 1
             return
 
-        # Layer 2: canonical-hash backstop (cross-source dedup).
         canonical = canonical_event_hash(entity_key, row.occurred_on, row.amount)
-        if canonical in self._canonical_cache or self._canonical_exists(canonical):
-            report.skipped_canonical_dup += 1
-            return
 
-        # Per-source fingerprint: catches re-uploads of the same Monarch file.
+        # Per-source fingerprint: catches re-uploads of the same Monarch
+        # row. Checked first so a re-uploaded row never uses up a
+        # cross-source match that belongs to a different row.
         source_hash = source_event_hash(
             SOURCE,
             row.account_label,
@@ -207,6 +209,13 @@ class MonarchImporter:
         )
         if source_hash in self._event_cache or self._source_exists(source_hash):
             report.skipped_source_dup += 1
+            return
+
+        # Layer 2: canonical-hash backstop (cross-source dedup). One row is
+        # dropped per event another source already wrote; any further row
+        # with the same account, date and amount is its own transaction.
+        if self._matches_foreign_event(canonical):
+            report.skipped_canonical_dup += 1
             return
 
         tx = self._to_transaction(row, resolved)
@@ -224,7 +233,6 @@ class MonarchImporter:
             )
         )
         self._event_cache.add(source_hash)
-        self._canonical_cache.add(canonical)
         report.imported += 1
 
     # ------------------------------------------------------------------
@@ -281,13 +289,20 @@ class MonarchImporter:
         self._ws_cutoff_cache[name] = cutoff
         return cutoff
 
-    def _canonical_exists(self, canonical: str) -> bool:
-        return (
-            self.db.execute(
-                select(ImportedEvent.id).where(ImportedEvent.canonical_hash == canonical)
-            ).scalar_one_or_none()
-            is not None
-        )
+    def _matches_foreign_event(self, canonical: str) -> bool:
+        """Pair this row with an unmatched event written by another source."""
+        if canonical not in self._foreign_canonical:
+            self._foreign_canonical[canonical] = self.db.execute(
+                select(func.count(ImportedEvent.id)).where(
+                    ImportedEvent.canonical_hash == canonical,
+                    ImportedEvent.source != SOURCE,
+                )
+            ).scalar_one()
+        matched = self._foreign_matched.get(canonical, 0)
+        if matched >= self._foreign_canonical[canonical]:
+            return False
+        self._foreign_matched[canonical] = matched + 1
+        return True
 
     def _source_exists(self, hashed: str) -> bool:
         return (
