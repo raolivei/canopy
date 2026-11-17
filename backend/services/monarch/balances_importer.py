@@ -65,6 +65,8 @@ class BalancesFileReport:
     skipped_pseudo: int = 0
     skipped_foreign: int = 0
     skipped_unknown_account: int = 0
+    skipped_account_labels: list[str] = field(default_factory=list)
+    defaulted_account_labels: list[str] = field(default_factory=list)
     assets_created: list[str] = field(default_factory=list)
     liabilities_created: list[str] = field(default_factory=list)
     assets_touched: set[str] = field(default_factory=set)
@@ -162,7 +164,12 @@ class MonarchBalancesImporter:
         resolved = self._resolve_cached(row)
         if resolved is None:
             report.skipped_unknown_account += 1
+            if row.account_label not in report.skipped_account_labels:
+                report.skipped_account_labels.append(row.account_label)
             return
+
+        if resolved.defaulted and row.account_label not in report.defaulted_account_labels:
+            report.defaulted_account_labels.append(row.account_label)
 
         if resolved.created:
             if resolved.asset is not None and resolved.asset.name not in report.assets_created:

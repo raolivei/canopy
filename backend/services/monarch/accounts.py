@@ -49,6 +49,9 @@ class ResolvedAccount:
     liability: Liability | None = None
     created: bool = False
     note: str | None = None
+    # True when the label carried no account-type keyword and the
+    # resolver fell back to treating it as a cash account.
+    defaulted: bool = False
 
     @property
     def kind(self) -> str:
@@ -82,13 +85,19 @@ def resolve_account(
 ) -> ResolvedAccount | None:
     """Resolve a single Monarch account label.
 
-    Returns ``None`` when the class is ``PSEUDO`` or ``UNKNOWN`` - the
-    caller should skip the row. ``currency`` is used only when
-    autocreating a new Asset / Liability: existing entities keep their
-    stored currency.
+    Returns ``None`` when the class is ``PSEUDO`` or ``FOREIGN`` - the
+    caller should skip the row. ``UNKNOWN`` labels (no account-type
+    keyword, e.g. a payment wallet exported as ``Wallet CA``) resolve to
+    an existing entity with the same name, or else to a new cash account
+    flagged ``defaulted`` so the caller can ask the user to check it.
+    ``currency`` is used only when autocreating a new Asset / Liability:
+    existing entities keep their stored currency.
     """
-    if account_class in {AccountClass.PSEUDO, AccountClass.UNKNOWN, AccountClass.FOREIGN}:
+    if account_class in {AccountClass.PSEUDO, AccountClass.FOREIGN}:
         return None
+
+    if account_class == AccountClass.UNKNOWN:
+        return _resolve_unclassified(db, label=label, last4=last4, currency=currency)
 
     if account_class == AccountClass.DEBT:
         return _resolve_liability(db, label=label, last4=last4, currency=currency)
@@ -146,6 +155,33 @@ def _resolve_asset(
         created=True,
         note="autocreated from Monarch import",
     )
+
+
+def _resolve_unclassified(
+    db: Session,
+    *,
+    label: str,
+    last4: str | None,
+    currency: str,
+) -> ResolvedAccount:
+    """Resolve a label the classifier could not place.
+
+    An existing liability with the same name wins (the user may have
+    created or retyped it by hand); otherwise the label goes through the
+    normal asset path as a cash account.
+    """
+    liability = db.execute(select(Liability).where(Liability.name == label)).scalar_one_or_none()
+    if liability is not None:
+        return ResolvedAccount(label=label, account_class=AccountClass.DEBT, liability=liability)
+
+    resolved = _resolve_asset(db, label=label, account_class=AccountClass.CASH, last4=last4, currency=currency)
+    if resolved.created:
+        resolved.defaulted = True
+        resolved.note = (
+            "label has no account-type keyword; created as a cash account. "
+            "Change its type on the Accounts page if that is wrong."
+        )
+    return resolved
 
 
 def _asset_type_for(label: str, account_class: AccountClass) -> AssetType:

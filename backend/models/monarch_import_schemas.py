@@ -13,6 +13,8 @@ class MonarchFileReport(BaseModel):
     skipped_pseudo: int
     skipped_foreign: int
     skipped_unknown_account: int
+    skipped_account_labels: list[str] = Field(default_factory=list)
+    defaulted_account_labels: list[str] = Field(default_factory=list)
     skipped_ws_covered: int
     skipped_canonical_dup: int
     skipped_source_dup: int
@@ -51,6 +53,8 @@ class MonarchBalancesFileReport(BaseModel):
     skipped_pseudo: int
     skipped_foreign: int
     skipped_unknown_account: int
+    skipped_account_labels: list[str] = Field(default_factory=list)
+    defaulted_account_labels: list[str] = Field(default_factory=list)
     assets_created: list[str] = Field(default_factory=list)
     liabilities_created: list[str] = Field(default_factory=list)
     assets_touched: list[str] = Field(default_factory=list)

@@ -234,3 +234,15 @@ def test_liability_same_day_repeated_balance_is_idempotent(db: Session) -> None:
 
     assert summary.inserted == 0
     assert summary.updated == 0  # same value -> no-op
+
+
+def test_unclassified_label_balance_lands_on_a_flagged_cash_account(db: Session) -> None:
+    summary = MonarchBalancesImporter(db).ingest([_file("2026-03-25,12.34,Wallet CA")])
+    db.commit()
+
+    rep = summary.files[0]
+    assert summary.inserted == 1
+    assert rep.skipped_unknown_account == 0
+    assert rep.defaulted_account_labels == ["Wallet CA"]
+    asset = db.execute(select(Asset)).scalar_one()
+    assert asset.asset_type == AssetType.CASH

@@ -174,3 +174,13 @@ def test_is_monarch_filename() -> None:
     assert is_monarch_filename("Monarch-Transactions-xyz.CSV")
     assert not is_monarch_filename("TFSA-monthly-statement-transactions-X-2025-12-01.csv")
     assert not is_monarch_filename("random.csv")
+
+
+def test_label_without_type_keyword_or_mask_is_unknown_with_no_last4() -> None:
+    # The importer resolves these as cash accounts (#144); the parser only
+    # reports that it could not classify them.
+    result = parse_monarch_csv(_csv("2026-10-08,Some Store,Electronics,Wallet CA,SOME STORE,,-29.92,"))
+    assert result.kept == 1
+    row = result.rows[0]
+    assert row.account_class == AccountClass.UNKNOWN
+    assert row.account_last4 is None
