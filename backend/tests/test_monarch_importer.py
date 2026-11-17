@@ -337,3 +337,56 @@ def test_usd_accounts_autocreate_with_usd_currency(db: Session) -> None:
     # Written transactions carry the same currency.
     txs = db.execute(select(Transaction)).scalars().all()
     assert {t.currency for t in txs} == {"USD"}
+
+
+# ---------------------------------------------------------------------------
+# Labels with no account-type keyword (#144)
+# ---------------------------------------------------------------------------
+
+
+def test_unclassified_label_imports_as_cash_and_is_flagged(db: Session) -> None:
+    f = _file(
+        "2024-01-08,Some Store,Electronics,Wallet CA,SOME STORE,,-29.92,",
+        "2024-01-09,Other Store,Shopping,Wallet CA,OTHER STORE,,-5.00,",
+    )
+    summary = MonarchImporter(db).ingest([f])
+    db.commit()
+
+    rep = summary.files[0]
+    assert summary.transactions_added == 2
+    assert rep.skipped_unknown_account == 0
+    assert rep.skipped_account_labels == []
+    assert rep.defaulted_account_labels == ["Wallet CA"]
+    assert any("Wallet CA" in w and "cash account" in w for w in rep.warnings)
+    asset = db.execute(select(Asset)).scalar_one()
+    assert asset.name == "Wallet CA"
+    assert asset.asset_type == AssetType.CASH
+
+
+def test_unclassified_label_reuses_existing_account_without_flag(db: Session) -> None:
+    MonarchImporter(db).ingest([_file("2024-01-08,Some Store,Electronics,Wallet CA,A,,-1.00,")])
+    db.commit()
+
+    summary = MonarchImporter(db).ingest([_file("2024-01-10,Some Store,Electronics,Wallet CA,B,,-2.00,")])
+    db.commit()
+
+    rep = summary.files[0]
+    assert summary.transactions_added == 1
+    assert rep.defaulted_account_labels == []
+    assert len(db.execute(select(Asset)).scalars().all()) == 1
+
+
+def test_unclassified_label_matches_existing_liability_by_name(db: Session) -> None:
+    liability = Liability(
+        name="Wallet CA", institution="Manual", liability_type="credit_card", currency="CAD", status="active"
+    )
+    db.add(liability)
+    db.commit()
+
+    summary = MonarchImporter(db).ingest([_file("2024-01-08,Some Store,Electronics,Wallet CA,A,,-29.92,")])
+    db.commit()
+
+    rep = summary.files[0]
+    assert summary.transactions_added == 1
+    assert rep.defaulted_account_labels == []
+    assert db.execute(select(Asset)).scalars().all() == []

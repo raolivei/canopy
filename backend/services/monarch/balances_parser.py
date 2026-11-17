@@ -130,12 +130,8 @@ def parse_monarch_balances_csv(text: str) -> BalancesParseResult:
         if row.account_class == AccountClass.FOREIGN:
             result.skipped_foreign += 1
             continue
-        if row.account_class == AccountClass.UNKNOWN:
-            result.skipped_unknown += 1
-            result.warnings.append(
-                f"Line {i}: account '{row.account_label}' did not match any known classifier; row skipped."
-            )
-            continue
+        # UNKNOWN labels (no account-type keyword) are kept: the account
+        # resolver imports them as cash accounts and flags them.
         result.rows.append(row)
 
     return result

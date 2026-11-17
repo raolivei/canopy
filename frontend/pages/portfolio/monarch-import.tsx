@@ -16,6 +16,7 @@ import {
   Trash2,
   Info,
 } from "lucide-react";
+import { AccountLabelNotes } from "@/components/import/AccountLabelNotes";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -31,6 +32,8 @@ type MonarchFileReport = {
   skipped_pseudo: number;
   skipped_foreign: number;
   skipped_unknown_account: number;
+  skipped_account_labels?: string[];
+  defaulted_account_labels?: string[];
   skipped_ws_covered: number;
   skipped_canonical_dup: number;
   skipped_source_dup: number;
@@ -50,6 +53,8 @@ type BalancesFileReport = {
   skipped_pseudo: number;
   skipped_foreign: number;
   skipped_unknown_account: number;
+  skipped_account_labels?: string[];
+  defaulted_account_labels?: string[];
   assets_created: string[];
   liabilities_created: string[];
   assets_touched: string[];
@@ -463,6 +468,10 @@ function TransactionFileRow({ f }: { f: MonarchFileReport }) {
           {[...f.assets_created, ...f.liabilities_created].join(", ")}
         </div>
       )}
+      <AccountLabelNotes
+        defaulted={f.defaulted_account_labels ?? []}
+        skipped={f.skipped_account_labels ?? []}
+      />
       {f.warnings.length > 0 && (
         <details className="mt-2 text-xs">
           <summary className="cursor-pointer text-slate-500 dark:text-slate-400">
@@ -525,6 +534,10 @@ function BalanceFileRow({ f }: { f: BalancesFileReport }) {
           {[...f.assets_created, ...f.liabilities_created].join(", ")}
         </div>
       )}
+      <AccountLabelNotes
+        defaulted={f.defaulted_account_labels ?? []}
+        skipped={f.skipped_account_labels ?? []}
+      />
       {f.warnings.length > 0 && (
         <details className="mt-2 text-xs">
           <summary className="cursor-pointer text-slate-500 dark:text-slate-400">

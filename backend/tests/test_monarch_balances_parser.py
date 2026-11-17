@@ -96,3 +96,10 @@ def test_malformed_row_is_skipped_with_warning() -> None:
     assert len(result.rows) == 1
     assert result.rows[0].balance == Decimal("50.00")
     assert len(result.warnings) >= 3
+
+
+def test_keeps_rows_whose_label_has_no_account_type_keyword() -> None:
+    result = parse_monarch_balances_csv(_body("2026-03-25,12.34,Wallet CA"))
+    assert result.skipped_unknown == 0
+    assert [r.account_label for r in result.rows] == ["Wallet CA"]
+    assert result.rows[0].account_class == AccountClass.UNKNOWN

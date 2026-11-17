@@ -72,6 +72,9 @@ class FileReport:
     skipped_foreign: int = 0
     skipped_unknown_account: int = 0
     skipped_ws_covered: int = 0
+    # Account labels by name, so the preview can show what needs a look
+    skipped_account_labels: list[str] = field(default_factory=list)
+    defaulted_account_labels: list[str] = field(default_factory=list)
     skipped_canonical_dup: int = 0
     skipped_source_dup: int = 0
     # Entities touched by this file
@@ -168,7 +171,12 @@ class MonarchImporter:
         resolved = self._resolve_cached(row)
         if resolved is None:
             report.skipped_unknown_account += 1
+            if row.account_label not in report.skipped_account_labels:
+                report.skipped_account_labels.append(row.account_label)
             return
+
+        if resolved.defaulted and row.account_label not in report.defaulted_account_labels:
+            report.defaulted_account_labels.append(row.account_label)
 
         if resolved.created:
             if resolved.asset is not None:
