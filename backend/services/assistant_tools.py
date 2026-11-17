@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Protocol
 
 from backend.db.models.transaction import Transaction
+from backend.services.calculation import month_bounds, months_back
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,9 +21,12 @@ class ToolFunction(Protocol):
 
 
 def _date_range(months: int = 1) -> tuple[date, date]:
-    """Get date range for last N months."""
+    """First day of the calendar month ``months`` back, through today."""
     today = datetime.now().date()
-    return today - timedelta(days=30 * months), today
+    if months < 1:
+        return today, today
+    start, _ = month_bounds(*months_back(today, months)[0])
+    return start, today
 
 
 def _transactions_in_range(

@@ -83,14 +83,14 @@ def get_latest_rate(db: Session, pair: str = DEFAULT_PAIR) -> FxRate | None:
     )
 
 
-def get_rate_on(db: Session, on_date: date, pair: str = DEFAULT_PAIR) -> Decimal | None:
-    """Return the rate for ``pair`` on ``on_date``.
+def get_rate_row_on(db: Session, on_date: date, pair: str = DEFAULT_PAIR) -> FxRate | None:
+    """Return the observation for ``pair`` in effect on ``on_date``.
 
     If there is no exact match (weekends / holidays / gaps), return the
-    most-recent prior observation. Returns ``None`` when the table has
-    nothing <= ``on_date``.
+    most-recent prior observation so callers can record its actual date as
+    provenance. Returns ``None`` when the table has nothing <= ``on_date``.
     """
-    row = (
+    return (
         db.execute(
             select(FxRate)
             .where(FxRate.pair == pair, FxRate.as_of_date <= on_date)
@@ -100,6 +100,11 @@ def get_rate_on(db: Session, on_date: date, pair: str = DEFAULT_PAIR) -> Decimal
         .scalars()
         .first()
     )
+
+
+def get_rate_on(db: Session, on_date: date, pair: str = DEFAULT_PAIR) -> Decimal | None:
+    """Return just the rate in effect on ``on_date`` (see :func:`get_rate_row_on`)."""
+    row = get_rate_row_on(db, on_date, pair)
     return row.rate if row is not None else None
 
 

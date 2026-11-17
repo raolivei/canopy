@@ -9,6 +9,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 ## [Unreleased]
 
 ### Added
+- Shared calculation contract (`backend/services/calculation/`, `docs/CALCULATION_CONTRACT.md`): half-open calendar periods, flow classification by type, per-currency Decimal totals with explicit FX provenance and no fallback rate, SQL-side monthly aggregation; `Money` response type; assistant tools and query builder use calendar months instead of 30-day windows - #112
 - CI quality gate (`ci.yml`): ruff + pytest for the backend, ESLint (zero warnings) + tsc + Jest for the frontend on every PR and on main; `backend/requirements-dev.txt`; jest-dom/jest-axe matcher types for `tsc` - #111
 - Consolidated Wallet/Tax roadmap from Monarch account review; parity checks now report unavailable references instead of comparing Canopy against itself. Bank connectivity is out of scope; post-Monarch operation uses file imports and manual entry - #107, #76
 - 6 AI assistant tools (budget, cashflow, recurring, patterns, merchant, goals) - #75, #76

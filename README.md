@@ -73,7 +73,7 @@ canopy/
 └── README.md
 ```
 
-Deeper docs: [CHANGELOG.md](./CHANGELOG.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md).
+Deeper docs: [CHANGELOG.md](./CHANGELOG.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [CSV_IMPORT_GUIDE.md](./CSV_IMPORT_GUIDE.md), [docs/CALCULATION_CONTRACT.md](./docs/CALCULATION_CONTRACT.md) (how money, periods and FX are computed).
 
 ## GitHub issues — triage (manual)
 
