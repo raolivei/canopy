@@ -21,3 +21,6 @@ def _money_to_float(value: Decimal) -> float:
 
 Money = Annotated[Decimal, PlainSerializer(_money_to_float, return_type=float, when_used="json")]
 """A ``Decimal`` that serializes to a 2-decimal JSON number."""
+
+Rate = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
+"""An FX rate: full ``Decimal`` precision in Python, JSON number on the wire."""

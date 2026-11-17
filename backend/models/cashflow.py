@@ -1,102 +1,131 @@
-"""Pydantic models for Cashflow API.
+"""Pydantic schemas for the cash-flow API.
 
-Canopy - Personal Finance Platform
+Money fields are ``Decimal`` in Python and 2-decimal JSON numbers on the
+wire (see ``backend.models.money``). Every total carries its reporting
+currency, the per-currency breakdown it was built from, and FX provenance.
 """
+
+from __future__ import annotations
+
+from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from backend.models.money import Money, Rate
 
-class MonthlySummary(BaseModel):
-    """Monthly income, expenses, and net cashflow."""
-
-    month: str = Field(..., description="Month in YYYY-MM format")
-    income: float = Field(..., description="Total income for the month")
-    expenses: float = Field(..., description="Total expenses for the month")
-    net: float = Field(..., description="Net cashflow (income - expenses)")
-    currency: str = Field(default="CAD", description="Currency code")
+FlowKind = Literal["income", "expense"]
+PeriodKind = Literal["month", "quarter", "year"]
+ReportingCurrency = Literal["CAD", "USD"]
 
 
-class MonthlySummaryRequest(BaseModel):
-    """Request for monthly summary."""
+class CurrencyFlowOut(BaseModel):
+    """Totals in one original currency."""
 
-    start_date: str = Field(..., description="Start date in YYYY-MM-DD format")
-    end_date: str = Field(..., description="End date in YYYY-MM-DD format")
+    income: Money
+    expenses: Money
+    net: Money
+
+
+class FxProvenanceOut(BaseModel):
+    """Which rate converted which currency into the reporting currency."""
+
+    from_currency: str
+    to_currency: str
+    pair: str
+    rate: Rate
+    as_of: date = Field(description="Observation date of the rate actually used")
+    source: str | None = None
+
+
+class ReportingTotalsOut(BaseModel):
+    """Reporting-currency totals plus what they were built from."""
+
+    currency: str
+    income: Money
+    expenses: Money
+    net: Money
+    savings_rate: float | None = Field(None, description="net / income, or null without income")
+    by_currency: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
+    fx_complete: bool = Field(description="False when some currency could not be converted")
+    unconverted: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
+    fx: list[FxProvenanceOut] = Field(default_factory=list)
+
+
+class MonthlySummary(ReportingTotalsOut):
+    month: str = Field(description="YYYY-MM")
 
 
 class MonthlySummaryResponse(BaseModel):
-    """Response for monthly summary."""
-
     data: list[MonthlySummary]
-    total_months: int = Field(..., description="Number of months in the summary")
-
-
-class CashflowTrendRequest(BaseModel):
-    """Request for cashflow trend."""
-
-    months: int = Field(12, description="Number of months to analyze", ge=1, le=60)
+    total_months: int
+    currency: str
+    fx_complete: bool
 
 
 class CashflowTrendResponse(BaseModel):
-    """Response for cashflow trend."""
-
-    months: int = Field(..., description="Number of months analyzed")
+    months: int
     monthly_data: list[MonthlySummary]
-    average_income: float = Field(..., description="Average monthly income")
-    average_expenses: float = Field(..., description="Average monthly expenses")
-    average_net: float = Field(..., description="Average monthly net cashflow")
-    trend: str = Field(
-        ...,
-        description="Overall trend: 'improving', 'declining', 'stable', or 'no_data'",
-    )
-    currency: str = Field(default="CAD", description="Currency code")
+    average_income: Money
+    average_expenses: Money
+    average_net: Money
+    trend: Literal["improving", "declining", "stable", "no_data"]
+    currency: str
+    fx_complete: bool
 
 
 class CategoryBreakdownItem(BaseModel):
-    """Category expense breakdown item."""
-
-    category: str = Field(..., description="Expense category name")
-    amount: float = Field(..., description="Total amount spent in category")
-    percentage: float = Field(..., description="Percentage of total expenses", ge=0, le=100)
-
-
-class CategoryBreakdownRequest(BaseModel):
-    """Request for category breakdown."""
-
-    month: str | None = Field(None, description="Month in YYYY-MM format (defaults to current month)")
+    category: str
+    amount: Money
+    percentage: float = Field(ge=0, le=100)
+    by_currency: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
+    fx_complete: bool
+    unconverted: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
 
 
 class CategoryBreakdownResponse(BaseModel):
-    """Response for category breakdown."""
-
-    month: str = Field(..., description="Month in YYYY-MM format")
-    total_expenses: float = Field(..., description="Total expenses for the month")
+    month: str
+    kind: FlowKind
+    total: Money
     categories: list[CategoryBreakdownItem]
-    currency: str = Field(default="CAD", description="Currency code")
+    currency: str
+    fx_complete: bool
+    unconverted: dict[str, CurrencyFlowOut] = Field(default_factory=dict)
+    fx: list[FxProvenanceOut] = Field(default_factory=list)
 
 
 class MonthlyBurn(BaseModel):
-    """Monthly burn rate data point."""
-
-    month: str = Field(..., description="Month in YYYY-MM format")
-    amount: float = Field(..., description="Total expenses for the month")
-
-
-class BurnRateRequest(BaseModel):
-    """Request for burn rate calculation."""
-
-    months: int = Field(3, description="Number of months to analyze", ge=1, le=24)
+    month: str
+    amount: Money
 
 
 class BurnRateResponse(BaseModel):
-    """Response for burn rate calculation."""
-
-    months_analyzed: int = Field(..., description="Actual number of months with data")
-    average_monthly_burn: float = Field(..., description="Average monthly spending")
+    months_analyzed: int = Field(description="Months in the window that had expenses")
+    average_monthly_burn: Money
     monthly_breakdown: list[MonthlyBurn]
-    min_month: dict[str, float | str] | None = Field(None, description="Month with minimum spending")
-    max_month: dict[str, float | str] | None = Field(None, description="Month with maximum spending")
-    volatility: str = Field(
-        ...,
-        description="Spending volatility: 'low', 'moderate', 'high', or 'no_data'",
-    )
-    currency: str = Field(default="CAD", description="Currency code")
+    min_month: MonthlyBurn | None
+    max_month: MonthlyBurn | None
+    volatility: Literal["low", "moderate", "high", "no_data"]
+    currency: str
+    fx_complete: bool
+
+
+class PeriodTotals(ReportingTotalsOut):
+    start: date
+    end: date = Field(description="Last day of the period (inclusive)")
+
+
+class ComparisonDelta(BaseModel):
+    income: Money
+    expenses: Money
+    net: Money
+    savings_rate_points: float | None
+
+
+class ComparisonResponse(BaseModel):
+    kind: PeriodKind
+    current: PeriodTotals
+    prior: PeriodTotals
+    delta: ComparisonDelta
+    currency: str
+    fx_complete: bool
