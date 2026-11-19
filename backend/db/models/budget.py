@@ -47,7 +47,14 @@ class Budget(Base):
     name: Mapped[str] = mapped_column(String(200))
     amount: Mapped[Decimal] = mapped_column(Numeric(precision=18, scale=2))
     period: Mapped[BudgetPeriodType] = mapped_column(
-        Enum(BudgetPeriodType, values_callable=lambda x: [e.value for e in x]), default=BudgetPeriodType.MONTHLY
+        Enum(
+            BudgetPeriodType,
+            values_callable=lambda x: [e.value for e in x],
+            # Migration 0015 stores the value in VARCHAR(20); no PostgreSQL enum type.
+            native_enum=False,
+            length=20,
+        ),
+        default=BudgetPeriodType.MONTHLY,
     )
 
     # Optional user_id for future multi-user support (nullable for single-user)

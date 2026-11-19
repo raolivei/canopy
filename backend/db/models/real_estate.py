@@ -58,7 +58,7 @@ class RealEstateProperty(Base):
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     state: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    country: Mapped[str] = mapped_column(String(2), default="CA")  # ISO 3166-1 alpha-2
+    country: Mapped[str] = mapped_column(String(2), default="CA", index=True)  # ISO 3166-1 alpha-2
 
     # Financial details (CAD + USD only; see AccountBalanceHistory for multi-currency balances).
     currency: Mapped[str] = mapped_column(String(3), default="CAD")

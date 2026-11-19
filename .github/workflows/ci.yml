@@ -40,3 +40,34 @@ jobs:
       working-directory: frontend
       install-args: --legacy-peer-deps
       runs-on: ubuntu-latest
+
+  migrations:
+    name: Migrations / postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: canopy
+          POSTGRES_PASSWORD: canopy-ci
+          POSTGRES_DB: canopy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U canopy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://canopy:canopy-ci@localhost:5432/canopy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - name: Upgrade an empty database twice at once, then check the schema
+        run: backend/scripts/check_postgres_migrations.sh

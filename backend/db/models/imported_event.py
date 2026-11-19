@@ -15,7 +15,7 @@ Both are nullable to allow lazy backfill for pre-existing rows.
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base
@@ -25,9 +25,10 @@ class ImportedEvent(Base):
     """Ledger row recording a single ingested CSV event."""
 
     __tablename__ = "imported_events"
+    __table_args__ = (UniqueConstraint("hash", name="uq_imported_events_hash"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    hash: Mapped[str] = mapped_column(String(64), index=True)
     canonical_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     source: Mapped[str] = mapped_column(String(50))
     target_table: Mapped[str] = mapped_column(String(50))

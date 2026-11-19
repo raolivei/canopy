@@ -59,13 +59,13 @@ class Liability(Base):
 
     # Identification
     name: Mapped[str] = mapped_column(String(255))  # e.g., "RBC VISA 7192"
-    institution: Mapped[str] = mapped_column(String(100))  # e.g., "RBC", "Scotiabank"
+    institution: Mapped[str] = mapped_column(String(100), index=True)  # e.g., "RBC", "Scotiabank"
     account_number_last4: Mapped[str | None] = mapped_column(
         String(4), nullable=True
     )  # Last 4 digits for identification
 
     # Type and status (stored as string to match migration)
-    liability_type: Mapped[str] = mapped_column(String(50), default="credit_card")
+    liability_type: Mapped[str] = mapped_column(String(50), default="credit_card", index=True)
     status: Mapped[str] = mapped_column(String(50), default="active")
 
     # Currency and country

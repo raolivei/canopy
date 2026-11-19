@@ -31,11 +31,13 @@ class AssistantMessage(Base):
     __tablename__ = "assistant_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    conversation_id: Mapped[int] = mapped_column(Integer, ForeignKey("assistant_conversations.id", ondelete="CASCADE"))
+    conversation_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("assistant_conversations.id", ondelete="CASCADE"), index=True
+    )
     role: Mapped[str] = mapped_column(String(20))  # 'user' or 'assistant'
     content: Mapped[str] = mapped_column(Text)
     functions_called: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     execution_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     conversation: Mapped["AssistantConversation"] = relationship("AssistantConversation", back_populates="messages")
