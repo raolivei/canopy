@@ -75,21 +75,14 @@ class Transaction(Base):
         Index("ix_transactions_type", "type"),
         Index("ix_transactions_account", "account"),
         Index("ix_transactions_merchant", "merchant"),
-        # Composite indexes created by migration 20260615_0014
-        Index("idx_transactions_date_type", "date", "type", postgresql_ops={"date": "DESC"}),
-        Index("idx_transactions_category_date", "category", "date", postgresql_ops={"date": "DESC"}),
-        Index(
-            "idx_transactions_date_type_category",
-            "date",
-            "type",
-            "category",
-            postgresql_ops={"date": "DESC"},
-        ),
+        # Composite indexes created by migration 20260615_0014 (date descending)
+        Index("idx_transactions_date_type", text("date DESC"), "type"),
+        Index("idx_transactions_category_date", "category", text("date DESC")),
+        Index("idx_transactions_date_type_category", text("date DESC"), "type", "category"),
         Index(
             "idx_transactions_merchant_date",
             "merchant",
-            "date",
-            postgresql_ops={"date": "DESC"},
+            text("date DESC"),
             postgresql_where=text("merchant IS NOT NULL"),
         ),
     )
