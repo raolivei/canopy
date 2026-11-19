@@ -33,6 +33,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 - Ruff config inlined in backend/pyproject.toml (shared extend path did not exist); mechanical lint and format fixes across the backend - #108
 
 ### Fixed
+- Database migrations take a PostgreSQL advisory lock, so API pods that start together migrate one at a time; new CI job upgrades an empty PostgreSQL database twice at once and checks the schema against the models. Removed `k8s/secrets-template.yaml` (secrets come from Vault); DEPLOYMENT.md describes the GitOps path - #48, #49
 - Monarch import no longer drops accounts whose label has no account-type keyword (e.g. payment wallets): they import as cash accounts, and the preview names them, plus any skipped accounts, so they can be checked - #144
 - Transaction import keeps two different transactions that share account, date and amount; a statement event from another source now absorbs one matching row instead of all of them - #143
 - Budgets: `/v1/budgets` mounted; status route no longer declares one schema while the service returns another; spend computed through the calculation contract (calendar periods, transfers excluded, per-currency with explicit FX); categories loaded in one query instead of N+1; duplicate schema module removed - #114, #83, #84

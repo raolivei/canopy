@@ -7,7 +7,7 @@ from backend.app.config import get_settings
 
 # Import Base and all models so they're registered for autogenerate
 from backend.db.base import Base
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
 
@@ -24,6 +24,11 @@ config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Target metadata for autogenerate support
 target_metadata = Base.metadata
+
+# Session-level PostgreSQL advisory lock key ("canopy" as an int64). Every
+# migration run holds it, so API pods that start together migrate one at a
+# time; the later ones find the schema already at head and do nothing.
+MIGRATION_LOCK_KEY = 0x63616E6F7079
 
 
 def run_migrations_offline() -> None:
@@ -61,14 +66,28 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-        )
+        use_lock = connection.dialect.name == "postgresql"
+        if use_lock:
+            # Blocks until no other migration run holds the lock. The lock
+            # belongs to the session, so it outlives the commit below and is
+            # released on unlock or when the connection closes (pod crash).
+            connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": MIGRATION_LOCK_KEY})
+            connection.commit()
 
-        with context.begin_transaction():
-            context.run_migrations()
+        try:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                compare_type=True,
+            )
+
+            with context.begin_transaction():
+                context.run_migrations()
+        finally:
+            if use_lock:
+                connection.rollback()
+                connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": MIGRATION_LOCK_KEY})
+                connection.commit()
 
 
 if context.is_offline_mode():

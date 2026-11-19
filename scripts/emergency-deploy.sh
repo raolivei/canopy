@@ -49,7 +49,6 @@ echo ""
 
 MANIFESTS=(
     "k8s/namespace.yaml"
-    "k8s/secrets-template.yaml"
     "k8s/deploy.yaml"
     "k8s/service.yaml"
     "k8s/ingress.yaml"

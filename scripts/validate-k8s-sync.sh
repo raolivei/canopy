@@ -20,7 +20,6 @@ fi
 EXCLUDE_ARGS=(
     --exclude="kustomization.yaml"      # Only in pi-fleet
     --exclude="middleware.yaml"         # Only in pi-fleet (Traefik middleware)
-    --exclude="secrets-template.yaml"   # Template only
 )
 
 # Compare directories

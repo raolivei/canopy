@@ -1,6 +1,6 @@
 # Canopy Deployment Guide
 
-Quick reference for deploying Canopy to your Pi cluster [[memory:10892785]].
+Quick reference for deploying Canopy to your Pi cluster.
 
 ## Prerequisites
 
@@ -9,27 +9,50 @@ Quick reference for deploying Canopy to your Pi cluster [[memory:10892785]].
 - Self-hosted GitHub Actions runner (optional, for CI/CD)
 - Docker images built and pushed to GHCR
 
-## Quick Deploy
+## How production deploys (GitOps)
+
+Production runs on Eldertree from `pi-fleet/clusters/eldertree/canopy/`, applied
+by Flux. Do not `kubectl apply` the files in `k8s/`; they are a local reference.
+
+1. A merge to `main` builds `ghcr.io/raolivei/canopy-api` and `canopy-frontend`
+   (`latest` plus the `VERSION` tag).
+2. The `canopy` HelmRelease pulls `latest` (`pullPolicy: Always`) on rollout.
+   Drift detection is on, so a manual `kubectl scale` is reverted to Git.
+3. Each API pod runs a `migrate` init container (`alembic upgrade head`) before
+   it serves. Alembic takes a PostgreSQL advisory lock (`backend/alembic/env.py`),
+   so pods starting together migrate one at a time; later ones find the schema
+   at head. A failed migration keeps the pod in `Init` with the error in
+   `kubectl logs <pod> -c migrate -n canopy`; the old pods keep serving.
+4. CI proves migrations on a real PostgreSQL database
+   (`backend/scripts/check_postgres_migrations.sh`): two concurrent upgrades of
+   an empty database, single head, no-op repeat and `alembic check`.
+
+Backups before irreversible migrations and restore drills are tracked in #136;
+upgrade tests from older production schemas remain under #48.
+
+### Secrets (Vault + External Secrets)
+
+All secrets come from Vault through External Secrets; none live in Git.
+
+| Kubernetes secret | Keys | Vault path (KV v2 `secret/`) | Defined in |
+|---|---|---|---|
+| `canopy-secrets` | `postgres-password`, `database-url`, `secret-key`, optional `questrade-refresh-token`, `wise-api-token` | `canopy/postgres`, `canopy/database`, `canopy/app`, `canopy/questrade`, `canopy/wise` | `pi-fleet/clusters/eldertree/secrets-management/external-secrets/externalsecrets/canopy-secrets.yaml` |
+| `canopy-basic-auth` | `users` (htpasswd) | `canopy/basic-auth` | `pi-fleet/clusters/eldertree/canopy/basic-auth-external.yaml` |
+| `ghcr-secret` | registry token | `canopy/ghcr-token` | `pi-fleet/clusters/eldertree/canopy/ghcr-secret-external.yaml` |
+
+Rotate a secret by writing the new value to Vault. External Secrets refreshes
+every 24 hours; to apply sooner, annotate the ExternalSecret
+(`kubectl annotate externalsecret canopy-secrets -n canopy force-sync=$(date +%s) --overwrite`)
+and restart the pods that read it. Redis runs inside the namespace without a
+password. See `pi-fleet/docs/VAULT.md`.
+
+### Verify
 
 ```bash
-# Set kubeconfig
 export KUBECONFIG=~/.kube/config-eldertree
-
-# Create secrets (first time only)
-cp k8s/secrets-template.yaml k8s/secrets.yaml
-# Edit secrets.yaml with real values
-kubectl apply -f k8s/secrets.yaml
-rm k8s/secrets.yaml  # Don't commit!
-
-# Deploy all components
-kubectl apply -f k8s/deploy.yaml
-kubectl apply -f k8s/service.yaml
-kubectl apply -f k8s/ingress.yaml
-
-# Verify deployment
-kubectl get pods -n canopy
-kubectl get svc -n canopy
-kubectl logs -f deployment/canopy-api -n canopy
+kubectl get externalsecret,pods -n canopy
+kubectl logs deploy/canopy-api -c migrate -n canopy
+curl -fsS https://canopy.eldertree.local/v1/health
 ```
 
 ## Manual Build & Deploy
