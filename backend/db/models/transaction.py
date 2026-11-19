@@ -7,7 +7,7 @@ import enum
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, DateTime, Index, Numeric, String, Text, func
+from sqlalchemy import JSON, DateTime, Index, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -75,6 +75,23 @@ class Transaction(Base):
         Index("ix_transactions_type", "type"),
         Index("ix_transactions_account", "account"),
         Index("ix_transactions_merchant", "merchant"),
+        # Composite indexes created by migration 20260615_0014
+        Index("idx_transactions_date_type", "date", "type", postgresql_ops={"date": "DESC"}),
+        Index("idx_transactions_category_date", "category", "date", postgresql_ops={"date": "DESC"}),
+        Index(
+            "idx_transactions_date_type_category",
+            "date",
+            "type",
+            "category",
+            postgresql_ops={"date": "DESC"},
+        ),
+        Index(
+            "idx_transactions_merchant_date",
+            "merchant",
+            "date",
+            postgresql_ops={"date": "DESC"},
+            postgresql_where=text("merchant IS NOT NULL"),
+        ),
     )
 
     def __repr__(self) -> str:
