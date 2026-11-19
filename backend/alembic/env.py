@@ -2,10 +2,17 @@
 
 from logging.config import fileConfig
 
+# Register every table on Base.metadata. ``alembic check`` and autogenerate
+# compare against this metadata, so a model that is not imported here looks
+# like a table to drop.
+import backend.db.models  # noqa: F401
+import backend.db.models.assistant  # noqa: F401
+import backend.db.models.category  # noqa: F401
+
 # Import the app config to get the database URL
 from backend.app.config import get_settings
 
-# Import Base and all models so they're registered for autogenerate
+# Declarative base whose metadata autogenerate compares against
 from backend.db.base import Base
 from sqlalchemy import engine_from_config, pool, text
 
