@@ -7,6 +7,7 @@
 
 import {
   Activity,
+  ArrowLeftRight,
   BarChart2,
   DollarSign,
   FileText,
@@ -36,6 +37,7 @@ export const walletNavigation: NavItem[] = [
   { name: "Transactions", href: "/transactions", icon: DollarSign },
   { name: "Budgets", href: "/budgets", icon: PiggyBank },
   { name: "Cash Flow", href: "/cashflow", icon: Activity },
+  { name: "Exchange", href: "/exchange", icon: ArrowLeftRight },
   { name: "Import", href: "/import", icon: UploadCloud },
   { name: "Insights", href: "/insights", icon: Target },
   { name: "Annual Report", href: "/report", icon: BarChart2 },

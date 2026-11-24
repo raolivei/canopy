@@ -9,6 +9,7 @@ from backend.db.models.budget import (
     BudgetPeriodType,
 )
 from backend.db.models.dividend import Dividend, DividendType
+from backend.db.models.exchange import Exchange
 from backend.db.models.fx_rate import FxRate
 from backend.db.models.imported_event import ImportedEvent
 from backend.db.models.liability import (
@@ -77,4 +78,6 @@ __all__ = [
     "AccountBalanceHistory",
     # Foreign exchange (CAD <-> USD)
     "FxRate",
+    # Currency exchange ledger (any ISO currency)
+    "Exchange",
 ]

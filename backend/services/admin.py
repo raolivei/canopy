@@ -8,6 +8,7 @@ from backend.db.models import (
     AccountBalanceHistory,
     Asset,
     Dividend,
+    Exchange,
     ImportedEvent,
     Liability,
     LiabilityBalanceHistory,
@@ -41,6 +42,7 @@ _DELETE_ORDER = [
     ("dividends", Dividend),
     ("lots", Lot),
     ("transactions", Transaction),
+    ("exchanges", Exchange),
     ("price_history", PriceHistory),
     ("imported_events", ImportedEvent),
     # Top-level entities last

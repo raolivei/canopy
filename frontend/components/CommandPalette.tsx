@@ -16,6 +16,7 @@ import {
   Sun,
   ArrowRight,
   UploadCloud,
+  ArrowLeftRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils/cn";
@@ -137,6 +138,14 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         category: "Navigation",
         action: () => router.push("/accounts"),
         keywords: ["bank", "balance"],
+      },
+      {
+        id: "exchange",
+        title: "Go to Exchange",
+        icon: <ArrowLeftRight className="w-4 h-4" />,
+        category: "Navigation",
+        action: () => router.push("/exchange"),
+        keywords: ["cambio", "currency", "fx", "wise", "remitly", "instarem", "convert"],
       },
       {
         id: "insights",
