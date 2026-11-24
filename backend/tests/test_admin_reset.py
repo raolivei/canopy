@@ -6,7 +6,7 @@ service; the endpoint itself is a thin wrapper adding header validation.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import Base
 from backend.db.models.asset import Asset, AssetType
+from backend.db.models.exchange import Exchange
 from backend.db.models.liability import Liability, LiabilityType
 from backend.db.models.transaction import Transaction, TransactionType
 from backend.services.admin import reset_all_data
@@ -50,6 +51,18 @@ def _seed(db: Session) -> None:
         date=datetime(2026, 4, 1),
     )
     db.add_all([asset, liab, tx])
+    db.flush()
+    db.add(
+        Exchange(
+            date=date(2026, 4, 2),
+            provider="wise",
+            from_currency="CAD",
+            from_amount=Decimal("100"),
+            to_currency="BRL",
+            to_amount=Decimal("390"),
+            from_asset_id=asset.id,
+        )
+    )
     db.commit()
 
 
@@ -65,7 +78,9 @@ def test_reset_all_data_clears_every_table(db: Session) -> None:
     assert db.query(Asset).count() == 0
     assert db.query(Liability).count() == 0
     assert db.query(Transaction).count() == 0
-    assert report.total >= 3
+    assert db.query(Exchange).count() == 0
+    assert report.deleted["exchanges"] == 1
+    assert report.total >= 4
     # Every seeded table appears in the report (even as zero).
     assert "assets" in report.deleted
     assert "liabilities" in report.deleted

@@ -38,6 +38,7 @@ describe("Sidebar workspace switch", () => {
     expect(screen.getByRole("button", { name: "Wallet" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("link", { name: /Budgets/ })).toHaveAttribute("href", "/budgets");
     expect(screen.getByRole("link", { name: /Cash Flow/ })).toHaveAttribute("href", "/cashflow");
+    expect(screen.getByRole("link", { name: /Exchange/ })).toHaveAttribute("href", "/exchange");
     expect(screen.getByRole("link", { name: /Holdings/ })).toBeInTheDocument();
   });
 

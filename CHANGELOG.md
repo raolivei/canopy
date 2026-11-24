@@ -9,6 +9,7 @@ Pre-release **0.x**; **1.0.0** when feature-complete.
 ## [Unreleased]
 
 ### Added
+- Exchange page (`/exchange`, Wallet): log currency conversions between your own balances in any ISO currency (e.g. CAD→BRL, CAD→USD) with provider, fee, quoted rate and optional linked accounts; per-pair totals, weighted average rate, fees and spread vs the Bank of Canada rate for CAD↔USD. Standalone ledger: no transactions are written, so Cash Flow and Budgets are unchanged. `/v1/exchange` CRUD + `/summary`, migration `20261123_0017` - #150, #149
 - Budgets page (`/budgets`): create/edit/delete budgets with per-category limits, month picker, budget-vs-actual chart, category table with on-track/close/over badges and drill-down to transactions; unconverted spend is listed, not guessed; quarterly periods flagged as pending #116 - #64, #65
 - Cash Flow page (`/cashflow`): period totals and savings rate, stacked monthly chart with running net, month/quarter/year comparison, spending and income breakdowns per month, month-by-month table with FX completeness; unconverted amounts are listed, never guessed - #67
 - Wallet/Tax workspace switch in the sidebar and mobile bar (persisted, deep-link aware); Wallet navigation gains Budgets and Cash Flow; `/tax` landing page states the Tax workspace is not available yet; shared navigation module - #115

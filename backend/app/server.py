@@ -13,6 +13,7 @@ from backend.api import (
     cashflow,
     contextual_insights,
     csv_import,
+    exchange,
     fx,
     insights,
     integrations,
@@ -44,6 +45,7 @@ ROUTERS = [
     contextual_insights.router,
     cashflow.router,
     budgets.router,
+    exchange.router,
 ]
 
 

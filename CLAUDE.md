@@ -95,6 +95,7 @@ canopy/
 - **Self-hosted only**: No cloud dependencies
 - **Privacy-first**: All data stored locally
 - **CAD only**: Canadian investments focus — no multi-currency FX plumbing
+  - Exception: the Exchange ledger (`/exchange`) stores any ISO currency per record; reporting stays CAD/USD (see `docs/CALCULATION_CONTRACT.md`)
 - **Wealthsimple-first**: Importer auto-creates accounts (cash → Accounts page, investments → Holdings, debt → Accounts page)
 - **Raspberry Pi optimized**: Low-power hardware
 
